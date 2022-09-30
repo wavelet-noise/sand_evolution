@@ -7,7 +7,6 @@
   "files": [
     "sand_evolution_bg.wasm",
     "sand_evolution.js",
-    "sand_evolution_bg.js",
     "sand_evolution.d.ts"
   ],
   "module": "sand_evolution.js",
