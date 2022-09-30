@@ -9,15 +9,21 @@
 </head>
 
 <body>
-    <script type="module">import init from "./pkg/sand_evolution.js";
-      init().then(() => {
-          console.log("WASM Loaded");
-      });</script>
     <style>
         canvas {
             background-color: black;
         }
     </style>
+    <canvas id="wasm-example" width="200" height="100">
+        <div>sdfsdfsdf</div>
+    </canvas>
+    <p>My favorite color is <del>blue</del> red.</p>
+
+    <script type="module">import init from "./pkg/sand_evolution.js";
+        init().then(() => {
+            console.log("WASM Loaded");
+        });</script>
+        
 </body>
 
 </html>
