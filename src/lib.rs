@@ -6,7 +6,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 
 struct State {
@@ -15,6 +15,8 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
+    // NEW!
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl State {
@@ -47,8 +49,7 @@ impl State {
                         wgpu::Limits::default()
                     },
                 },
-                // Some(&std::path::Path::new("trace")), // Trace path
-                None,
+                None, // Trace path
             )
             .await
             .unwrap();
@@ -62,12 +63,69 @@ impl State {
         };
         surface.configure(&device, &config);
 
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::POLYGON_MODE_LINE
+                // or Features::POLYGON_MODE_POINT
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            // If the pipeline will be used with a multiview render pass, this
+            // indicates how many array layers the attachments will have.
+            multiview: None,
+        });
+
         Self {
             surface,
             device,
             queue,
-            config,
             size,
+            config,
+            render_pipeline,
         }
     }
 
@@ -100,7 +158,7 @@ impl State {
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -117,6 +175,9 @@ impl State {
                 })],
                 depth_stencil_attachment: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -126,7 +187,7 @@ impl State {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
 pub async fn run() {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
@@ -145,8 +206,8 @@ pub async fn run() {
         // Winit prevents sizing with CSS, so we have to set
         // the size manually when on web.
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(1000, 1000));
-
+        window.set_inner_size(PhysicalSize::new(450, 400));
+        
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
             .and_then(|win| win.document())
@@ -158,7 +219,7 @@ pub async fn run() {
             })
             .expect("Couldn't append canvas to document body.");
     }
-
+    
     // State::new uses async code, so we're going to wait for it to finish
     let mut state = State::new(&window).await;
 
@@ -169,7 +230,6 @@ pub async fn run() {
                 window_id,
             } if window_id == window.id() => {
                 if !state.input(event) {
-                    // UPDATED!
                     match event {
                         WindowEvent::CloseRequested
                         | WindowEvent::KeyboardInput {
@@ -185,7 +245,7 @@ pub async fn run() {
                             state.resize(*physical_size);
                         }
                         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            // new_inner_size is &&mut so w have to dereference it twice
+                            // new_inner_size is &mut so w have to dereference it twice
                             state.resize(**new_inner_size);
                         }
                         _ => {}
@@ -200,11 +260,11 @@ pub async fn run() {
                     Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => state.resize(state.size),
                     // The system is out of memory, we should probably quit
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    
+                    // We're ignoring timeouts
                     Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
                 }
             }
-            Event::RedrawEventsCleared => {
+            Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually
                 // request it.
                 window.request_redraw();
