@@ -1,30 +1,32 @@
 [package]
 name = "sand_evolution"
 version = "0.1.0"
+authors = ["wn"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "sand_evolution"
+path = "src/main.rs"
 
 [dependencies]
+cfg-if = "1"
 winit = "0.26"
 env_logger = "0.9"
 log = "0.4"
 wgpu = "0.13"
-cfg-if = "1"
-# the other regular dependencies...
+pollster = "0.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "0.2.0"
 wgpu = { version = "0.13", features = ["webgl"]}
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.76"
 wasm-bindgen-futures = "0.4.30"
-web-sys = { version = "0.3", features = [
+web-sys = { version = "0.3.53", features = [
     "Document",
     "Window",
     "Element",
 ]}
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-
