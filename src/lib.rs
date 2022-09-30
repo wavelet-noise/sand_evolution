@@ -1,11 +1,11 @@
-#[cfg(target_arch="wasm32")]
-use wasm_bindgen::prelude::*;
-
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
+
+#[cfg(target_arch="wasm32")]
+use wasm_bindgen::prelude::*;
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
 pub fn run() {
@@ -19,7 +19,9 @@ pub fn run() {
     }
 
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .build(&event_loop)
+        .unwrap();
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -38,7 +40,7 @@ pub fn run() {
                 Some(())
             })
             .expect("Couldn't append canvas to document body.");
-    }   
+    }
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
