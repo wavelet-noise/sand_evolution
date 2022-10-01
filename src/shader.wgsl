@@ -2,6 +2,9 @@
 
 struct WorldSettings {
     time: f32,
+    _wasm_padding0: f32,
+    _wasm_padding1: f32,
+    _wasm_padding2: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
