@@ -1,3 +1,4 @@
+
 use std::iter;
 
 use wgpu::util::DeviceExt;
@@ -7,6 +8,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 use instant::Duration;
+use image::{ImageBuffer, Rgba};
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -15,7 +17,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
-    color: [f32; 3],
+    uv: [f32; 2],
 }
 
 impl Vertex {
@@ -32,7 +34,7 @@ impl Vertex {
                 wgpu::VertexAttribute {
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
             ],
         }
@@ -41,16 +43,16 @@ impl Vertex {
 
 const VERTICES: &[Vertex] = &[
     Vertex {
-        position: [-1.0, -1.0, 0.0], color: [0.5, 0.0, 1.5],
+        position: [-1.0, -1.0, 0.0], uv: [0.0, 0.0],
     },
     Vertex {
-        position: [1.0, -1.0, 0.0], color: [0.5, 0.0, 0.5],
+        position: [1.0, -1.0, 0.0], uv: [1.0, 0.0],
     }, 
     Vertex {
-        position: [-1.0, 1.0, 0.0], color: [0.5, 1.0, 0.5],
+        position: [-1.0, 1.0, 0.0], uv: [0.0, 1.0],
     },
     Vertex {
-        position: [1.0, 1.0, 0.0], color: [1.5, 0.0, 0.5],
+        position: [1.0, 1.0, 0.0], uv: [1.0, 1.0],
     }
 ];
 
@@ -108,7 +110,10 @@ struct State {
     world_settings: WorldSettings,
     settings_buffer: wgpu::Buffer,
     settings_bind_group: wgpu::BindGroup,
-    start_time: f64
+    start_time: f64,
+    diffuse_bind_group: wgpu::BindGroup,
+    diffuse_rgba: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    diffuse_texture: wgpu::Texture,
 }
 
 impl State {
@@ -154,6 +159,73 @@ impl State {
             present_mode: wgpu::PresentMode::Fifo,
         };
         surface.configure(&device, &config);
+
+        let mut buf = [0u8; 3];
+        let mut diffuse_rgba = ImageBuffer::from_fn(512, 512, |x, y| {
+            if x > 1 && y > 1 && x < 512 - 2 && y < 512 - 2
+            {
+                _ = getrandom::getrandom(&mut buf);
+                return image::Rgba([buf[0]%2 * 128, 0, 0, 255]);
+            }
+            else
+            {
+                return image::Rgba([255,255,255,255]);
+            }
+        });
+
+        for _ in 0..20
+        {
+            _ = getrandom::getrandom(&mut buf);
+
+            for x in 0..50
+            {
+                diffuse_rgba.put_pixel(buf[0] as u32 + x, buf[1] as u32, image::Rgba([255,255,255,255]));
+            }
+        }
+
+
+        let dimensions = diffuse_rgba.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+        let diffuse_texture = device.create_texture(
+            &wgpu::TextureDescriptor {
+                // All textures are stored as 3D, we represent our 2D texture
+                // by setting depth to 1.
+                size: texture_size,
+                mip_level_count: 1, // We'll talk about this a little later
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                // Most images are stored using sRGB so we need to reflect that here.
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
+                // COPY_DST means that we want to copy data to this texture
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                label: Some("diffuse_texture"),
+            }
+        );
+
+        queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            &diffuse_rgba,
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
+        );
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -208,7 +280,58 @@ impl State {
             label: Some("settings_bind_group"),
         });
 
+        let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
 
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+
+        let diffuse_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &texture_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                    }
+                ],
+                label: Some("diffuse_bind_group"),
+            }
+        );
 
         //-------------------------------
 
@@ -216,7 +339,8 @@ impl State {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    &settings_bind_group_layout
+                    &settings_bind_group_layout,
+                    &texture_bind_group_layout
                 ],
                 push_constant_ranges: &[],
             });
@@ -290,7 +414,10 @@ impl State {
             world_settings,
             settings_buffer,
             settings_bind_group,
-            start_time
+            start_time,
+            diffuse_bind_group,
+            diffuse_rgba,
+            diffuse_texture,
         }
     }
 
@@ -315,6 +442,105 @@ impl State {
             &self.settings_buffer,
             0,
             bytemuck::cast_slice(&[self.world_settings.time]),
+        );
+
+        let dimensions = self.diffuse_rgba.dimensions();
+
+        let texture_size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+
+        let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
+
+
+        let mut buf = [0u8; 3];
+
+        for x in 1..texture_size.width-1
+        {
+            for y in 1..texture_size.height-1
+            {
+                let pix = self.diffuse_rgba.get_pixel(x, y);
+                let pixDown = self.diffuse_rgba.get_pixel(x, y - 1);
+                let pixDownRight = self.diffuse_rgba.get_pixel(x + 1, y - 1);
+                let pixDownLeft = self.diffuse_rgba.get_pixel(x - 1, y - 1);
+
+                if pix[0] > 0 && pix[1] == 0
+                {
+                    if pixDown[0] == 0 && pixDown[1] == 0
+                    {
+                        output.put_pixel(x, y - 1, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([pix[0], pix[1], pix[2], pix[3]])
+                        );
+
+                        output.put_pixel(x, y, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([0,0,0,0])
+                        );
+                    }
+                    else if pixDownRight[0] == 0 && pixDownRight[1] == 0
+                    {
+                        output.put_pixel(x + 1, y - 1, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([pix[0], pix[1], pix[2], pix[3]])
+                        );
+
+                        output.put_pixel(x, y, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([0,0,0,0])
+                        );
+                    }
+                    else if pixDownLeft[0] == 0 && pixDownLeft[1] == 0
+                    {
+                        output.put_pixel(x - 1, y - 1, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([pix[0], pix[1], pix[2], pix[3]])
+                        );
+
+                        output.put_pixel(x, y, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([0,0,0,0])
+                        );
+                    }
+                    else
+                    {
+                        output.put_pixel(x, y, 
+                            // pixel.map will iterate over the r, g, b, a values of the pixel
+                            Rgba([pix[0], pix[1], pix[2], pix[3]])
+                        );
+                    }
+                }
+                else
+                {
+                    output.put_pixel(x, y, 
+                        // pixel.map will iterate over the r, g, b, a values of the pixel
+                        Rgba([pix[0], pix[1], pix[2], pix[3]])
+                    );
+                }
+            }
+        }
+
+        self.diffuse_rgba = output;
+
+        self.queue.write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &self.diffuse_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            &self.diffuse_rgba,
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+            },
+            texture_size,
         );
     }
 
@@ -351,8 +577,11 @@ impl State {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
+
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
