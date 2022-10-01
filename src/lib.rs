@@ -6,7 +6,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use std::time::{Duration, SystemTime};
+use instant::Duration;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -56,8 +56,13 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0,1,3,0,3,2];
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct WorldSettings {
-    time: f32
+    time: f32,
+    _wasm_padding0: f32,
+    _wasm_padding1: f32,
+    _wasm_padding2: f32,
 }
 
 struct Camera {
@@ -103,7 +108,7 @@ struct State {
     world_settings: WorldSettings,
     settings_buffer: wgpu::Buffer,
     settings_bind_group: wgpu::BindGroup,
-    now: SystemTime
+    start_time: f64
 }
 
 impl State {
@@ -155,16 +160,23 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        let now = SystemTime::now();
+        let start_time = instant::now();
 
         let world_settings = WorldSettings {
-            time: 0.0
+            time: 0.0,
+            _wasm_padding0: 0.0,
+            _wasm_padding1: 1.0,
+            _wasm_padding2: 2.0,
         };
+
+        let raw_ptr = &world_settings as * const WorldSettings;
+        let raw_ptr_bytes = raw_ptr as * mut u8;
 
         let settings_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Camera Buffer"),
-                contents: bytemuck::cast_slice(&[world_settings.time]),
+                contents: unsafe { std::slice::from_raw_parts(raw_ptr_bytes, std::mem::size_of::<WorldSettings>()) },
+                
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }
         );
@@ -278,7 +290,7 @@ impl State {
             world_settings,
             settings_buffer,
             settings_bind_group,
-            now
+            start_time
         }
     }
 
@@ -297,14 +309,7 @@ impl State {
     }
 
     fn update(&mut self) {
-        match self.now.elapsed() {
-            Ok(elapsed) => {
-                self.world_settings.time = elapsed.as_secs_f32();
-            }
-            Err(_) => {
-                self.world_settings.time = 10.0;
-            }
-        }
+        self.world_settings.time = (instant::now() - self.start_time) as f32 / 1000.0;
 
         self.queue.write_buffer(
             &self.settings_buffer,
