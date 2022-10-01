@@ -1,5 +1,11 @@
 // Vertex shader
 
+struct WorldSettings {
+    time: f32,
+};
+@group(0) @binding(0)
+var<uniform> settings: WorldSettings;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) color: vec3<f32>,
@@ -53,6 +59,6 @@ fn voroNoise2(x: vec2<f32>, u: f32, v: f32) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let temp: f32 = voroNoise2(in.clip_position.xy / 100.0, 1.0, 0.0);
+    let temp: f32 = voroNoise2(in.clip_position.xy / 100.0 + vec2<f32>(settings.time, settings.time), 1.0, 0.0);
     return vec4<f32>(temp,temp,temp, 1.0);
 }

@@ -6,6 +6,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+use std::time::{Duration, SystemTime};
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -55,6 +56,40 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0,1,3,0,3,2];
 
+struct WorldSettings {
+    time: f32
+}
+
+struct Camera {
+    eye: cgmath::Point3<f32>,
+    target: cgmath::Point3<f32>,
+    up: cgmath::Vector3<f32>,
+    aspect: f32,
+    fovy: f32,
+    znear: f32,
+    zfar: f32,
+}
+
+#[rustfmt::skip]
+pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
+    1.0, 0.0, 0.0, 0.0,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 0.5, 0.0,
+    0.0, 0.0, 0.5, 1.0,
+);
+
+impl Camera {
+    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
+        // 1.
+        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
+        // 2.
+        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+
+        // 3.
+        return OPENGL_TO_WGPU_MATRIX * proj * view;
+    }
+}
+
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -62,10 +97,13 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    // NEW!
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
+    world_settings: WorldSettings,
+    settings_buffer: wgpu::Buffer,
+    settings_bind_group: wgpu::BindGroup,
+    now: SystemTime
 }
 
 impl State {
@@ -117,10 +155,57 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
+        let now = SystemTime::now();
+
+        let world_settings = WorldSettings {
+            time: 0.0
+        };
+
+        let settings_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Buffer"),
+                contents: bytemuck::cast_slice(&[world_settings.time]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let settings_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("settings_bind_group_layout"),
+        });
+
+        let settings_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &settings_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: settings_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("settings_bind_group"),
+        });
+
+
+
+        //-------------------------------
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[
+                    &settings_bind_group_layout
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -190,6 +275,10 @@ impl State {
             vertex_buffer,
             index_buffer,
             num_indices,
+            world_settings,
+            settings_buffer,
+            settings_bind_group,
+            now
         }
     }
 
@@ -207,7 +296,22 @@ impl State {
         false
     }
 
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        match self.now.elapsed() {
+            Ok(elapsed) => {
+                self.world_settings.time = elapsed.as_secs_f32();
+            }
+            Err(_) => {
+                self.world_settings.time = 10.0;
+            }
+        }
+
+        self.queue.write_buffer(
+            &self.settings_buffer,
+            0,
+            bytemuck::cast_slice(&[self.world_settings.time]),
+        );
+    }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
@@ -241,6 +345,7 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
