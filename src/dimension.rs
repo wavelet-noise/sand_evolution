@@ -1,14 +1,15 @@
+mod cs;
 
 use std::iter;
 
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, TextureFormat};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
 use instant::Duration;
-use image::{ImageBuffer, Rgba};
+use image::{ImageBuffer, Rgba, GrayImage};
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -112,8 +113,10 @@ struct State {
     settings_bind_group: wgpu::BindGroup,
     start_time: f64,
     diffuse_bind_group: wgpu::BindGroup,
-    diffuse_rgba: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    diffuse_rgba: ImageBuffer<image::Luma<u8>, Vec<u8>>,
     diffuse_texture: wgpu::Texture,
+    a: cs::PointType,
+    b: cs::PointType,
 }
 
 impl State {
@@ -161,15 +164,15 @@ impl State {
         surface.configure(&device, &config);
 
         let mut buf = [0u8; 3];
-        let mut diffuse_rgba = ImageBuffer::from_fn(512, 512, |x, y| {
+        let mut diffuse_rgba = GrayImage::from_fn(512, 512, |x, y| {
             if x > 1 && y > 1 && x < 512 - 2 && y < 512 - 2
             {
                 _ = getrandom::getrandom(&mut buf);
-                return image::Rgba([buf[0]%2 * 128, 0, 0, 255]);
+                return image::Luma([buf[0]%2 * 64]);
             }
             else
             {
-                return image::Rgba([255,255,255,255]);
+                return image::Luma([255]);
             }
         });
 
@@ -179,7 +182,7 @@ impl State {
 
             for x in 0..50
             {
-                diffuse_rgba.put_pixel(buf[0] as u32 + x, buf[1] as u32, image::Rgba([255,255,255,255]));
+                diffuse_rgba.put_pixel(buf[0] as u32 + x, buf[1] as u32, image::Luma([255]));
             }
         }
 
@@ -200,7 +203,7 @@ impl State {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 // Most images are stored using sRGB so we need to reflect that here.
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                format: wgpu::TextureFormat::R8Uint,
                 // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
                 // COPY_DST means that we want to copy data to this texture
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -221,7 +224,7 @@ impl State {
             // The layout of the texture
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                bytes_per_row: std::num::NonZeroU32::new(dimensions.0),
                 rows_per_image: std::num::NonZeroU32::new(dimensions.1),
             },
             texture_size,
@@ -280,12 +283,14 @@ impl State {
             label: Some("settings_bind_group"),
         });
 
-        let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut tv = wgpu::TextureViewDescriptor::default().clone();
+        tv.format = Some(TextureFormat::R8Uint);
+        let diffuse_texture_view = diffuse_texture.create_view(& tv);
         let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
+            mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
@@ -300,7 +305,7 @@ impl State {
                         ty: wgpu::BindingType::Texture {
                             multisampled: false,
                             view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            sample_type: wgpu::TextureSampleType::Uint,
                         },
                         count: None,
                     },
@@ -309,7 +314,7 @@ impl State {
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         // This should match the filterable field of the
                         // corresponding Texture entry above.
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                         count: None,
                     },
                 ],
@@ -401,6 +406,9 @@ impl State {
         });
         let num_indices = INDICES.len() as u32;
 
+        let a = 0;
+        let b = 0;
+
         Self {
             surface,
             device,
@@ -418,6 +426,8 @@ impl State {
             diffuse_bind_group,
             diffuse_rgba,
             diffuse_texture,
+            a,
+            b
         }
     }
 
@@ -452,77 +462,75 @@ impl State {
             depth_or_array_layers: 1,
         };
 
-        let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
-
+        //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
         let mut buf = [0u8; 3];
 
-        for x in 1..texture_size.width-1
-        {
-            for y in 1..texture_size.height-1
+        for k in 0..5
+		{
+
+			self.a += 1;
+			if self.a > 1
             {
-                let pix = self.diffuse_rgba.get_pixel(x, y);
-                let pixDown = self.diffuse_rgba.get_pixel(x, y - 1);
-                let pixDownRight = self.diffuse_rgba.get_pixel(x + 1, y - 1);
-                let pixDownLeft = self.diffuse_rgba.get_pixel(x - 1, y - 1);
-
-                if pix[0] > 0 && pix[1] == 0
+                self.a = 0;
+				self.b += 1;
+                if self.b > 1
                 {
-                    if pixDown[0] == 0 && pixDown[1] == 0
-                    {
-                        output.put_pixel(x, y - 1, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([pix[0], pix[1], pix[2], pix[3]])
-                        );
-
-                        output.put_pixel(x, y, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([0,0,0,0])
-                        );
-                    }
-                    else if pixDownRight[0] == 0 && pixDownRight[1] == 0
-                    {
-                        output.put_pixel(x + 1, y - 1, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([pix[0], pix[1], pix[2], pix[3]])
-                        );
-
-                        output.put_pixel(x, y, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([0,0,0,0])
-                        );
-                    }
-                    else if pixDownLeft[0] == 0 && pixDownLeft[1] == 0
-                    {
-                        output.put_pixel(x - 1, y - 1, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([pix[0], pix[1], pix[2], pix[3]])
-                        );
-
-                        output.put_pixel(x, y, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([0,0,0,0])
-                        );
-                    }
-                    else
-                    {
-                        output.put_pixel(x, y, 
-                            // pixel.map will iterate over the r, g, b, a values of the pixel
-                            Rgba([pix[0], pix[1], pix[2], pix[3]])
-                        );
-                    }
-                }
-                else
-                {
-                    output.put_pixel(x, y, 
-                        // pixel.map will iterate over the r, g, b, a values of the pixel
-                        Rgba([pix[0], pix[1], pix[2], pix[3]])
-                    );
+                    self.b = 0;
                 }
             }
-        }
+			//if prng->UintPrng() % 2 == 0
+			//	continue;
 
-        self.diffuse_rgba = output;
+			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
+			{
+		        for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2)
+				{
+					let cur = cs::xy_to_index(i, j);
+                    let cur_v = *self.diffuse_rgba.get(cur).unwrap();
+
+                    let down = cs::xy_to_index(i, j - 1);
+                    let down_v = *self.diffuse_rgba.get(down).unwrap();
+
+                    let dl = cs::xy_to_index(i - 1, j - 1);
+                    let dl_v = *self.diffuse_rgba.get(dl).unwrap();
+
+                    let dr = cs::xy_to_index(i + 1, j - 1);
+                    let dr_v = *self.diffuse_rgba.get(dr).unwrap();
+
+                    if cur_v > 0 && cur_v != 255
+                    {
+                        if down_v == 0
+                        {
+                            self.diffuse_rgba.swap(cur, down);
+                        }
+                        if dr_v == 0
+                        {
+                            self.diffuse_rgba.swap(cur, dr);
+                        }
+                        if dl_v == 0
+                        {
+                            self.diffuse_rgba.swap(cur, dl);
+                        }
+                    }
+
+					// if (TypeTex[cur] == nullptr || TypeTex[cur]->sleep || !mPalette[TypeTex[cur]->color]->GetIsUpdatable())
+					// 	continue;
+
+					// const auto cptr = mPalette[TypeTex[cur]->color];
+
+					// if (!cptr->Update(*this, TypeTex, i, j, cur, prng.get()))
+					// {
+					// 	TypeTex[cur]->sleep = true;
+					// }
+
+
+				}
+			}
+		}
+
+
+        //self.diffuse_rgba = output;
 
         self.queue.write_texture(
             // Tells wgpu where to copy the pixel data
@@ -608,8 +616,10 @@ pub async fn run() {
 
     #[cfg(target_arch = "wasm32")]
     {
-        // Winit prevents sizing with CSS, so we have to set
-        // the size manually when on web.
+        let url = web_sys::url();
+
+        print!(url);
+
         use winit::dpi::PhysicalSize;
         window.set_inner_size(PhysicalSize::new(1000, 1000));
         

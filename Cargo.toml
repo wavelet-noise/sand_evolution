@@ -4,9 +4,6 @@ version = "0.1.0"
 authors = ["wn"]
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [[bin]]
 name = "sand_evolution"
 path = "src/main.rs"
