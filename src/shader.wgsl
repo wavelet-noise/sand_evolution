@@ -61,14 +61,14 @@ fn voroNoise2(x: vec2<f32>, u: f32, v: f32) -> f32 {
 }
 
 @group(1) @binding(0)
-var t_diffuse: texture_2d<f32>;
+var t_diffuse: texture_2d<u32>;
 @group(1)@binding(1)
 var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
+    //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
     //return vec4<f32>(temp,temp,temp, 1.0);
-
-    return textureSample(t_diffuse, s_diffuse, in.uv);
+  //textureLoad(t_diffuse, s_diffuse, in.uv) / 255.0
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
 }

@@ -1,6 +1,5 @@
-mod lib;
-use lib::run;
+mod dimension;
 
 fn main() {
-    pollster::block_on(run());
+    pollster::block_on(dimension::run());
 }
