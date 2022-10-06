@@ -461,8 +461,21 @@ impl State {
 
         //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
-        let mut buf = [0u8; 5];
+        const buf_size : usize = 50;
+        let mut buf = [0u8; buf_size];
         _ = getrandom::getrandom(&mut buf);
+
+        let mut b_index = 0;
+
+        if (self.world_settings.time as u32) % 5 == 0
+        {
+            let mut buf = [0u8; 100];
+            _ = getrandom::getrandom(&mut buf);
+            for i in 0..100
+            {
+                self.diffuse_rgba.put_pixel(buf[i] as u32 * 2, 512 - i as u32 % 3 - 2, image::Luma([1]));
+            }
+        }
 
         for k in 0..5
 		{
@@ -476,16 +489,22 @@ impl State {
                     self.b = 0;
                 }
             }
-            
-            if buf[k] > 128
-            {
-                continue;
-            }
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
 		        for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2)
 				{
+                    b_index += 1;
+                    if b_index >= buf_size
+                    {
+                        b_index = 0;
+                    }
+
+                    if buf[b_index] > 200
+                    {
+                        continue;
+                    }
+
 					let cur = cs::xy_to_index(i, j);
                     let cur_v = *self.diffuse_rgba.get(cur).unwrap();
 
