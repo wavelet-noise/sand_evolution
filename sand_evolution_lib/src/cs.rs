@@ -3,7 +3,7 @@ pub type IndexType = usize;
 
 use cgmath::Point2;
 
-pub const SECTOR_SIZE: Point2<PointType> = Point2::new(512, 512);
+pub const SECTOR_SIZE: Point2<PointType> = Point2::new(1024, 512);
 
 pub fn point_to_index(pos : Point2<PointType>) -> IndexType
 {
