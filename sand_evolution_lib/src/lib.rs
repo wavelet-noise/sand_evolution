@@ -1,6 +1,8 @@
 mod cs;
+mod types;
 
 use cgmath::num_traits::clamp;
+use image::GenericImageView;
 use wgpu::{util::DeviceExt, TextureFormat};
 use winit::{
     event::*,
@@ -160,12 +162,12 @@ impl State {
         };
         surface.configure(&device, &config);
 
-        let mut buf = [0u8; 3];
-        let mut diffuse_rgba = image::GrayImage::from_fn(512, 512, |x, y| {
-            if x > 1 && y > 1 && x < 512 - 2 && y < 512 - 2
+        let mut buf = [0u8; 4];
+        let mut diffuse_rgba = image::GrayImage::from_fn(cs::SECTOR_SIZE.x as u32, cs::SECTOR_SIZE.y as u32, |x, y| {
+            if x > 1 && y > 1 && x < cs::SECTOR_SIZE.x as u32 - 2 && y < cs::SECTOR_SIZE.y as u32 - 2
             {
                 _ = getrandom::getrandom(&mut buf);
-                return image::Luma([if buf[0]%7 == 0 { 1 } else { 0 }]);
+                return image::Luma([if buf[0]%7 == 0 { buf[1]%4 } else { 0 }]);
             }
             else
             {
@@ -173,13 +175,20 @@ impl State {
             }
         });
 
-        for _ in 0..80
+        for _ in 0..150
         {
             _ = getrandom::getrandom(&mut buf);
 
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
             for x in 0..50
             {
-                diffuse_rgba.put_pixel(clamp(buf[0] as u32 * 2, 0, 450) + x, clamp(buf[1] as u32 * 2, 0, 450), image::Luma([255]));
+                diffuse_rgba.put_pixel(
+                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                    image::Luma([255])
+                );
             }
         }
 
@@ -461,21 +470,38 @@ impl State {
 
         //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
-        const buf_size : usize = 50;
-        let mut buf = [0u8; buf_size];
-        _ = getrandom::getrandom(&mut buf);
-
         let mut b_index = 0;
 
         if (self.world_settings.time as u32) % 5 == 0
         {
-            let mut buf = [0u8; 100];
+            let mut buf = [0u8; 101];
             _ = getrandom::getrandom(&mut buf);
+
             for i in 0..100
             {
-                self.diffuse_rgba.put_pixel(buf[i] as u32 * 2, 512 - i as u32 % 3 - 2, image::Luma([1]));
+                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
+                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
+                if *self.diffuse_rgba.get_pixel(px, py) == image::Luma([0])
+                {
+                    self.diffuse_rgba.put_pixel(px, py, image::Luma([1]));
+                }
             }
         }
+
+        let mut pal_container  = types::Palette::new();
+        for i in 0..=255
+        {
+            pal_container.pal.push(types::Void::boxed())
+        }
+
+        pal_container.pal[1] = types::Sand::boxed();
+        pal_container.pal[2] = types::Water::boxed();
+        pal_container.pal[3] = types::Steam::boxed();
+        pal_container.pal[255] = types::Stone::boxed();
+
+        const buf_size : usize = 50;
+        let mut buf = [0u8; buf_size];
+        _ = getrandom::getrandom(&mut buf);
 
         for k in 0..5
 		{
@@ -489,6 +515,8 @@ impl State {
                     self.b = 0;
                 }
             }
+
+            let mut prng = types::Prng::new();
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
@@ -508,42 +536,7 @@ impl State {
 					let cur = cs::xy_to_index(i, j);
                     let cur_v = *self.diffuse_rgba.get(cur).unwrap();
 
-                    let down = cs::xy_to_index(i, j - 1);
-                    let down_v = *self.diffuse_rgba.get(down).unwrap();
-
-                    let dl = cs::xy_to_index(i - 1, j - 1);
-                    let dl_v = *self.diffuse_rgba.get(dl).unwrap();
-
-                    let dr = cs::xy_to_index(i + 1, j - 1);
-                    let dr_v = *self.diffuse_rgba.get(dr).unwrap();
-
-                    if cur_v > 0 && cur_v != 255
-                    {
-                        if down_v == 0
-                        {
-                            self.diffuse_rgba.swap(cur, down);
-                        }
-                        if dr_v == 0
-                        {
-                            self.diffuse_rgba.swap(cur, dr);
-                        }
-                        if dl_v == 0
-                        {
-                            self.diffuse_rgba.swap(cur, dl);
-                        }
-                    }
-
-					// if (TypeTex[cur] == nullptr || TypeTex[cur]->sleep || !mPalette[TypeTex[cur]->color]->GetIsUpdatable())
-					// 	continue;
-
-					// const auto cptr = mPalette[TypeTex[cur]->color];
-
-					// if (!cptr->Update(*this, TypeTex, i, j, cur, prng.get()))
-					// {
-					// 	TypeTex[cur]->sleep = true;
-					// }
-
-
+                    pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &pal_container, &mut prng);
 				}
 			}
 		}
@@ -636,7 +629,7 @@ pub async fn run() {
     #[cfg(target_arch = "wasm32")]
     {
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(1000, 1000));
+        window.set_inner_size(PhysicalSize::new(2000, 1000));
         
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()

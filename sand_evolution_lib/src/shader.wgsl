@@ -82,7 +82,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
     //return vec4<f32>(temp,temp,temp, 1.0);
 
-    let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * 512.0), i32(in.uv.y * 512.0)), 0);
+    let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * 1024.0), i32(in.uv.y * 512.0)), 0);
     let t = texel.x;
 
     var col = vec4<f32>(0.0);
@@ -95,10 +95,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.0);
     }
-    else
+    else if t == 1u
     {
       let n = noise2(in.uv * 2000.0) * 0.8;
       col = vec4<f32>(n + 0.1, n + 0.1, 0.1, 1.0);
+    }
+    else if t == 2u
+    {
+      col = vec4<f32>(0.1, 0.15, 1.0, 1.0);
+    }
+    else if t == 3u
+    {
+      col = vec4<f32>(0.5);
+    }
+    else
+    {
+      col = vec4<f32>(1.0, 0.0, 0.0, 1.0);
     }
 
     return col;
