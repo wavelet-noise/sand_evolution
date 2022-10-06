@@ -1,0 +1,39 @@
+[package]
+name = "sand_evolution_lib"
+version = "0.1.0"
+authors = ["wn"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+
+[dependencies]
+cfg-if = "1"
+winit = "0.26"
+env_logger = "0.9"
+log = "0.4"
+wgpu = "0.13"
+pollster = "0.2"
+bytemuck = { version = "1.4", features = [ "derive" ] }
+cgmath = "0.18"
+instant = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dependencies.image]
+version = "0.24"
+default-features = false
+features = ["png", "jpeg"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.6"
+console_log = "0.2.0"
+wgpu = { version = "0.13", features = ["webgl"]}
+wasm-bindgen = "0.2.76"
+wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "0.3.53", features = [
+    "Document",
+    "Window",
+    "Element",
+]}

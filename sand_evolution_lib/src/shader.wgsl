@@ -60,6 +60,18 @@ fn voroNoise2(x: vec2<f32>, u: f32, v: f32) -> f32 {
   return va / wt;
 }
 
+fn rand2(n: vec2<f32>) -> f32 {
+  return fract(sin(dot(n, vec2<f32>(12.9898, 4.1414))) * 43758.5453);
+}
+
+fn noise2(n: vec2<f32>) -> f32 {
+  let d = vec2<f32>(0., 1.);
+  let b = floor(n);
+  let f = smoothstep(vec2<f32>(0.), vec2<f32>(1.), fract(n));
+  return mix(mix(rand2(b), rand2(b + d.yx), f.x), mix(rand2(b + d.xy), rand2(b + d.yy), f.x), f.y);
+}
+
+
 @group(1) @binding(0)
 var t_diffuse: texture_2d<u32>;
 @group(1)@binding(1)
@@ -69,6 +81,25 @@ var s_diffuse: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
     //return vec4<f32>(temp,temp,temp, 1.0);
-  //textureLoad(t_diffuse, s_diffuse, in.uv) / 255.0
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+    let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * 512.0), i32(in.uv.y * 512.0)), 0);
+    let t = texel.x;
+
+    var col = vec4<f32>(0.0);
+
+    if t == 255u
+    {
+      col = vec4<f32>(1.0);
+    }
+    else if t == 0u
+    {
+      col = vec4<f32>(0.0);
+    }
+    else
+    {
+      let n = noise2(in.uv * 2000.0) * 0.8;
+      col = vec4<f32>(n + 0.1, n + 0.1, 0.1, 1.0);
+    }
+
+    return col;
 }

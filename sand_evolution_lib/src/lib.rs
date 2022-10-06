@@ -1,15 +1,11 @@
 mod cs;
 
-use std::iter;
-
 use wgpu::{util::DeviceExt, TextureFormat};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use instant::Duration;
-use image::{ImageBuffer, Rgba, GrayImage};
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -113,7 +109,7 @@ struct State {
     settings_bind_group: wgpu::BindGroup,
     start_time: f64,
     diffuse_bind_group: wgpu::BindGroup,
-    diffuse_rgba: ImageBuffer<image::Luma<u8>, Vec<u8>>,
+    diffuse_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
     diffuse_texture: wgpu::Texture,
     a: cs::PointType,
     b: cs::PointType,
@@ -164,11 +160,11 @@ impl State {
         surface.configure(&device, &config);
 
         let mut buf = [0u8; 3];
-        let mut diffuse_rgba = GrayImage::from_fn(512, 512, |x, y| {
+        let mut diffuse_rgba = image::GrayImage::from_fn(512, 512, |x, y| {
             if x > 1 && y > 1 && x < 512 - 2 && y < 512 - 2
             {
                 _ = getrandom::getrandom(&mut buf);
-                return image::Luma([buf[0]%2 * 64]);
+                return image::Luma([if buf[0]%5 == 0 { 1 } else { 0 }]);
             }
             else
             {
@@ -545,7 +541,7 @@ impl State {
             // The layout of the texture
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
+                bytes_per_row: std::num::NonZeroU32::new(dimensions.0),
                 rows_per_image: std::num::NonZeroU32::new(dimensions.1),
             },
             texture_size,
@@ -593,7 +589,7 @@ impl State {
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
-        self.queue.submit(iter::once(encoder.finish()));
+        self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
         Ok(())
@@ -616,10 +612,6 @@ pub async fn run() {
 
     #[cfg(target_arch = "wasm32")]
     {
-        let url = web_sys::url();
-
-        print!(url);
-
         use winit::dpi::PhysicalSize;
         window.set_inner_size(PhysicalSize::new(1000, 1000));
         
