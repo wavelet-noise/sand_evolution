@@ -461,11 +461,11 @@ impl State {
 
         //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
-        let mut buf = [0u8; 3];
+        let mut buf = [0u8; 5];
+        _ = getrandom::getrandom(&mut buf);
 
         for k in 0..5
 		{
-
 			self.a += 1;
 			if self.a > 1
             {
@@ -476,8 +476,11 @@ impl State {
                     self.b = 0;
                 }
             }
-			//if prng->UintPrng() % 2 == 0
-			//	continue;
+            
+            if buf[k] > 128
+            {
+                continue;
+            }
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
