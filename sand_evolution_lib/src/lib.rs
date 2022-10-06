@@ -1,5 +1,6 @@
 mod cs;
 
+use cgmath::num_traits::clamp;
 use wgpu::{util::DeviceExt, TextureFormat};
 use winit::{
     event::*,
@@ -164,7 +165,7 @@ impl State {
             if x > 1 && y > 1 && x < 512 - 2 && y < 512 - 2
             {
                 _ = getrandom::getrandom(&mut buf);
-                return image::Luma([if buf[0]%5 == 0 { 1 } else { 0 }]);
+                return image::Luma([if buf[0]%7 == 0 { 1 } else { 0 }]);
             }
             else
             {
@@ -172,13 +173,13 @@ impl State {
             }
         });
 
-        for _ in 0..20
+        for _ in 0..80
         {
             _ = getrandom::getrandom(&mut buf);
 
             for x in 0..50
             {
-                diffuse_rgba.put_pixel(buf[0] as u32 + x, buf[1] as u32, image::Luma([255]));
+                diffuse_rgba.put_pixel(clamp(buf[0] as u32 * 2, 0, 450) + x, clamp(buf[1] as u32 * 2, 0, 450), image::Luma([255]));
             }
         }
 
