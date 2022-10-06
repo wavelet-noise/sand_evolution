@@ -477,7 +477,7 @@ impl State {
             let mut buf = [0u8; 101];
             _ = getrandom::getrandom(&mut buf);
 
-            for i in 0..100
+            for i in 0..400
             {
                 let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                 let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
