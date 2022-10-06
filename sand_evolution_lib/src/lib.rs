@@ -474,7 +474,7 @@ impl State {
 
         if (self.world_settings.time as u32) % 5 == 0
         {
-            let mut buf = [0u8; 101];
+            let mut buf = [0u8; 401];
             _ = getrandom::getrandom(&mut buf);
 
             for i in 0..400
