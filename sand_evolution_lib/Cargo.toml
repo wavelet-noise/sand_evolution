@@ -8,21 +8,30 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
-
 [dependencies]
+egui_wgpu_backend = "0.19"
+chrono = "0.4"
+pollster = "0.2"
+egui = "0.19"
+epi = "0.17"
+egui_winit_platform = "0.16"
+wgpu = "0.13"
+winit = { version="0.27.3", features = ["x11"]}
+egui_demo_lib = "0.19"
+
+
 cfg-if = "1"
-winit = "0.26"
 env_logger = "0.9"
 log = "0.4"
-wgpu = "0.13"
-pollster = "0.2"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
-egui = "0.19.0"
-egui_wgpu_backend = "0.19"
-egui_winit_platform = "0.16"
+
+#[patch.crates-io]
+# egui = { version = "0.5", git = "https://github.com/emilk/egui" }
+# egui_wgpu_backend = { path = "../egui_wgpu_backend" }
+# egui_winit_platform = { path = "../egui_winit_platform" }
 
 [dependencies.image]
 version = "0.24"
