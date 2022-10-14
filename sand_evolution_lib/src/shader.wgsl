@@ -108,6 +108,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.5);
     }
+    else if t == 4u
+    {
+      col = vec4<f32>(1.0, 0.2, 0.1, 1.0);
+    }
+    else if t == 5u
+    {
+      col = vec4<f32>(0.5, 0.2, 0.2, 1.0);
+    }
+    else if t == 6u
+    {
+      col = vec4<f32>(0.8, 1.0, 0.5, 1.0);
+    }
     else
     {
       col = vec4<f32>(1.0, 0.0, 0.0, 1.0);
