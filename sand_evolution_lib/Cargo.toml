@@ -20,6 +20,9 @@ bytemuck = { version = "1.4", features = [ "derive" ] }
 cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
+egui = "0.19.0"
+egui_wgpu_backend = "0.19"
+egui_winit_platform = "0.16"
 
 [dependencies.image]
 version = "0.24"

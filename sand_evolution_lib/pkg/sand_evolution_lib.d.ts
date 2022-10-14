@@ -1,15 +1,17 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
+* @param {number} w
+* @param {number} h
 * @returns {Promise<void>}
 */
-export function run(): Promise<void>;
+export function run(w: number, h: number): Promise<void>;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly run: () => void;
+  readonly run: (a: number, b: number) => number;
   readonly wgpu_render_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_render_pass_set_pipeline: (a: number, b: number) => void;
   readonly wgpu_render_pass_set_blend_constant: (a: number, b: number) => void;
@@ -60,12 +62,12 @@ export interface InitOutput {
   readonly __wbindgen_malloc: (a: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number) => number;
   readonly __wbindgen_export_2: WebAssembly.Table;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h03a4f6ad76f83921: (a: number, b: number, c: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h184bc13766cd2b44: (a: number, b: number) => void;
+  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h1116133cc7ecee1a: (a: number, b: number, c: number) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h4b40ddab3b3d7b05: (a: number, b: number) => void;
   readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h5718ed629bc0319e: (a: number, b: number, c: number) => void;
   readonly __wbindgen_free: (a: number, b: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
-  readonly __wbindgen_start: () => void;
+  readonly wasm_bindgen__convert__closures__invoke2_mut__h57eac7613e777d0f: (a: number, b: number, c: number, d: number) => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;

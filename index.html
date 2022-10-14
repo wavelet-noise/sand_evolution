@@ -9,10 +9,25 @@
 </head>
 
 <body id="wasm-example">
-    <script type="module">import init from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
-        init().then(() => {
-            console.log("WASM Loaded");
-        });
+    <script type="module"> 
+        import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
+        async function gameloop() {
+            console.log("initialization");
+            await init();
+            console.log("done");
+
+            var body = document.body,
+            html = document.documentElement;
+
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight) * 1.8;
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth) * 1.9;
+
+            console.log("x = " + vw + ", y = " + vh);
+
+            run(vw, vh);
+        }
+
+        gameloop();
     </script>
     <style>
         canvas {

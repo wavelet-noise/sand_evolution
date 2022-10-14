@@ -3,6 +3,7 @@ mod types;
 
 use cgmath::num_traits::clamp;
 use image::GenericImageView;
+use types::*;
 use wgpu::{util::DeviceExt, TextureFormat};
 use winit::{
     event::*,
@@ -167,11 +168,11 @@ impl State {
             if x > 1 && y > 1 && x < cs::SECTOR_SIZE.x as u32 - 2 && y < cs::SECTOR_SIZE.y as u32 - 2
             {
                 _ = getrandom::getrandom(&mut buf);
-                return image::Luma([if buf[0]%7 == 0 { buf[1]%4 } else { 0 }]);
+                return image::Luma([if (buf[0]%7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2) { buf[1]%4 } else { 0 }]);
             }
             else
             {
-                return image::Luma([255]);
+                return image::Luma([Stone::id()]);
             }
         });
 
@@ -187,7 +188,24 @@ impl State {
                 diffuse_rgba.put_pixel(
                     clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
                     clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                    image::Luma([255])
+                    image::Luma([Wood::id()])
+                );
+            }
+        }
+
+        for _ in 0..350
+        {
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+            for x in 0..10
+            {
+                diffuse_rgba.put_pixel(
+                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                    image::Luma([Wood::id()])
                 );
             }
         }
@@ -483,24 +501,28 @@ impl State {
                 let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
                 if *self.diffuse_rgba.get_pixel(px, py) == image::Luma([0])
                 {
-                    self.diffuse_rgba.put_pixel(px, py, image::Luma([1]));
+                    self.diffuse_rgba.put_pixel(px, py, image::Luma([4]));
                 }
             }
         }
 
-        let mut pal_container  = types::Palette::new();
+        let mut pal_container  = Palette::new();
         for i in 0..=255
         {
-            pal_container.pal.push(types::Void::boxed())
+            pal_container.pal.push(Void::boxed())
         }
 
-        pal_container.pal[1] = types::Sand::boxed();
-        pal_container.pal[2] = types::Water::boxed();
-        pal_container.pal[3] = types::Steam::boxed();
-        pal_container.pal[255] = types::Stone::boxed();
+        pal_container.pal[1] = Sand::boxed();
+        pal_container.pal[2] = Water::boxed();
+        pal_container.pal[3] = Steam::boxed();
+        pal_container.pal[4] = Fire::boxed();
+        pal_container.pal[5] = Wood::boxed();
+        pal_container.pal[6] = BurningWood::boxed();
+        pal_container.pal[7] = BurningCoal::boxed();
+        pal_container.pal[255] = Stone::boxed();
 
-        const buf_size : usize = 50;
-        let mut buf = [0u8; buf_size];
+        const BUF_SIZE : usize = 50;
+        let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
 
         for k in 0..5
@@ -516,14 +538,14 @@ impl State {
                 }
             }
 
-            let mut prng = types::Prng::new();
+            let mut prng = Prng::new();
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
 		        for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2)
 				{
                     b_index += 1;
-                    if b_index >= buf_size
+                    if b_index >= BUF_SIZE
                     {
                         b_index = 0;
                     }
@@ -612,8 +634,8 @@ impl State {
     }
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
-pub async fn run() {
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+pub async fn run(w: f32, h: f32) {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -629,7 +651,7 @@ pub async fn run() {
     #[cfg(target_arch = "wasm32")]
     {
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(2000, 1000));
+        window.set_inner_size(PhysicalSize::new(w, h));
         
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
