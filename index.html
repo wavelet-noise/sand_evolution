@@ -19,8 +19,8 @@
             var body = document.body,
             html = document.documentElement;
 
-            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight) - 20;
-            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth) - 10;
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
 
             console.log("x = " + vw + ", y = " + vh);
 
@@ -30,7 +30,9 @@
         gameloop();
     </script>
     <style>
-        canvas {
+        html, body {
+            margin: 0;
+            overflow: hidden;
             background-color: black;
         }
     </style>
