@@ -450,26 +450,6 @@ impl State {
 
         let mut b_index = 0;
 
-        if (self.world_settings.time - self.last_spawn) > 5.0
-        {
-            self.last_spawn = self.world_settings.time;
-
-            self.last_id = if self.last_id == BurningCoal::id() { Water::id() } else { BurningCoal::id() };
-
-            let mut buf = [0u8; 4001];
-            _ = getrandom::getrandom(&mut buf);
-
-            for i in 0..4000
-            {
-                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
-                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                if *self.diffuse_rgba.get_pixel(px, py) == image::Luma([0])
-                {
-                    self.diffuse_rgba.put_pixel(px, py, image::Luma([self.last_id]));
-                }
-            }
-        }
-
         let mut pal_container  = Palette::new();
         for i in 0..=255
         {
@@ -603,9 +583,9 @@ pub async fn run(w: f32, h: f32) {
         .with_resizable(true)
         .with_transparent(false)
         .with_title("sand evolution v0.1")
-        .with_inner_size(winit::dpi::PhysicalSize {
-            width: 1000,
-            height: 1000,
+        .with_inner_size(winit::dpi::LogicalSize {
+            width: w,
+            height: h,
         })
         .build(&event_loop)
         .unwrap();
@@ -613,7 +593,7 @@ pub async fn run(w: f32, h: f32) {
     #[cfg(target_arch = "wasm32")]
     {
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(w, h));
+        window.set_inner_size(winit::dpi::LogicalSize::new(w, h));
         
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
@@ -721,10 +701,75 @@ pub async fn run(w: f32, h: f32) {
                 // Draw the demo application.
                 //demo_app.ui(&platform.context());
 
-                egui::Window::new("my_area")
-                .fixed_pos(egui::pos2(32.0, 32.0))
+                egui::Window::new("Toolbox")
+                .fixed_pos(egui::pos2(5.0, 5.0))
                 .show(&platform.context(), |ui| {
-                    ui.label("Floating text!");
+                    if ui.button("Spawn Water").clicked() {
+                        let mut buf = [0u8; 501];
+                        _ = getrandom::getrandom(&mut buf);
+            
+                        for i in 0..500
+                        {
+                            let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
+                            let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
+                            state.diffuse_rgba.put_pixel(px, py, image::Luma([Water::id()]));
+                        }
+                    }
+
+                    if ui.button("Spawn Embers").clicked() {
+                        let mut buf = [0u8; 501];
+                        _ = getrandom::getrandom(&mut buf);
+            
+                        for i in 0..500
+                        {
+                            let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
+                            let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
+                            state.diffuse_rgba.put_pixel(px, py, image::Luma([BurningCoal::id()]));
+                        }
+                    }
+
+                    if ui.button("Platforms").clicked() {
+                        for _ in 0..150
+                        {
+                            let mut buf = [0u8; 4];
+                            _ = getrandom::getrandom(&mut buf);
+
+                            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                            for x in 0..50
+                            {
+                                state.diffuse_rgba.put_pixel(
+                                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                    image::Luma([Wood::id()])
+                                );
+                            }
+                        }
+                    }
+
+                    if ui.button("Cubes").clicked() {
+                        for _ in 0..100
+                        {
+                            let mut buf = [0u8; 4];
+                            _ = getrandom::getrandom(&mut buf);
+
+                            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                            for x in 0..20
+                            {
+                                for y in 0..20
+                                {
+                                    state.diffuse_rgba.put_pixel(
+                                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                        image::Luma([Wood::id()])
+                                    );
+                                }
+                            }
+                        }
+                    }
                 });
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.

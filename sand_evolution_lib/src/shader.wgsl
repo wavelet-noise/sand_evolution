@@ -136,7 +136,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     else if t == 8u
     {
-      col = vec4<f32>(0.2);
+      col = vec4<f32>(0.05);
     }
     else
     {
