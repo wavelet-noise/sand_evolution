@@ -8,7 +8,7 @@ pub fn id() -> CellType { 2 }
 pub struct Cell;
 impl CellTrait for Cell {
 
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
     {
         let down = cs::xy_to_index(i, j - 1);
         let down_v = container[down] as usize;

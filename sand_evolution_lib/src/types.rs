@@ -10,24 +10,43 @@ use crate::cs::{self, PointType};
 use self::helper::sand_faling_helper;
 pub type CellType = u8;
 
-pub struct Prng {
+pub struct Dim {
     rnd: [u8; 256],
-    rnd_next: usize
+    rnd_next: usize,
+
+    carb: i32
 }
 
-impl Prng {
+impl Dim {
     pub fn new() -> Self { 
         let mut buf = [0u8; 256];
         _ = getrandom::getrandom(&mut buf);
-
-         Self { rnd: buf, rnd_next: 0 }
+        Self { rnd: buf, rnd_next: 0, carb: 100 }
     }
+
+    pub fn gen(&mut self) {
+        let mut buf = [0u8; 256];
+        _ = getrandom::getrandom(&mut buf);
+        self.rnd = buf;
+        self.rnd_next = 0;
+    }
+
     pub fn next(&mut self) -> u8 { 
         self.rnd_next += 1; 
         self.rnd_next = if self.rnd_next >= 256 { 0 } else {  self.rnd_next };
 
         return self.rnd[self.rnd_next];
     }
+
+    pub fn add_carb(&mut self) {
+        self.carb += 1; 
+    }
+
+    pub fn rm_carb(&mut self) {
+        self.carb -= 1; 
+    }
+
+    pub fn carb(&self) -> i32 { self.carb }
 }
 
 pub struct Palette {
@@ -43,7 +62,7 @@ impl Palette {
 }
 
 pub trait CellTrait {
-    fn update(&self, i: PointType, j: PointType, cur : usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng);
+    fn update(&self, i: PointType, j: PointType, cur : usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim);
     fn den(&self) -> i8 { 0 }
     fn stat(&self) -> bool { false }
     fn burnable(&self) -> CellType { Void::id() }
@@ -75,7 +94,7 @@ impl Void {
     pub fn id() -> CellType { 0 }
 }
 impl CellTrait for Void {
-    fn update(&self, _: PointType, _: PointType, _: usize, _: & mut [u8], _: &Palette, _: &mut Prng)
+    fn update(&self, _: PointType, _: PointType, _: usize, _: & mut [u8], _: &Palette, _: &mut Dim)
     {
         
     }
@@ -88,7 +107,7 @@ impl Sand {
     pub fn id() -> CellType { 1 }
 }
 impl CellTrait for Sand {
-     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, _: &mut Prng)
+     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, _: &mut Dim)
      {
         sand_faling_helper(self.den(), i, j, container, pal_container, cur);
      }
@@ -103,7 +122,7 @@ impl Stone {
     pub fn id() -> CellType { 255 }
 }
 impl CellTrait for Stone {
-    fn update(&self, _: PointType, _: PointType, _ : usize, _: & mut [CellType], _: &Palette, _: &mut Prng)
+    fn update(&self, _: PointType, _: PointType, _ : usize, _: & mut [CellType], _: &Palette, _: &mut Dim)
     {
     
     }
@@ -119,7 +138,7 @@ impl Wood {
 }
 impl CellTrait for Wood {
 
-    fn update(&self, _: PointType, _: PointType, _: usize, _: & mut [CellType], _: &Palette, _: &mut Prng)
+    fn update(&self, _: PointType, _: PointType, _: usize, _: & mut [CellType], _: &Palette, _: &mut Dim)
     {
         
     }
@@ -136,7 +155,7 @@ impl Coal {
 }
 impl CellTrait for Coal {
 
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
     {
         sand_faling_helper(self.den(), i, j, container, pal_container, cur);
     }

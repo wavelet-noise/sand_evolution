@@ -8,7 +8,7 @@ pub fn id() -> CellType { 6 }
 pub struct Cell;
 impl CellTrait for Cell {
 
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
     {
         if prng.next() > 200
         {
@@ -18,6 +18,7 @@ impl CellTrait for Cell {
         if prng.next() > 250
         {
             container[cur] = burning_coal::id();
+            prng.add_carb();
 		    return;
         }
 
