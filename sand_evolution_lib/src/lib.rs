@@ -113,8 +113,7 @@ struct State {
     diffuse_texture: wgpu::Texture,
     a: cs::PointType,
     b: cs::PointType,
-    last_spawn: f32,
-    last_id: u8
+    last_spawn: f32
 }
 
 impl State {
@@ -394,8 +393,6 @@ impl State {
 
         let last_spawn = -5.0;
 
-        let last_id = Water::id();
-
         Self {
             render_pipeline,
             vertex_buffer,
@@ -410,8 +407,7 @@ impl State {
             diffuse_texture,
             a,
             b,
-            last_spawn,
-            last_id
+            last_spawn
         }
     }
 
@@ -450,21 +446,7 @@ impl State {
 
         let mut b_index = 0;
 
-        let mut pal_container  = Palette::new();
-        for i in 0..=255
-        {
-            pal_container.pal.push(Void::boxed())
-        }
-
-        pal_container.pal[1] = Sand::boxed();
-        pal_container.pal[2] = Water::boxed();
-        pal_container.pal[3] = Steam::boxed();
-        pal_container.pal[4] = Fire::boxed();
-        pal_container.pal[5] = Wood::boxed();
-        pal_container.pal[6] = BurningWood::boxed();
-        pal_container.pal[7] = BurningCoal::boxed();
-        pal_container.pal[8] = Coal::boxed();
-        pal_container.pal[255] = Stone::boxed();
+        let pal_container = Palette::new();
 
         const BUF_SIZE : usize = 50;
         let mut buf = [0u8; BUF_SIZE];
@@ -531,7 +513,7 @@ impl State {
         );
     }
 
-    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Surface, view: &wgpu::TextureView) {        
+    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
         let mut encoder = device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
@@ -693,7 +675,7 @@ pub async fn run(w: f32, h: f32) {
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
                 state.update(&queue);
-                _ = state.render(&device, &queue, &surface, &output_view);
+                _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
                 platform.begin_frame();
@@ -712,7 +694,7 @@ pub async fn run(w: f32, h: f32) {
                         {
                             let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                             let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                            state.diffuse_rgba.put_pixel(px, py, image::Luma([Water::id()]));
+                            state.diffuse_rgba.put_pixel(px, py, image::Luma([water::id()]));
                         }
                     }
 
@@ -724,7 +706,7 @@ pub async fn run(w: f32, h: f32) {
                         {
                             let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                             let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                            state.diffuse_rgba.put_pixel(px, py, image::Luma([BurningCoal::id()]));
+                            state.diffuse_rgba.put_pixel(px, py, image::Luma([burning_coal::id()]));
                         }
                     }
 
