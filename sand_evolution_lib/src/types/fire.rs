@@ -8,7 +8,7 @@ pub fn id() -> CellType { 4 }
 pub struct Cell;
 impl CellTrait for Cell {
 
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
     {
         if prng.next() > 128
         {

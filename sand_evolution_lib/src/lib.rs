@@ -113,7 +113,9 @@ struct State {
     diffuse_texture: wgpu::Texture,
     a: cs::PointType,
     b: cs::PointType,
-    last_spawn: f32
+    last_spawn: f32,
+    pal_container: types::Palette,
+    prng: types::Dim,
 }
 
 impl State {
@@ -393,6 +395,9 @@ impl State {
 
         let last_spawn = -5.0;
 
+        let pal_container = Palette::new();
+        let prng = Dim::new();
+
         Self {
             render_pipeline,
             vertex_buffer,
@@ -407,7 +412,9 @@ impl State {
             diffuse_texture,
             a,
             b,
-            last_spawn
+            last_spawn,
+            pal_container,
+            prng
         }
     }
 
@@ -446,8 +453,6 @@ impl State {
 
         let mut b_index = 0;
 
-        let pal_container = Palette::new();
-
         const BUF_SIZE : usize = 50;
         let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
@@ -465,7 +470,7 @@ impl State {
                 }
             }
 
-            let mut prng = Prng::new();
+            self.prng.gen();
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
@@ -485,7 +490,7 @@ impl State {
 					let cur = cs::xy_to_index(i, j);
                     let cur_v = *self.diffuse_rgba.get(cur).unwrap();
 
-                    pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &pal_container, &mut prng);
+                    self.pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &self.pal_container, &mut self.prng);
 				}
 			}
 		}
@@ -545,6 +550,18 @@ impl State {
 
         queue.submit(std::iter::once(encoder.finish()));
     }
+}
+
+pub fn compact_number_string(n: i32) -> String
+{
+    let abs = cgmath::num_traits::abs(n);
+
+    if abs < 999
+    {
+        return abs.to_string();
+    }
+
+    return "???".to_string();
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
@@ -690,9 +707,12 @@ pub async fn run(w: f32, h: f32) {
                 .default_pos(egui::pos2(5.0, 5.0))
                 .fixed_size(egui::vec2(200., 100.))
                 .show(&platform.context(), |ui| {
+                    ui.label(["CO2 level:", state.prng.carb().to_string().as_str()].join(" "));
                     ui.heading("Spawn particles");
                     ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
                     ui.label("Click to add");
+
+
                     if ui.button("Water").clicked() {
                         let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
                         _ = getrandom::getrandom(&mut buf);
