@@ -18,17 +18,8 @@ jobs:
       uses: jetli/wasm-pack-action@v0.3.0
     - name: Build 🛠
       run: wasm-pack build --release --target web sand_evolution_lib
-    - name: Archive 💼
-      uses: actions/upload-artifact@v3
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
       with:
-        name: dist
-        path: |
-          sand_evolution_lib/pkg
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/master'
-      uses: qoomon/deploy-to-github-pages-action@v1
-      with:
-        GITHUB_PAGES_SOURCE_DIR: sand_evolution_lib/pkg # default value:  dist
-        GITHUB_PAGES_BRANCH: gh-pages # default value:  gh-pages
-        GITHUB_PAGES_REPLACE: true   # default value:  false
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./sand_evolution_lib/pkg
