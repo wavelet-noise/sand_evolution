@@ -1,4 +1,10 @@
 mod helper;
+pub mod burning_wood;
+pub mod water;
+pub mod steam;
+pub mod fire;
+pub mod burning_coal;
+
 use crate::cs::{self, PointType};
 
 use self::helper::sand_faling_helper;
@@ -29,7 +35,11 @@ pub struct Palette {
 }
 
 impl Palette {
-    pub const fn new() -> Self { Self { pal: Vec::new() } }
+    pub fn new() -> Self { 
+        let mut me = Self { pal: Vec::new() }; 
+        setup_palette(&mut me); 
+        return me; 
+    }
 }
 
 pub trait CellTrait {
@@ -38,6 +48,24 @@ pub trait CellTrait {
     fn stat(&self) -> bool { false }
     fn burnable(&self) -> CellType { Void::id() }
     fn heatable(&self) -> CellType { Void::id() }
+}
+
+pub fn setup_palette(pal_container: &mut Palette)
+{
+    for i in 0..=255
+    {
+        pal_container.pal.push(Void::boxed())
+    }
+
+    pal_container.pal[1] = Sand::boxed();
+    pal_container.pal[2] = water::boxed();
+    pal_container.pal[3] = steam::boxed();
+    pal_container.pal[4] = fire::boxed();
+    pal_container.pal[5] = Wood::boxed();
+    pal_container.pal[6] = burning_wood::boxed();
+    pal_container.pal[7] = burning_coal::boxed();
+    pal_container.pal[8] = Coal::boxed();
+    pal_container.pal[255] = Stone::boxed();
 }
 
 pub struct Void;
@@ -68,124 +96,6 @@ impl CellTrait for Sand {
      fn den(&self) -> i8 { 2 }
 }
 
-pub struct Water;
-impl Water {
-    pub const fn new() -> Self { Self }
-    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
-    pub fn id() -> CellType { 2 }
-}
-
-impl CellTrait for Water {
-
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
-    {
-        let down = cs::xy_to_index(i, j - 1);
-        let down_v = container[down] as usize;
-        let down_c = &pal_container.pal[down_v];
-
-        let dl = cs::xy_to_index(i - 1, j - 1);
-        let dl_v = container[dl] as usize;
-        let dl_c = &pal_container.pal[dl_v];
-
-        let dr = cs::xy_to_index(i + 1, j - 1);
-        let dr_v = container[dr] as usize;
-        let dr_c = &pal_container.pal[dr_v];
-
-        let r = cs::xy_to_index(i + 1, j);
-        let r_v = container[r] as usize;
-        let r_c = &pal_container.pal[r_v];
-
-        let l = cs::xy_to_index(i - 1, j);
-        let l_v = container[l] as usize;
-        let l_c = &pal_container.pal[l_v];
-
-        if down_c.den() < self.den() && !down_c.stat()
-        {
-            container.swap(cur, down);
-        }
-        else if dr_c.den() < self.den() && !dr_c.stat()
-        {
-            container.swap(cur, dr);
-        }
-        else if dl_c.den() < self.den() && !dl_c.stat()
-        {
-            container.swap(cur, dl);
-        }
-        else if r_c.den() < self.den() && !r_c.stat()
-        {
-            container.swap(cur, r);
-        }
-        else if l_c.den() < self.den() && !l_c.stat()
-        {
-            container.swap(cur, l);
-        }
-        else if prng.next() == 0 && prng.next() == 0
-        {
-            container[cur] = 3;
-        }
-    }
-
-    fn den(&self) -> i8 { 1 }
-}
-
-pub struct Steam;
-impl Steam {
-    pub const fn new() -> Self { Self }
-    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
-    pub fn id() -> CellType { 3 }
-}
-impl CellTrait for Steam {
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
-    {
-        let down = cs::xy_to_index(i, j + 1);
-        let down_v = container[down] as usize;
-        let down_c = &pal_container.pal[down_v];
-
-        let dl = cs::xy_to_index(i - 1, j + 1);
-        let dl_v = container[dl] as usize;
-        let dl_c = &pal_container.pal[dl_v];
-
-        let dr = cs::xy_to_index(i + 1, j + 1);
-        let dr_v = container[dr] as usize;
-        let dr_c = &pal_container.pal[dr_v];
-
-        let r = cs::xy_to_index(i + 1, j);
-        let r_v = container[r] as usize;
-        let r_c = &pal_container.pal[r_v];
-
-        let l = cs::xy_to_index(i - 1, j);
-        let l_v = container[l] as usize;
-        let l_c = &pal_container.pal[l_v];
-
-        if down_c.den() > self.den() && !down_c.stat()
-        {
-            container.swap(cur, down);
-        }
-        else if dr_c.den() > self.den() && !dr_c.stat()
-        {
-            container.swap(cur, dr);
-        }
-        else if dl_c.den() > self.den() && !dl_c.stat()
-        {
-            container.swap(cur, dl);
-        }
-        else if r_c.den() > self.den() && !r_c.stat()
-        {
-            container.swap(cur, r);
-        }
-        else if l_c.den() > self.den() && !l_c.stat()
-        {
-            container.swap(cur, l);
-        }
-        else if prng.next() == 0 && prng.next() == 0
-        {
-            container[cur] = 2;
-        }
-    }
-
-    fn den(&self) -> i8 { -1 }
-}
-
 pub struct Stone;
 impl Stone {
     pub const fn new() -> Self { Self }
@@ -199,88 +109,6 @@ impl CellTrait for Stone {
     }
 
     fn stat(&self) -> bool { true }
-}
-
-pub struct Fire;
-impl Fire {
-    pub const fn new() -> Self { Self }
-    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
-    pub fn id() -> CellType { 4 }
-}
-impl CellTrait for Fire {
-
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
-    {
-        if prng.next() > 128
-        {
-		    return;
-        }
-
-        if prng.next() > 200
-        {
-            container[cur] = 0;
-		    return;
-        }
-
-        let top = cs::xy_to_index(i, j + 1);
-        let down = cs::xy_to_index(i, j - 1);
-        let r = cs::xy_to_index(i + 1, j);
-        let l = cs::xy_to_index(i - 1, j);
-
-	    let arr = [top, down, l, r];
-	    let cc = arr[(prng.next() % 4) as usize];
-
-        if prng.next() > 50
-        {
-            let cc_v = container[cc] as usize;
-            let cc_c = &pal_container.pal[cc_v];
-            let cc_b = cc_c.burnable();
-
-            if cc_b != Void::id()
-            {
-                container[cc] = cc_b;
-                return;
-            }
-
-            let cc_h = cc_c.heatable();
-
-            if cc_h != Void::id()
-            {
-                container[cc] = cc_h;
-                return;
-            }
-        }
-
-        let top_v = container[top];
-
-        if top_v == Void::id()
-        {
-            container.swap(cur, top);
-            return;
-        }
-
-        let topl = cs::xy_to_index(i - 1, j + 1);
-        let topl_v = container[topl];
-
-        if topl_v == Void::id()
-        {
-            container.swap(cur, topl);
-            return;
-        }
-
-        let topr = cs::xy_to_index(i + 1, j + 1);
-        let topr_v = container[topr];
-
-        if topr_v == Void::id()
-        {
-            container.swap(cur, topr);
-            return;
-        }
-
-        container[cur] = 0;
-    }
-
-    fn den(&self) -> i8 { -1 }
 }
 
 pub struct Wood;
@@ -297,110 +125,7 @@ impl CellTrait for Wood {
     }
 
     fn stat(&self) -> bool { true }
-    fn burnable(&self) -> u8 { BurningWood::id() }
-}
-
-pub struct BurningWood;
-impl BurningWood {
-    pub const fn new() -> Self { Self }
-    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
-    pub fn id() -> CellType { 6 }
-}
-impl CellTrait for BurningWood {
-
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
-    {
-        if prng.next() > 200
-        {
-		    return;
-        }
-
-        if prng.next() > 250
-        {
-            container[cur] = BurningCoal::id();
-		    return;
-        }
-
-        let top = cs::xy_to_index(i, j + 1);
-        let topl = cs::xy_to_index(i - 1, j + 1);
-        let topr = cs::xy_to_index(i + 1, j + 1);
-        
-	    let arr = [top, topl, topr];
-	    let cc = arr[(prng.next() % 3) as usize];
-        let top_v = container[cc];
-
-        if top_v == Void::id() {
-            container[cc] = Fire::id();
-        }
-    }
-
-    fn stat(&self) -> bool { true }
-}
-
-pub struct BurningCoal;
-impl BurningCoal {
-    pub const fn new() -> Self { Self }
-    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
-    pub fn id() -> CellType { 7 }
-}
-impl CellTrait for BurningCoal {
-
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
-    {
-        if !sand_faling_helper(self.den(), i, j, container, pal_container, cur) {
-
-            let bot = cs::xy_to_index(i, j - 1);
-            let bot_v = container[bot] as usize;
-
-            let top = cs::xy_to_index(i, j + 1);
-
-            if container[top] == Water::id()
-            {
-                container[top] = Steam::id();
-                container[cur] = Coal::id();
-                return;
-            }
-
-            if prng.next() > 200
-            {
-                return;
-            }
-
-            if prng.next() > 250
-            {
-                container[cur] = Void::id();
-                return;
-            }
-
-            
-            let topl = cs::xy_to_index(i - 1, j + 1);
-            let topr = cs::xy_to_index(i + 1, j + 1);
-            
-            let arr = [top, topl, topr];
-            let cc = arr[(prng.next() % 3) as usize];
-            let top_v = container[cc];
-
-            if top_v == Void::id() {
-                container[cc] = Fire::id();
-            }
-
-            if prng.next() > 50
-            {
-                return;
-            }
-
-            let bot_c = &pal_container.pal[bot_v];
-            let bot_b = bot_c.burnable();
-
-            if bot_b != Void::id()
-            {
-                container[bot] = bot_b;
-                return;
-            }
-        }
-    }
-
-    fn den(&self) -> i8 { 2 }
+    fn burnable(&self) -> u8 { burning_wood::id() }
 }
 
 pub struct Coal;
@@ -417,5 +142,5 @@ impl CellTrait for Coal {
     }
 
     fn den(&self) -> i8 { 2 }
-    fn burnable(&self) -> u8 { BurningCoal::id() }
+    fn burnable(&self) -> u8 { burning_coal::id() }
 }
