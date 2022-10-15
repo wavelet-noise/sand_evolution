@@ -230,22 +230,25 @@ impl CellTrait for Fire {
 	    let arr = [top, down, l, r];
 	    let cc = arr[(prng.next() % 4) as usize];
 
-        let cc_v = container[cc] as usize;
-        let cc_c = &pal_container.pal[cc_v];
-        let cc_b = cc_c.burnable();
-
-        if cc_b != Void::id()
+        if prng.next() > 50
         {
-            container[cc] = cc_b;
-            return;
-        }
+            let cc_v = container[cc] as usize;
+            let cc_c = &pal_container.pal[cc_v];
+            let cc_b = cc_c.burnable();
 
-        let cc_h = cc_c.heatable();
+            if cc_b != Void::id()
+            {
+                container[cc] = cc_b;
+                return;
+            }
 
-        if cc_h != Void::id()
-        {
-            container[cc] = cc_h;
-            return;
+            let cc_h = cc_c.heatable();
+
+            if cc_h != Void::id()
+            {
+                container[cc] = cc_h;
+                return;
+            }
         }
 
         let top_v = container[top];
@@ -345,6 +348,19 @@ impl CellTrait for BurningCoal {
     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
     {
         if !sand_faling_helper(self.den(), i, j, container, pal_container, cur) {
+
+            let bot = cs::xy_to_index(i, j - 1);
+            let bot_v = container[bot] as usize;
+
+            let top = cs::xy_to_index(i, j + 1);
+
+            if container[top] == Water::id()
+            {
+                container[top] = Steam::id();
+                container[cur] = Coal::id();
+                return;
+            }
+
             if prng.next() > 200
             {
                 return;
@@ -356,7 +372,7 @@ impl CellTrait for BurningCoal {
                 return;
             }
 
-            let top = cs::xy_to_index(i, j + 1);
+            
             let topl = cs::xy_to_index(i - 1, j + 1);
             let topr = cs::xy_to_index(i + 1, j + 1);
             
@@ -368,8 +384,11 @@ impl CellTrait for BurningCoal {
                 container[cc] = Fire::id();
             }
 
-            let bot = cs::xy_to_index(i, j - 1);
-            let bot_v = container[bot] as usize;
+            if prng.next() > 50
+            {
+                return;
+            }
+
             let bot_c = &pal_container.pal[bot_v];
             let bot_b = bot_c.burnable();
 
@@ -382,4 +401,21 @@ impl CellTrait for BurningCoal {
     }
 
     fn den(&self) -> i8 { 2 }
+}
+
+pub struct Coal;
+impl Coal {
+    pub const fn new() -> Self { Self }
+    pub fn boxed() -> Box<Self> { Box::new(Self::new()) }
+    pub fn id() -> CellType { 8 }
+}
+impl CellTrait for Coal {
+
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Prng)
+    {
+        sand_faling_helper(self.den(), i, j, container, pal_container, cur);
+    }
+
+    fn den(&self) -> i8 { 2 }
+    fn burnable(&self) -> u8 { BurningCoal::id() }
 }
