@@ -24,8 +24,11 @@ jobs:
         name: dist
         path: |
           sand_evolution_lib/pkg
-    - name: Deploy 🚀
-      uses: JamesIves/github-pages-deploy-action@4.1.0
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/master'
+      uses: qoomon/deploy-to-github-pages-action@v1
       with:
-        branch: gh-pages
-        folder: .
+        GITHUB_PAGES_SOURCE_DIR: sand_evolution_lib/pkg # default value:  dist
+        GITHUB_PAGES_BRANCH: gh-pages # default value:  gh-pages
+        GITHUB_PAGES_REPLACE: true   # default value:  false
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
