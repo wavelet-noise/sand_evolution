@@ -552,6 +552,18 @@ impl State {
     }
 }
 
+pub fn compact_number_string(n: i32) -> String
+{
+    let abs = cgmath::num_traits::abs(n);
+
+    if abs < 999
+    {
+        return abs.to_string();
+    }
+
+    return "???".to_string();
+}
+
 #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
 
