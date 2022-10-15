@@ -1,9 +1,11 @@
 mod cs;
 mod types;
+mod fps_meter;
 
 use cgmath::num_traits::clamp;
 use egui::{FontDefinitions};
 use types::*;
+use fps_meter::FpsMeter;
 use wgpu::{util::DeviceExt, TextureFormat};
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
@@ -68,6 +70,8 @@ struct WorldSettings {
     _wasm_padding1: f32,
     _wasm_padding2: f32,
 }
+
+type UpdateResult = f64;
 
 struct Camera {
     eye: cgmath::Point3<f32>,
@@ -432,8 +436,9 @@ impl State {
     //     false
     // }
 
-    fn update(&mut self, queue: &wgpu::Queue) {
-        self.world_settings.time = (instant::now() - self.start_time) as f32 / 1000.0;
+    fn update(&mut self, queue: &wgpu::Queue) -> UpdateResult {
+        let upd_start_time = instant::now();
+        self.world_settings.time = (upd_start_time - self.start_time) as f32 / 1000.0;
 
         queue.write_buffer(
             &self.settings_buffer,
@@ -516,6 +521,7 @@ impl State {
             },
             texture_size,
         );
+        return instant::now() - upd_start_time;
     }
 
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
@@ -584,6 +590,8 @@ pub async fn run(w: f32, h: f32) {
 
     let mut number_of_cells_to_add = 500;
     let mut number_of_structures_to_add = 100;
+
+    let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
@@ -709,7 +717,7 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                state.update(&queue);
+                let update_time = state.update(&queue);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
@@ -723,6 +731,9 @@ pub async fn run(w: f32, h: f32) {
                 .fixed_size(egui::vec2(200.0, 100.0))
                 .show(&platform.context(), |ui|{
                     ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
+                    ui.separator();
+                    ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
+                    ui.label(format!("frame time: {} ms.", format!("{:.3}", (update_time).to_string())));
                 });
 
                 egui::Window::new("Toolbox")
