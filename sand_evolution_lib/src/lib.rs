@@ -1,37 +1,25 @@
 mod cs;
 mod types;
 
-use std::{time::Instant, iter};
-
 use cgmath::num_traits::clamp;
 use egui::{FontDefinitions};
 use types::*;
 use wgpu::{util::DeviceExt, TextureFormat};
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
-use winit::event::Event::*;
+use winit::{event::Event::*, event_loop::EventLoop};
 use winit::event_loop::ControlFlow;
 
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::window::{Window, WindowBuilder};
 
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
     uv: [f32; 2],
-}
-
-enum Event {
-    RequestRedraw,
-}
-struct ExampleRepaintSignal(std::sync::Mutex<winit::event_loop::EventLoopProxy<Event>>);
-
-impl epi::backend::RepaintSignal for ExampleRepaintSignal {
-    fn request_repaint(&self) {
-        self.0.lock().unwrap().send_event(Event::RequestRedraw).ok();
-    }
 }
 
 impl Vertex {
@@ -112,11 +100,6 @@ impl Camera {
 }
 
 struct State {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -133,49 +116,7 @@ struct State {
 }
 
 impl State {
-    async fn new(window: &Window) -> Self {
-        let size = window.inner_size();
-
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
-        let surface = unsafe { instance.create_surface(window) };
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .unwrap();
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    features: wgpu::Features::empty(),
-                    // WebGL doesn't support all of wgpu's features, so if
-                    // we're building for the web we'll have to disable some.
-                    limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits::default()
-                    },
-                },
-                None, // Trace path
-            )
-            .await
-            .unwrap();
-
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_supported_formats(&adapter)[0],
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-        };
-        surface.configure(&device, &config);
-
+    async fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, surface: &wgpu::Surface) -> Self {
         let mut buf = [0u8; 4];
         let mut diffuse_rgba = image::GrayImage::from_fn(cs::SECTOR_SIZE.x as u32, cs::SECTOR_SIZE.y as u32, |x, y| {
             if x > 1 && y > 1 && x < cs::SECTOR_SIZE.x as u32 - 2 && y < cs::SECTOR_SIZE.y as u32 - 2
@@ -401,8 +342,8 @@ impl State {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
+                        color: wgpu::BlendComponent::OVER,
+                        alpha: wgpu::BlendComponent::OVER,
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -447,11 +388,6 @@ impl State {
         let b = 0;
 
         Self {
-            surface,
-            device,
-            queue,
-            config,
-            size,
             render_pipeline,
             vertex_buffer,
             index_buffer,
@@ -468,24 +404,24 @@ impl State {
         }
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
-        }
-    }
+    // pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    //     if new_size.width > 0 && new_size.height > 0 {
+    //         self.size = new_size;
+    //         self.config.width = new_size.width;
+    //         self.config.height = new_size.height;
+    //         self.surface.configure(&self.device, &self.config);
+    //     }
+    // }
 
     // #[allow(unused_variables)]
     // fn input(&mut self, event: &WindowEvent) -> bool {
     //     false
     // }
 
-    fn update(&mut self) {
+    fn update(&mut self, queue: &wgpu::Queue) {
         self.world_settings.time = (instant::now() - self.start_time) as f32 / 1000.0;
 
-        self.queue.write_buffer(
+        queue.write_buffer(
             &self.settings_buffer,
             0,
             bytemuck::cast_slice(&[self.world_settings.time]),
@@ -579,7 +515,7 @@ impl State {
 
         //self.diffuse_rgba = output;
 
-        self.queue.write_texture(
+        queue.write_texture(
             // Tells wgpu where to copy the pixel data
             wgpu::ImageCopyTexture {
                 texture: &self.diffuse_texture,
@@ -599,17 +535,11 @@ impl State {
         );
     }
 
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Surface, view: &wgpu::TextureView) {        
+        let mut encoder = device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -618,12 +548,7 @@ impl State {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Load,
                         store: true,
                     },
                 })],
@@ -640,10 +565,7 @@ impl State {
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
-        self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
+        queue.submit(std::iter::once(encoder.finish()));
     }
 }
 
@@ -659,12 +581,12 @@ pub async fn run(w: f32, h: f32) {
         }
     }
 
-    let event_loop = winit::event_loop::EventLoopBuilder::<Event>::with_user_event().build();
+    let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_decorations(true)
         .with_resizable(true)
         .with_transparent(false)
-        .with_title("egui-wgpu_winit example")
+        .with_title("sand evolution v0.1")
         .with_inner_size(winit::dpi::PhysicalSize {
             width: 1000,
             height: 1000,
@@ -672,25 +594,51 @@ pub async fn run(w: f32, h: f32) {
         .build(&event_loop)
         .unwrap();
 
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::dpi::PhysicalSize;
+        window.set_inner_size(PhysicalSize::new(w, h));
+        
+        use winit::platform::web::WindowExtWebSys;
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| {
+                let dst = doc.get_element_by_id("wasm-example")?;
+                let canvas = web_sys::Element::from(window.canvas());
+                dst.append_child(&canvas).ok()?;
+                Some(())
+            })
+            .expect("Couldn't append canvas to document body.");
+    }
+
+    let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window) };
 
-    // WGPU 0.11+ support force fallback (if HW implementation not supported), set it to true or false (optional).
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: Some(&surface),
-        force_fallback_adapter: false,
-    }))
-    .unwrap();
+    let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap();
 
-    let (device, queue) = pollster::block_on(adapter.request_device(
+    let (device, queue) = adapter
+    .request_device(
         &wgpu::DeviceDescriptor {
-            features: wgpu::Features::default(),
-            limits: wgpu::Limits::default(),
             label: None,
+            features: wgpu::Features::empty(),
+            // WebGL doesn't support all of wgpu's features, so if
+            // we're building for the web we'll have to disable some.
+            limits: if cfg!(target_arch = "wasm32") {
+                wgpu::Limits::downlevel_webgl2_defaults()
+            } else {
+                wgpu::Limits::default()
+            },
         },
-        None,
-    ))
+        None, // Trace path
+    )
+    .await
     .unwrap();
 
     let size = window.inner_size();
@@ -719,14 +667,16 @@ pub async fn run(w: f32, h: f32) {
     // Display the demo application that ships with egui.
     let mut demo_app = egui_demo_lib::DemoWindows::default();
 
-    let start_time = Instant::now();
+    let mut state = State::new(&device, &queue, &surface_config, &surface).await;
+
+    let start_time = instant::now();
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
 
         match event {
             RedrawRequested(..) => {
-                platform.update_time(start_time.elapsed().as_secs_f64());
+                platform.update_time((instant::now() - start_time) / 1000.0);
 
                 let output_frame = match surface.get_current_texture() {
                     Ok(frame) => frame,
@@ -741,9 +691,13 @@ pub async fn run(w: f32, h: f32) {
                         return;
                     }
                 };
+                
                 let output_view = output_frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+
+                state.update(&queue);
+                _ = state.render(&device, &queue, &surface, &output_view);
 
                 // Begin to draw the UI frame.
                 platform.begin_frame();
@@ -751,12 +705,18 @@ pub async fn run(w: f32, h: f32) {
                 // Draw the demo application.
                 demo_app.ui(&platform.context());
 
+                // egui::Window::new("my_area")
+                // .fixed_pos(egui::pos2(32.0, 32.0))
+                // .show(&platform.context(), |ui| {
+                //     ui.label("Floating text!");
+                // });
+
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));
                 let paint_jobs = platform.context().tessellate(full_output.shapes);
 
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("encoder"),
+                    label: Some("Render Encoder"),
                 });
 
                 // Upload all resources for the GPU.
@@ -778,11 +738,12 @@ pub async fn run(w: f32, h: f32) {
                         &output_view,
                         &paint_jobs,
                         &screen_descriptor,
-                        Some(wgpu::Color::BLACK),
+                        None,
                     )
                     .unwrap();
+
                 // Submit the commands.
-                queue.submit(iter::once(encoder.finish()));
+                queue.submit(std::iter::once(encoder.finish()));
 
                 // Redraw egui
                 output_frame.present();
@@ -797,8 +758,8 @@ pub async fn run(w: f32, h: f32) {
                 // } else {
                 //     *control_flow = ControlFlow::Wait;
                 // }
-            }
-            MainEventsCleared | UserEvent(Event::RequestRedraw) => {
+            },
+            MainEventsCleared {} => {
                 window.request_redraw();
             }
             WindowEvent { event, .. } => match event {
