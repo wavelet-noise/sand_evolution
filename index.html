@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sand Evolution v0.1</title>
+</head>
+
+<body id="wasm-example">
+    <script type="module"> 
+        import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
+        async function gameloop() {
+            console.log("initialization");
+            await init();
+            console.log("done");
+
+            var body = document.body,
+            html = document.documentElement;
+
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
+
+            console.log("x = " + vw + ", y = " + vh);
+
+            run(vw, vh);
+        }
+
+        gameloop();
+    </script>
+    <style>
+        html, body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+    </style>
+</body>
+
+</html>
