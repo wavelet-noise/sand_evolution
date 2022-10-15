@@ -567,6 +567,9 @@ pub fn compact_number_string(n: i32) -> String
 #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
 
+    let mut number_of_cells_to_add = 500;
+    let mut number_of_structures_to_add = 100;
+
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -701,16 +704,20 @@ pub async fn run(w: f32, h: f32) {
                 //demo_app.ui(&platform.context());
 
                 egui::Window::new("Toolbox")
-                .fixed_pos(egui::pos2(5.0, 5.0))
+                .default_pos(egui::pos2(5.0, 5.0))
+                .fixed_size(egui::vec2(200., 100.))
                 .show(&platform.context(), |ui| {
-
                     ui.label(["CO2 level:", state.prng.carb().to_string().as_str()].join(" "));
+                    ui.heading("Spawn particles");
+                    ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
+                    ui.label("Click to add");
 
-                    if ui.button("Spawn Water").clicked() {
-                        let mut buf = [0u8; 501];
+
+                    if ui.button("Water").clicked() {
+                        let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
                         _ = getrandom::getrandom(&mut buf);
             
-                        for i in 0..500
+                        for i in 0..number_of_cells_to_add
                         {
                             let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                             let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
@@ -718,11 +725,11 @@ pub async fn run(w: f32, h: f32) {
                         }
                     }
 
-                    if ui.button("Spawn Embers").clicked() {
-                        let mut buf = [0u8; 501];
+                    if ui.button("Embers").clicked() {
+                        let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
                         _ = getrandom::getrandom(&mut buf);
             
-                        for i in 0..500
+                        for i in 0..number_of_cells_to_add
                         {
                             let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                             let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
@@ -730,8 +737,13 @@ pub async fn run(w: f32, h: f32) {
                         }
                     }
 
-                    if ui.button("Platforms").clicked() {
-                        for _ in 0..150
+                    ui.separator();
+                    ui.heading("Spawn structures");
+                    ui.add(egui::Slider::new(&mut number_of_structures_to_add, 0..=MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD).text("Number of structures to add"));
+                    ui.label("Click to add");
+
+                    if ui.button("Wooden platforms").clicked() {
+                        for _ in 0..number_of_structures_to_add
                         {
                             let mut buf = [0u8; 4];
                             _ = getrandom::getrandom(&mut buf);
@@ -751,7 +763,7 @@ pub async fn run(w: f32, h: f32) {
                     }
 
                     if ui.button("Cubes").clicked() {
-                        for _ in 0..100
+                        for _ in 0..number_of_structures_to_add
                         {
                             let mut buf = [0u8; 4];
                             _ = getrandom::getrandom(&mut buf);
@@ -845,3 +857,6 @@ pub async fn run(w: f32, h: f32) {
         }
     });
 }
+
+const MAXIMUM_NUMBER_OF_CELLS_TO_ADD: usize = 10000;
+const MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD: usize = 500;
