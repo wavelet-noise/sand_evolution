@@ -692,7 +692,7 @@ pub async fn run(w: f32, h: f32) {
                 .fixed_pos(egui::pos2(5.0, 5.0))
                 .show(&platform.context(), |ui| {
 
-                    ui.label(["carbox level:", state.prng.carb().to_string().as_str()].join(" "));
+                    ui.label(["CO2 level:", state.prng.carb().to_string().as_str()].join(" "));
 
                     if ui.button("Spawn Water").clicked() {
                         let mut buf = [0u8; 501];
