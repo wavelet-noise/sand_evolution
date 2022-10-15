@@ -18,8 +18,6 @@ jobs:
       uses: jetli/wasm-pack-action@v0.3.0
     - name: Build 🛠
       run: wasm-pack build --release --target web sand_evolution_lib
-    - name: Test 🪲
-      run: cargo test --verbose
     - name: Archive 💼
       uses: actions/upload-artifact@v3
       with:
