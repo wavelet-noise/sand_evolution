@@ -18,5 +18,3 @@ jobs:
       uses: jetli/wasm-pack-action@v0.3.0
     - name: Build
       run: wasm-pack build --release --target web sand_evolution_lib
-    - name: Run tests
-      run: cargo test --verbose
