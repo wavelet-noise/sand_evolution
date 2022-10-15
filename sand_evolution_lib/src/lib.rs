@@ -113,6 +113,8 @@ struct State {
     diffuse_texture: wgpu::Texture,
     a: cs::PointType,
     b: cs::PointType,
+    last_spawn: f32,
+    last_id: u8
 }
 
 impl State {
@@ -147,20 +149,23 @@ impl State {
             }
         }
 
-        for _ in 0..350
+        for _ in 0..100
         {
             _ = getrandom::getrandom(&mut buf);
 
             let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
             let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
-            for x in 0..10
+            for x in 0..20
             {
-                diffuse_rgba.put_pixel(
-                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                    image::Luma([Wood::id()])
-                );
+                for y in 0..20
+                {
+                    diffuse_rgba.put_pixel(
+                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                        image::Luma([Wood::id()])
+                    );
+                }
             }
         }
 
@@ -387,6 +392,10 @@ impl State {
         let a = 0;
         let b = 0;
 
+        let last_spawn = -5.0;
+
+        let last_id = Water::id();
+
         Self {
             render_pipeline,
             vertex_buffer,
@@ -400,7 +409,9 @@ impl State {
             diffuse_rgba,
             diffuse_texture,
             a,
-            b
+            b,
+            last_spawn,
+            last_id
         }
     }
 
@@ -439,18 +450,22 @@ impl State {
 
         let mut b_index = 0;
 
-        if (self.world_settings.time as u32) % 5 == 0
+        if (self.world_settings.time - self.last_spawn) > 5.0
         {
-            let mut buf = [0u8; 401];
+            self.last_spawn = self.world_settings.time;
+
+            self.last_id = if self.last_id == BurningCoal::id() { Water::id() } else { BurningCoal::id() };
+
+            let mut buf = [0u8; 4001];
             _ = getrandom::getrandom(&mut buf);
 
-            for i in 0..400
+            for i in 0..4000
             {
                 let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
                 let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
                 if *self.diffuse_rgba.get_pixel(px, py) == image::Luma([0])
                 {
-                    self.diffuse_rgba.put_pixel(px, py, image::Luma([4]));
+                    self.diffuse_rgba.put_pixel(px, py, image::Luma([self.last_id]));
                 }
             }
         }
@@ -468,6 +483,7 @@ impl State {
         pal_container.pal[5] = Wood::boxed();
         pal_container.pal[6] = BurningWood::boxed();
         pal_container.pal[7] = BurningCoal::boxed();
+        pal_container.pal[8] = Coal::boxed();
         pal_container.pal[255] = Stone::boxed();
 
         const BUF_SIZE : usize = 50;
@@ -703,13 +719,13 @@ pub async fn run(w: f32, h: f32) {
                 platform.begin_frame();
 
                 // Draw the demo application.
-                demo_app.ui(&platform.context());
+                //demo_app.ui(&platform.context());
 
-                // egui::Window::new("my_area")
-                // .fixed_pos(egui::pos2(32.0, 32.0))
-                // .show(&platform.context(), |ui| {
-                //     ui.label("Floating text!");
-                // });
+                egui::Window::new("my_area")
+                .fixed_pos(egui::pos2(32.0, 32.0))
+                .show(&platform.context(), |ui| {
+                    ui.label("Floating text!");
+                });
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));

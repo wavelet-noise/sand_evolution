@@ -85,6 +85,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * 1024.0), i32(in.uv.y * 512.0)), 0);
     let t = texel.x;
 
+    let noisy_mixer: f32 = pow(noise2(in.uv * 400.0 + sin(settings.time)*400.0), 2.0);
+
     var col = vec4<f32>(0.0);
 
     if t == 255u
@@ -110,7 +112,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     else if t == 4u
     {
-      col = vec4<f32>(1.0, 0.2, 0.1, 1.0);
+      col = mix(
+        vec4<f32>(1.0, 0.0, 0.0, 1.0),
+        vec4<f32>(1.0, 1.0, 0.0, 1.0),
+        noisy_mixer - 0.04
+      );
     }
     else if t == 5u
     {
@@ -120,9 +126,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.8, 1.0, 0.5, 1.0);
     }
+    else if t == 7u
+    {
+      col = mix(
+        vec4<f32>(8.0, 0.0, 0.0, 1.0),
+        vec4<f32>(8.0, 0.5, 0.0, 1.0),
+        noisy_mixer
+      );
+    }
+    else if t == 8u
+    {
+      col = vec4<f32>(0.2);
+    }
     else
     {
-      col = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+      col = vec4<f32>(0.0,1.0,0.0,1.0);
     }
 
     return col;
