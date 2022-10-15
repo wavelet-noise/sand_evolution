@@ -27,6 +27,7 @@ jobs:
         path: |
           sand_evolution_lib/pkg
     - name: Deploy 🚀
-      uses: avinal/github-pages-deploy-action@7702e2ad1f82097323b08b428c8f57cb21dd965b
+      uses: JamesIves/github-pages-deploy-action@4.1.0
       with:
         branch: gh-pages
+        folder: .
