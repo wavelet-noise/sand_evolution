@@ -552,16 +552,31 @@ impl State {
     }
 }
 
-pub fn compact_number_string(n: i32) -> String
+pub fn compact_number_string(n: f32) -> String
 {
     let abs = cgmath::num_traits::abs(n);
 
-    if abs < 999
+    if abs < 999.0
     {
-        return abs.to_string();
+        return format!("{}", abs);
     }
 
-    return "???".to_string();
+    if abs < 999999.0
+    {
+        return format!("{:.2}k", abs as f32 / 1000.0);
+    }
+
+    if abs < 999999999.0
+    {
+        return format!("{:.2}M", abs as f32 / 1000000.0);
+    }
+
+    if abs < 999999999999.0
+    {
+        return format!("{:.2}G", abs as f32 / 1000000000.0);
+    }
+
+    return format!("{:.2}T", abs as f32 / 1000000000000.0);
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
@@ -703,11 +718,17 @@ pub async fn run(w: f32, h: f32) {
                 // Draw the demo application.
                 //demo_app.ui(&platform.context());
 
+                egui::Window::new("Monitor")
+                .default_pos(egui::pos2(340.0, 5.0))
+                .fixed_size(egui::vec2(200.0, 100.0))
+                .show(&platform.context(), |ui|{
+                    ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
+                });
+
                 egui::Window::new("Toolbox")
                 .default_pos(egui::pos2(5.0, 5.0))
                 .fixed_size(egui::vec2(200., 100.))
                 .show(&platform.context(), |ui| {
-                    ui.label(["CO2 level:", state.prng.carb().to_string().as_str()].join(" "));
                     ui.heading("Spawn particles");
                     ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
                     ui.label("Click to add");
