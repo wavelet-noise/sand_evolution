@@ -113,7 +113,9 @@ struct State {
     diffuse_texture: wgpu::Texture,
     a: cs::PointType,
     b: cs::PointType,
-    last_spawn: f32
+    last_spawn: f32,
+    pal_container: types::Palette,
+    prng: types::Dim,
 }
 
 impl State {
@@ -393,6 +395,9 @@ impl State {
 
         let last_spawn = -5.0;
 
+        let pal_container = Palette::new();
+        let prng = Dim::new();
+
         Self {
             render_pipeline,
             vertex_buffer,
@@ -407,7 +412,9 @@ impl State {
             diffuse_texture,
             a,
             b,
-            last_spawn
+            last_spawn,
+            pal_container,
+            prng
         }
     }
 
@@ -446,8 +453,6 @@ impl State {
 
         let mut b_index = 0;
 
-        let pal_container = Palette::new();
-
         const BUF_SIZE : usize = 50;
         let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
@@ -465,7 +470,7 @@ impl State {
                 }
             }
 
-            let mut prng = Prng::new();
+            self.prng.gen();
 
 			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
 			{
@@ -485,7 +490,7 @@ impl State {
 					let cur = cs::xy_to_index(i, j);
                     let cur_v = *self.diffuse_rgba.get(cur).unwrap();
 
-                    pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &pal_container, &mut prng);
+                    self.pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &self.pal_container, &mut self.prng);
 				}
 			}
 		}
@@ -686,6 +691,9 @@ pub async fn run(w: f32, h: f32) {
                 egui::Window::new("Toolbox")
                 .fixed_pos(egui::pos2(5.0, 5.0))
                 .show(&platform.context(), |ui| {
+
+                    ui.label(["carbox level:", state.prng.carb().to_string().as_str()].join(" "));
+
                     if ui.button("Spawn Water").clicked() {
                         let mut buf = [0u8; 501];
                         _ = getrandom::getrandom(&mut buf);
