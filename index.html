@@ -19,8 +19,8 @@
             var body = document.body,
             html = document.documentElement;
 
-            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight) * 1.8;
-            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth) * 1.9;
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight) - 20;
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth) - 10;
 
             console.log("x = " + vw + ", y = " + vh);
 
@@ -34,7 +34,6 @@
             background-color: black;
         }
     </style>
-    <p>sand evolution canvas</p> 
 </body>
 
 </html>
