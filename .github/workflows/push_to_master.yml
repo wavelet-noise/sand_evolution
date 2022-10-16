@@ -24,9 +24,7 @@ jobs:
         ls sand_evolution_lib/pkg
         echo "----------------"
         mkdir dest
-        mkdir dest/sand_evolution_lib
-        mkdir dest/sand_evolution_lib/pkg
-        cp -r sand_evolution_lib/pkg dest/sand_evolution_lib/pkg
+        cp -r sand_evolution_lib/pkg dest
         echo "-  clone main  -"
         git clone https://github.com/wavelet-noise/sand_evolution.git repo
         ls repo
