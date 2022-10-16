@@ -31,6 +31,7 @@ jobs:
         echo "----------------"
         cp repo/index.html dest/index.html
         cp repo/favicon.ico dest/favicon.ico
+        rm -f dest/pkg/.gitignore
         echo "---  result  ---"
         ls -fR dest
     - name: Deploy 🚀
