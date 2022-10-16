@@ -50,7 +50,7 @@ pub fn sand_faling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_
 #[inline(always)]
 pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_container: &Palette, cur: usize, rpng: &mut Dim) -> bool {
     const ORDER: [[usize; 2]; 2] = [[0,1],[1,0]];
-    let selected_order = ORDER[(rpng.next() % 2) as usize];
+    let selected_order = [0,1];//ORDER[(rpng.next() % 2) as usize];
 
     let down = cs::xy_to_index(i, j - 1);
     let down_v = container[down] as usize;
@@ -120,15 +120,6 @@ pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pa
 pub fn fluid_flying_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_container: &Palette, cur: usize, rpng: &mut Dim) -> bool {
     const ORDER: [[usize; 2]; 2] = [[0,1],[1,0]];
     let selected_order = ORDER[(rpng.next() % 2) as usize];
-
-    let down = cs::xy_to_index(i, j + 1);
-    let down_v = container[down] as usize;
-    let down_c = &pal_container.pal[down_v];
-    if down_c.den() < my_den && !down_c.stat()
-    {
-        container.swap(cur, down);
-        return true;
-    }
     
     for k in 0..2  {
         match selected_order[k] {
