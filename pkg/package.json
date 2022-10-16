@@ -1,0 +1,15 @@
+{
+  "name": "sand_evolution_lib",
+  "collaborators": [
+    "wn"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "sand_evolution_lib_bg.wasm",
+    "sand_evolution_lib.js",
+    "sand_evolution_lib.d.ts"
+  ],
+  "module": "sand_evolution_lib.js",
+  "types": "sand_evolution_lib.d.ts",
+  "sideEffects": false
+}
