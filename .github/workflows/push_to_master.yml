@@ -21,18 +21,18 @@ jobs:
     - name: Archive 💼
       run: |
         echo "- builed files -"
-        ls sand_evolution_lib/pkg
+        ls -f sand_evolution_lib/pkg
         echo "----------------"
         mkdir dest
         cp -r sand_evolution_lib/pkg dest
         echo "-  clone main  -"
         git clone https://github.com/wavelet-noise/sand_evolution.git repo
-        ls repo
+        ls -f repo
         echo "----------------"
         cp repo/index.html dest/index.html
         cp repo/favicon.ico dest/favicon.ico
         echo "---  result  ---"
-        ls -R dest
+        ls -fR dest
     - name: Deploy 🚀
       uses: s0/git-publish-subdir-action@develop
       env:
