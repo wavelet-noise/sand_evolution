@@ -32,7 +32,7 @@ jobs:
         echo "----------------"
         cp repo/index.html dest/index.html
         cp repo/favicon.ico dest/favicon.ico
-        rm -f dest/pkg/.gitignore
+        rm -f dest/sand_evolution_lib/pkg/.gitignore
         echo "---  result  ---"
         ls -fR dest
     - name: Deploy 🚀
