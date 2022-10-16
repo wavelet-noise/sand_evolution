@@ -29,5 +29,5 @@ jobs:
       env:
         REPO: self
         BRANCH: gh-pages
-        FOLDER: sand_evolution_lib/pkg
+        FOLDER: ../sand_evolution_lib/pkg
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
