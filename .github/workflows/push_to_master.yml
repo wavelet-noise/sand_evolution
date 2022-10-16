@@ -18,8 +18,16 @@ jobs:
       uses: jetli/wasm-pack-action@v0.3.0
     - name: Build 🛠
       run: wasm-pack build --release --target web sand_evolution_lib
-    - name: Deploy
-      uses: peaceiris/actions-gh-pages@v3
+    - name: Archive 💼
+      uses: actions/upload-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: sand_evolution_lib/pkg
+        name: dist
+        path: |
+          sand_evolution_lib/pkg
+    - name: Deploy
+      uses: s0/git-publish-subdir-action@develop
+      env:
+        REPO: self
+        BRANCH: gh-pages
+        FOLDER: sand_evolution_lib/pkg
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
