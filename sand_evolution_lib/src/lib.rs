@@ -71,7 +71,10 @@ struct WorldSettings {
     _wasm_padding2: f32,
 }
 
-type UpdateResult = f64;
+struct UpdateResult {
+    simulation_step_average_time: f64,
+    update_time: f64,
+}
 
 struct Camera {
     eye: cgmath::Point3<f32>,
@@ -436,8 +439,9 @@ impl State {
     //     false
     // }
 
-    fn update(&mut self, queue: &wgpu::Queue) -> UpdateResult {
-        self.world_settings.time = (instant::now() - self.start_time) as f32 / 1000.0;
+    fn update(&mut self, queue: &wgpu::Queue, sim_steps: u8) -> UpdateResult {
+        let update_start_time = instant::now();
+        self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
 
         queue.write_buffer(
             &self.settings_buffer,
@@ -462,9 +466,8 @@ impl State {
         _ = getrandom::getrandom(&mut buf);
 
         let sim_upd_start_time = instant::now();
-        let number_of_simulation_steps = 5;
 
-        for _sim_update in 0..number_of_simulation_steps
+        for _sim_update in 0..sim_steps
 		{
 			self.a += 1;
 			if self.a > 1
@@ -502,7 +505,7 @@ impl State {
 			}
 		}
 
-        let average_sim_update_time = (instant::now() - sim_upd_start_time) / number_of_simulation_steps as f64;
+        let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 
 
         //self.diffuse_rgba = output;
@@ -525,7 +528,10 @@ impl State {
             },
             texture_size,
         );
-        return average_sim_update_time;
+        return UpdateResult {
+            simulation_step_average_time,
+            update_time: instant::now() - update_start_time,
+        };
     }
 
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
@@ -721,7 +727,8 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let simulation_step_time = state.update(&queue);
+                let number_of_simulation_steps = 5;
+                let upd_result = state.update(&queue, number_of_simulation_steps);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
@@ -737,7 +744,8 @@ pub async fn run(w: f32, h: f32) {
                     ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
                     ui.separator();
                     ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
-                    ui.label(format!("sim. step time: {:.1} ms.", simulation_step_time));
+                    ui.label(format!("sim. step avg time: {:.1} ms.", upd_result.simulation_step_average_time));
+                    ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
                 });
 
                 egui::Window::new("Toolbox")
