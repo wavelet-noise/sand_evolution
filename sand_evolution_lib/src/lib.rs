@@ -71,7 +71,10 @@ struct WorldSettings {
     _wasm_padding2: f32,
 }
 
-type UpdateResult = f64;
+struct UpdateResult {
+    simulation_step_average_time: f64,
+    update_time: f64,
+}
 
 struct Camera {
     eye: cgmath::Point3<f32>,
@@ -436,9 +439,9 @@ impl State {
     //     false
     // }
 
-    fn update(&mut self, queue: &wgpu::Queue) -> UpdateResult {
-        let upd_start_time = instant::now();
-        self.world_settings.time = (upd_start_time - self.start_time) as f32 / 1000.0;
+    fn update(&mut self, queue: &wgpu::Queue, sim_steps: u8) -> UpdateResult {
+        let update_start_time = instant::now();
+        self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
 
         queue.write_buffer(
             &self.settings_buffer,
@@ -462,7 +465,9 @@ impl State {
         let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
 
-        for k in 0..5
+        let sim_upd_start_time = instant::now();
+
+        for _sim_update in 0..sim_steps
 		{
 			self.a += 1;
 			if self.a > 1
@@ -500,6 +505,8 @@ impl State {
 			}
 		}
 
+        let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
+
 
         //self.diffuse_rgba = output;
 
@@ -521,7 +528,10 @@ impl State {
             },
             texture_size,
         );
-        return instant::now() - upd_start_time;
+        return UpdateResult {
+            simulation_step_average_time,
+            update_time: instant::now() - update_start_time,
+        };
     }
 
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
@@ -590,6 +600,7 @@ pub async fn run(w: f32, h: f32) {
 
     let mut number_of_cells_to_add = 500;
     let mut number_of_structures_to_add = 100;
+    let mut simulation_steps_per_frame = 5;
 
     let mut fps_meter = FpsMeter::new();
 
@@ -717,7 +728,7 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let update_time = state.update(&queue);
+                let upd_result = state.update(&queue, simulation_steps_per_frame);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
@@ -733,13 +744,22 @@ pub async fn run(w: f32, h: f32) {
                     ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
                     ui.separator();
                     ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
-                    ui.label(format!("frame time: {} ms.", format!("{:.3}", (update_time).to_string())));
+                    let sim_step_avg_time_str = if simulation_steps_per_frame == 0 {
+                        "sim. step avg time: ON PAUSE".to_string()
+                    } else { 
+                        format!("sim. step avg time: {:.1} ms.", upd_result.simulation_step_average_time)
+                    };
+                    ui.label(sim_step_avg_time_str);
+                    ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
                 });
 
                 egui::Window::new("Toolbox")
                 .default_pos(egui::pos2(5.0, 5.0))
                 .fixed_size(egui::vec2(200., 100.))
                 .show(&platform.context(), |ui| {
+                    ui.heading("Simulation settings");
+                    ui.add(egui::Slider::new(&mut simulation_steps_per_frame, 0..=50).text("Simulation steps per frame"));
+                    ui.separator();
                     ui.heading("Spawn particles");
                     ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
                     ui.label("Click to add");
