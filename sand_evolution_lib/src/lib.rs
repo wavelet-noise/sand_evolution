@@ -600,6 +600,7 @@ pub async fn run(w: f32, h: f32) {
 
     let mut number_of_cells_to_add = 500;
     let mut number_of_structures_to_add = 100;
+    let mut simulation_steps_per_frame = 5;
 
     let mut fps_meter = FpsMeter::new();
 
@@ -727,8 +728,7 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let number_of_simulation_steps = 5;
-                let upd_result = state.update(&queue, number_of_simulation_steps);
+                let upd_result = state.update(&queue, simulation_steps_per_frame);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
@@ -744,7 +744,12 @@ pub async fn run(w: f32, h: f32) {
                     ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
                     ui.separator();
                     ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
-                    ui.label(format!("sim. step avg time: {:.1} ms.", upd_result.simulation_step_average_time));
+                    let sim_step_avg_time_str = if simulation_steps_per_frame == 0 {
+                        "sim. step avg time: ON PAUSE".to_string()
+                    } else { 
+                        format!("sim. step avg time: {:.1} ms.", upd_result.simulation_step_average_time)
+                    };
+                    ui.label(sim_step_avg_time_str);
                     ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
                 });
 
@@ -752,6 +757,9 @@ pub async fn run(w: f32, h: f32) {
                 .default_pos(egui::pos2(5.0, 5.0))
                 .fixed_size(egui::vec2(200., 100.))
                 .show(&platform.context(), |ui| {
+                    ui.heading("Simulation settings");
+                    ui.add(egui::Slider::new(&mut simulation_steps_per_frame, 0..=50).text("Simulation steps per frame"));
+                    ui.separator();
                     ui.heading("Spawn particles");
                     ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
                     ui.label("Click to add");
