@@ -24,10 +24,16 @@ jobs:
         name: dist
         path: |
           sand_evolution_lib/pkg
+    - name: bash
+      run: |
+        ls /home/runner/work/sand_evolution/sand_evolution/sand_evolution_lib/pkg
+        git clone https://github.com/wavelet-noise/sand_evolution.git repo
+        ls repo
+        ls sand_evolution_lib/pkg
     - name: Deploy
       uses: s0/git-publish-subdir-action@develop
       env:
         REPO: self
         BRANCH: gh-pages
-        FOLDER: ../sand_evolution_lib/pkg
+        FOLDER: sand_evolution_lib/pkg
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
