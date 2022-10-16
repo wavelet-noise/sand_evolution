@@ -1,6 +1,6 @@
 # sand_evolution
 
-[![deploy](https://github.com/wavelet-noise/sand_evolution/actions/workflows/push_to_master.yml/badge.svg)](https://github.com/wavelet-noise/sand_evolution/actions/workflows/push_to_master.yml)
+[![deploy](https://github.com/wavelet-noise/sand_evolution/actions/workflows/push_to_master.yml/badge.svg?branch=master)](https://github.com/wavelet-noise/sand_evolution/actions/workflows/push_to_master.yml)
 
 Play: https://wavelet-noise.github.io/sand_evolution/
 
