@@ -107,9 +107,9 @@ impl Sand {
     pub fn id() -> CellType { 1 }
 }
 impl CellTrait for Sand {
-     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, _: &mut Dim)
+     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, dim: &mut Dim)
      {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur);
+        sand_faling_helper(self.den(), i, j, container, pal_container, cur, dim);
      }
 
      fn den(&self) -> i8 { 2 }
@@ -155,9 +155,9 @@ impl Coal {
 }
 impl CellTrait for Coal {
 
-    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
+    fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, dim: &mut Dim)
     {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur);
+        sand_faling_helper(self.den(), i, j, container, pal_container, cur, dim);
     }
 
     fn den(&self) -> i8 { 2 }

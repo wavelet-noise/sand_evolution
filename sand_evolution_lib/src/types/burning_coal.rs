@@ -10,7 +10,7 @@ impl CellTrait for Cell {
 
     fn update(&self, i: PointType, j: PointType, cur: usize, container: & mut [CellType], pal_container: &Palette, prng: &mut Dim)
     {
-        if !sand_faling_helper(self.den(), i, j, container, pal_container, cur) {
+        if !sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
 
             let bot = cs::xy_to_index(i, j - 1);
             let bot_v = container[bot] as usize;
