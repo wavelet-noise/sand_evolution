@@ -437,8 +437,7 @@ impl State {
     // }
 
     fn update(&mut self, queue: &wgpu::Queue) -> UpdateResult {
-        let upd_start_time = instant::now();
-        self.world_settings.time = (upd_start_time - self.start_time) as f32 / 1000.0;
+        self.world_settings.time = (instant::now() - self.start_time) as f32 / 1000.0;
 
         queue.write_buffer(
             &self.settings_buffer,
@@ -462,7 +461,10 @@ impl State {
         let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
 
-        for k in 0..5
+        let sim_upd_start_time = instant::now();
+        let number_of_simulation_steps = 5;
+
+        for _sim_update in 0..number_of_simulation_steps
 		{
 			self.a += 1;
 			if self.a > 1
@@ -500,6 +502,8 @@ impl State {
 			}
 		}
 
+        let average_sim_update_time = (instant::now() - sim_upd_start_time) / number_of_simulation_steps as f64;
+
 
         //self.diffuse_rgba = output;
 
@@ -521,7 +525,7 @@ impl State {
             },
             texture_size,
         );
-        return instant::now() - upd_start_time;
+        return average_sim_update_time;
     }
 
     fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
@@ -717,7 +721,7 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let update_time = state.update(&queue);
+                let simulation_step_time = state.update(&queue);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
@@ -733,7 +737,7 @@ pub async fn run(w: f32, h: f32) {
                     ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
                     ui.separator();
                     ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
-                    ui.label(format!("frame time: {} ms.", format!("{:.3}", (update_time).to_string())));
+                    ui.label(format!("sim. step time: {:.1} ms.", simulation_step_time));
                 });
 
                 egui::Window::new("Toolbox")
