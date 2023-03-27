@@ -1,31 +1,34 @@
 use crate::cs;
 
-use super::{Palette, Dim};
+use super::{Dim, Palette};
 
-
-
-pub fn sand_faling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_container: &Palette, cur: usize, rpng: &mut Dim) -> bool {
-
-    const ORDER: [[usize; 2]; 2] = [[0,1],[1,0]];
+pub fn sand_faling_helper(
+    my_den: i8,
+    i: u16,
+    j: u16,
+    container: &mut [u8],
+    pal_container: &Palette,
+    cur: usize,
+    rpng: &mut Dim,
+) -> bool {
+    const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
     let selected_order = ORDER[(rpng.next() % 2) as usize];
 
     let down = cs::xy_to_index(i, j - 1);
     let down_v = container[down] as usize;
     let down_c = &pal_container.pal[down_v];
-    if down_c.den() < my_den && !down_c.stat()
-    {
+    if down_c.den() < my_den && !down_c.stat() {
         container.swap(cur, down);
         return true;
     }
-    
-    for k in 0..2  {
+
+    for k in 0..2 {
         match selected_order[k] {
             0 => {
                 let dr = cs::xy_to_index(i + 1, j - 1);
                 let dr_v = container[dr] as usize;
                 let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() < my_den && !dr_c.stat()
-                {
+                if dr_c.den() < my_den && !dr_c.stat() {
                     container.swap(cur, dr);
                     return true;
                 }
@@ -34,13 +37,12 @@ pub fn sand_faling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_
                 let dl = cs::xy_to_index(i - 1, j - 1);
                 let dl_v = container[dl] as usize;
                 let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() < my_den && !dl_c.stat()
-                {
+                if dl_c.den() < my_den && !dl_c.stat() {
                     container.swap(cur, dl);
                     return true;
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -48,27 +50,33 @@ pub fn sand_faling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_
 }
 
 #[inline(always)]
-pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_container: &Palette, cur: usize, rpng: &mut Dim) -> bool {
-    const ORDER: [[usize; 2]; 2] = [[0,1],[1,0]];
-    let selected_order = [0,1];//ORDER[(rpng.next() % 2) as usize];
+pub fn fluid_falling_helper(
+    my_den: i8,
+    i: u16,
+    j: u16,
+    container: &mut [u8],
+    pal_container: &Palette,
+    cur: usize,
+    rpng: &mut Dim,
+) -> bool {
+    const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
+    let selected_order = [0, 1]; //ORDER[(rpng.next() % 2) as usize];
 
     let down = cs::xy_to_index(i, j - 1);
     let down_v = container[down] as usize;
     let down_c = &pal_container.pal[down_v];
-    if down_c.den() < my_den && !down_c.stat()
-    {
+    if down_c.den() < my_den && !down_c.stat() {
         container.swap(cur, down);
         return true;
     }
-    
-    for k in 0..2  {
+
+    for k in 0..2 {
         match selected_order[k] {
             0 => {
                 let dr = cs::xy_to_index(i + 1, j - 1);
                 let dr_v = container[dr] as usize;
                 let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() < my_den && !dr_c.stat()
-                {
+                if dr_c.den() < my_den && !dr_c.stat() {
                     container.swap(cur, dr);
                     return true;
                 }
@@ -77,24 +85,22 @@ pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pa
                 let dl = cs::xy_to_index(i - 1, j - 1);
                 let dl_v = container[dl] as usize;
                 let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() < my_den && !dl_c.stat()
-                {
+                if dl_c.den() < my_den && !dl_c.stat() {
                     container.swap(cur, dl);
                     return true;
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
-    for k in 0..2  {
+    for k in 0..2 {
         match selected_order[k] {
             0 => {
                 let dr = cs::xy_to_index(i + 1, j);
                 let dr_v = container[dr] as usize;
                 let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() < my_den && !dr_c.stat()
-                {
+                if dr_c.den() < my_den && !dr_c.stat() {
                     container.swap(cur, dr);
                     return true;
                 }
@@ -103,13 +109,12 @@ pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pa
                 let dl = cs::xy_to_index(i - 1, j);
                 let dl_v = container[dl] as usize;
                 let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() < my_den && !dl_c.stat()
-                {
+                if dl_c.den() < my_den && !dl_c.stat() {
                     container.swap(cur, dl);
                     return true;
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -117,18 +122,25 @@ pub fn fluid_falling_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pa
 }
 
 #[inline(always)]
-pub fn fluid_flying_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal_container: &Palette, cur: usize, rpng: &mut Dim) -> bool {
-    const ORDER: [[usize; 2]; 2] = [[0,1],[1,0]];
+pub fn fluid_flying_helper(
+    my_den: i8,
+    i: u16,
+    j: u16,
+    container: &mut [u8],
+    pal_container: &Palette,
+    cur: usize,
+    rpng: &mut Dim,
+) -> bool {
+    const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
     let selected_order = ORDER[(rpng.next() % 2) as usize];
-    
-    for k in 0..2  {
+
+    for k in 0..2 {
         match selected_order[k] {
             0 => {
                 let dr = cs::xy_to_index(i + 1, j + 1);
                 let dr_v = container[dr] as usize;
                 let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() > my_den && !dr_c.stat()
-                {
+                if dr_c.den() > my_den && !dr_c.stat() {
                     container.swap(cur, dr);
                     return true;
                 }
@@ -137,24 +149,22 @@ pub fn fluid_flying_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal
                 let dl = cs::xy_to_index(i - 1, j + 1);
                 let dl_v = container[dl] as usize;
                 let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() > my_den && !dl_c.stat()
-                {
+                if dl_c.den() > my_den && !dl_c.stat() {
                     container.swap(cur, dl);
                     return true;
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
-    for k in 0..2  {
+    for k in 0..2 {
         match selected_order[k] {
             0 => {
                 let dr = cs::xy_to_index(i + 1, j);
                 let dr_v = container[dr] as usize;
                 let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() > my_den && !dr_c.stat()
-                {
+                if dr_c.den() > my_den && !dr_c.stat() {
                     container.swap(cur, dr);
                     return true;
                 }
@@ -163,13 +173,12 @@ pub fn fluid_flying_helper(my_den: i8, i: u16, j: u16, container: &mut [u8], pal
                 let dl = cs::xy_to_index(i - 1, j);
                 let dl_v = container[dl] as usize;
                 let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() > my_den && !dl_c.stat()
-                {
+                if dl_c.den() > my_den && !dl_c.stat() {
                     container.swap(cur, dl);
                     return true;
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
