@@ -1,21 +1,20 @@
 mod cs;
-mod types;
 mod fps_meter;
+mod types;
 
 use cgmath::num_traits::clamp;
-use egui::{FontDefinitions};
-use types::*;
-use fps_meter::FpsMeter;
-use wgpu::{util::DeviceExt, TextureFormat};
+use egui::FontDefinitions;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
-use winit::{event::Event::*, event_loop::EventLoop};
+use fps_meter::FpsMeter;
+use types::*;
+use wgpu::{util::DeviceExt, TextureFormat};
 use winit::event_loop::ControlFlow;
+use winit::{event::Event::*, event_loop::EventLoop};
 
-#[cfg(target_arch="wasm32")]
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::window::{Window, WindowBuilder};
-
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -47,20 +46,24 @@ impl Vertex {
 
 const VERTICES: &[Vertex] = &[
     Vertex {
-        position: [-1.0, -1.0, 0.0], uv: [0.0, 0.0],
+        position: [-1.0, -1.0, 0.0],
+        uv: [0.0, 0.0],
     },
     Vertex {
-        position: [1.0, -1.0, 0.0], uv: [1.0, 0.0],
-    }, 
-    Vertex {
-        position: [-1.0, 1.0, 0.0], uv: [0.0, 1.0],
+        position: [1.0, -1.0, 0.0],
+        uv: [1.0, 0.0],
     },
     Vertex {
-        position: [1.0, 1.0, 0.0], uv: [1.0, 1.0],
-    }
+        position: [-1.0, 1.0, 0.0],
+        uv: [0.0, 1.0],
+    },
+    Vertex {
+        position: [1.0, 1.0, 0.0],
+        uv: [1.0, 1.0],
+    },
 ];
 
-const INDICES: &[u16] = &[0,1,3,0,3,2];
+const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -123,60 +126,89 @@ struct State {
     last_spawn: f32,
     pal_container: types::Palette,
     prng: types::Dim,
+    base_texture: wgpu::Texture,
+    glow_texture: wgpu::Texture,
 }
 
 impl State {
-    async fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, surface: &wgpu::Surface) -> Self {
+    async fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        surface: &wgpu::Surface,
+    ) -> Self {
         let mut buf = [0u8; 4];
-        let mut diffuse_rgba = image::GrayImage::from_fn(cs::SECTOR_SIZE.x as u32, cs::SECTOR_SIZE.y as u32, |x, y| {
-            if x > 1 && y > 1 && x < cs::SECTOR_SIZE.x as u32 - 2 && y < cs::SECTOR_SIZE.y as u32 - 2
-            {
-                _ = getrandom::getrandom(&mut buf);
-                return image::Luma([if (buf[0]%7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2) { buf[1]%4 } else { 0 }]);
-            }
-            else
-            {
-                return image::Luma([Stone::id()]);
-            }
-        });
+        let mut diffuse_rgba = image::GrayImage::from_fn(
+            cs::SECTOR_SIZE.x as u32,
+            cs::SECTOR_SIZE.y as u32,
+            |x, y| {
+                if x > 1
+                    && y > 1
+                    && x < cs::SECTOR_SIZE.x as u32 - 2
+                    && y < cs::SECTOR_SIZE.y as u32 - 2
+                {
+                    _ = getrandom::getrandom(&mut buf);
+                    return image::Luma([
+                        if (buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2) {
+                            buf[1] % 4
+                        } else {
+                            0
+                        },
+                    ]);
+                } else {
+                    return image::Luma([Stone::id()]);
+                }
+            },
+        );
 
-        for _ in 0..150
-        {
+        fn create_render_target(
+            device: &wgpu::Device,
+            size: wgpu::Extent3d,
+            format: wgpu::TextureFormat,
+        ) -> wgpu::Texture {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("RenderTarget"),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+            })
+        }
+
+        for _ in 0..150 {
             _ = getrandom::getrandom(&mut buf);
 
             let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
             let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
-            for x in 0..50
-            {
+            for x in 0..50 {
                 diffuse_rgba.put_pixel(
                     clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
                     clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                    image::Luma([Wood::id()])
+                    image::Luma([Wood::id()]),
                 );
             }
         }
 
-        for _ in 0..100
-        {
+        for _ in 0..100 {
             _ = getrandom::getrandom(&mut buf);
 
             let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
             let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
-            for x in 0..20
-            {
-                for y in 0..20
-                {
+            for x in 0..20 {
+                for y in 0..20 {
                     diffuse_rgba.put_pixel(
                         clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
                         clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                        image::Luma([Wood::id()])
+                        image::Luma([Wood::id()]),
                     );
                 }
             }
         }
-
 
         let dimensions = diffuse_rgba.dimensions();
 
@@ -185,27 +217,43 @@ impl State {
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
-        let diffuse_texture = device.create_texture(
-            &wgpu::TextureDescriptor {
-                // All textures are stored as 3D, we represent our 2D texture
-                // by setting depth to 1.
-                size: texture_size,
-                mip_level_count: 1, // We'll talk about this a little later
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                // Most images are stored using sRGB so we need to reflect that here.
-                format: wgpu::TextureFormat::R8Uint,
-                // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
-                // COPY_DST means that we want to copy data to this texture
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: Some("diffuse_texture"),
-            }
+
+        let cell_type_texture = device.create_texture(&wgpu::TextureDescriptor {
+            // All textures are stored as 3D, we represent our 2D texture
+            // by setting depth to 1.
+            size: texture_size,
+            mip_level_count: 1, // We'll talk about this a little later
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            // Most images are stored using sRGB so we need to reflect that here.
+            format: wgpu::TextureFormat::R8Uint,
+            // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
+            // COPY_DST means that we want to copy data to this texture
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some("diffuse_texture"),
+        });
+
+        let viewport_extent = wgpu::Extent3d {
+            width: 1024,
+            height: 768,
+            depth_or_array_layers: 1,
+        };
+
+        let base_texture = create_render_target(
+            &device,
+            viewport_extent,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+        );
+        let glow_texture = create_render_target(
+            &device,
+            viewport_extent,
+            wgpu::TextureFormat::Rgba16Float,
         );
 
         queue.write_texture(
             // Tells wgpu where to copy the pixel data
             wgpu::ImageCopyTexture {
-                texture: &diffuse_texture,
+                texture: &cell_type_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -235,21 +283,21 @@ impl State {
             _wasm_padding2: 2.0,
         };
 
-        let raw_ptr = &world_settings as * const WorldSettings;
-        let raw_ptr_bytes = raw_ptr as * mut u8;
+        let raw_ptr = &world_settings as *const WorldSettings;
+        let raw_ptr_bytes = raw_ptr as *mut u8;
 
-        let settings_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Camera Buffer"),
-                contents: unsafe { std::slice::from_raw_parts(raw_ptr_bytes, std::mem::size_of::<WorldSettings>()) },
-                
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
+        let settings_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Buffer"),
+            contents: unsafe {
+                std::slice::from_raw_parts(raw_ptr_bytes, std::mem::size_of::<WorldSettings>())
+            },
 
-        let settings_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let settings_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
@@ -258,25 +306,22 @@ impl State {
                         min_binding_size: None,
                     },
                     count: None,
-                }
-            ],
-            label: Some("settings_bind_group_layout"),
-        });
+                }],
+                label: Some("settings_bind_group_layout"),
+            });
 
         let settings_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &settings_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: settings_buffer.as_entire_binding(),
-                }
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: settings_buffer.as_entire_binding(),
+            }],
             label: Some("settings_bind_group"),
         });
 
         let mut tv = wgpu::TextureViewDescriptor::default().clone();
         tv.format = Some(TextureFormat::R8Uint);
-        let diffuse_texture_view = diffuse_texture.create_view(& tv);
+        let diffuse_texture_view = cell_type_texture.create_view(&tv);
         let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -312,32 +357,27 @@ impl State {
                 label: Some("texture_bind_group_layout"),
             });
 
-        let diffuse_bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
-                    }
-                ],
-                label: Some("diffuse_bind_group"),
-            }
-        );
+        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                },
+            ],
+            label: Some("diffuse_bind_group"),
+        });
 
         //-------------------------------
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[
-                    &settings_bind_group_layout,
-                    &texture_bind_group_layout
-                ],
+                bind_group_layouts: &[&settings_bind_group_layout, &texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -395,6 +435,7 @@ impl State {
             contents: bytemuck::cast_slice(INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
+        
         let num_indices = INDICES.len() as u32;
 
         let a = 0;
@@ -416,12 +457,14 @@ impl State {
             start_time,
             diffuse_bind_group,
             diffuse_rgba,
-            diffuse_texture,
+            diffuse_texture: cell_type_texture,
             a,
             b,
             last_spawn,
             pal_container,
-            prng
+            prng,
+            base_texture,
+            glow_texture
         }
     }
 
@@ -461,52 +504,51 @@ impl State {
 
         let mut b_index = 0;
 
-        const BUF_SIZE : usize = 50;
+        const BUF_SIZE: usize = 50;
         let mut buf = [0u8; BUF_SIZE];
         _ = getrandom::getrandom(&mut buf);
 
         let sim_upd_start_time = instant::now();
 
-        for _sim_update in 0..sim_steps
-		{
-			self.a += 1;
-			if self.a > 1
-            {
+        for _sim_update in 0..sim_steps {
+            self.a += 1;
+            if self.a > 1 {
                 self.a = 0;
-				self.b += 1;
-                if self.b > 1
-                {
+                self.b += 1;
+                if self.b > 1 {
                     self.b = 0;
                 }
             }
 
             self.prng.gen();
 
-			for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2)
-			{
-		        for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2)
-				{
+            for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2) {
+                for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2) {
                     b_index += 1;
-                    if b_index >= BUF_SIZE
-                    {
+                    if b_index >= BUF_SIZE {
                         b_index = 0;
                     }
 
-                    if buf[b_index] > 200
-                    {
+                    if buf[b_index] > 200 {
                         continue;
                     }
 
-					let cur = cs::xy_to_index(i, j);
+                    let cur = cs::xy_to_index(i, j);
                     let cur_v = *self.diffuse_rgba.get(cur).unwrap();
 
-                    self.pal_container.pal[cur_v as usize].update(i, j, cur, self.diffuse_rgba.as_mut(), &self.pal_container, &mut self.prng);
-				}
-			}
-		}
+                    self.pal_container.pal[cur_v as usize].update(
+                        i,
+                        j,
+                        cur,
+                        self.diffuse_rgba.as_mut(),
+                        &self.pal_container,
+                        &mut self.prng,
+                    );
+                }
+            }
+        }
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
-
 
         //self.diffuse_rgba = output;
 
@@ -534,11 +576,10 @@ impl State {
         };
     }
 
-    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {        
-        let mut encoder = device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+    fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -568,36 +609,30 @@ impl State {
     }
 }
 
-pub fn compact_number_string(n: f32) -> String
-{
+pub fn compact_number_string(n: f32) -> String {
     let abs = cgmath::num_traits::abs(n);
 
-    if abs < 999.0
-    {
+    if abs < 999.0 {
         return format!("{}", abs);
     }
 
-    if abs < 999999.0
-    {
+    if abs < 999999.0 {
         return format!("{:.2}k", abs as f32 / 1000.0);
     }
 
-    if abs < 999999999.0
-    {
+    if abs < 999999999.0 {
         return format!("{:.2}M", abs as f32 / 1000000.0);
     }
 
-    if abs < 999999999999.0
-    {
+    if abs < 999999999999.0 {
         return format!("{:.2}G", abs as f32 / 1000000000.0);
     }
 
     return format!("{:.2}T", abs as f32 / 1000000000000.0);
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
-
     let mut number_of_cells_to_add = 500;
     let mut number_of_structures_to_add = 100;
     let mut simulation_steps_per_frame = 5;
@@ -630,7 +665,7 @@ pub async fn run(w: f32, h: f32) {
     {
         use winit::dpi::PhysicalSize;
         window.set_inner_size(winit::dpi::LogicalSize::new(w, h));
-        
+
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
             .and_then(|win| win.document())
@@ -647,31 +682,31 @@ pub async fn run(w: f32, h: f32) {
     let surface = unsafe { instance.create_surface(&window) };
 
     let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .unwrap();
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .unwrap();
 
     let (device, queue) = adapter
-    .request_device(
-        &wgpu::DeviceDescriptor {
-            label: None,
-            features: wgpu::Features::empty(),
-            // WebGL doesn't support all of wgpu's features, so if
-            // we're building for the web we'll have to disable some.
-            limits: if cfg!(target_arch = "wasm32") {
-                wgpu::Limits::downlevel_webgl2_defaults()
-            } else {
-                wgpu::Limits::default()
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                label: None,
+                features: wgpu::Features::empty(),
+                // WebGL doesn't support all of wgpu's features, so if
+                // we're building for the web we'll have to disable some.
+                limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits::default()
+                },
             },
-        },
-        None, // Trace path
-    )
-    .await
-    .unwrap();
+            None, // Trace path
+        )
+        .await
+        .unwrap();
 
     let size = window.inner_size();
     let surface_format = surface.get_supported_formats(&adapter)[0];
@@ -723,7 +758,7 @@ pub async fn run(w: f32, h: f32) {
                         return;
                     }
                 };
-                
+
                 let output_view = output_frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
@@ -738,105 +773,136 @@ pub async fn run(w: f32, h: f32) {
                 //demo_app.ui(&platform.context());
 
                 egui::Window::new("Monitor")
-                .default_pos(egui::pos2(340.0, 5.0))
-                .fixed_size(egui::vec2(200.0, 100.0))
-                .show(&platform.context(), |ui|{
-                    ui.label(["CO2 level:", compact_number_string(state.prng.carb() as f32).as_str()].join(" "));
-                    ui.separator();
-                    ui.label(format!("fps: {}", compact_number_string(fps_meter.next() as f32)));
-                    let sim_step_avg_time_str = if simulation_steps_per_frame == 0 {
-                        "sim. step avg time: ON PAUSE".to_string()
-                    } else { 
-                        format!("sim. step avg time: {:.1} ms.", upd_result.simulation_step_average_time)
-                    };
-                    ui.label(sim_step_avg_time_str);
-                    ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
-                });
+                    .default_pos(egui::pos2(340.0, 5.0))
+                    .fixed_size(egui::vec2(200.0, 100.0))
+                    .show(&platform.context(), |ui| {
+                        ui.label(
+                            [
+                                "CO2 level:",
+                                compact_number_string(state.prng.carb() as f32).as_str(),
+                            ]
+                            .join(" "),
+                        );
+                        ui.separator();
+                        ui.label(format!(
+                            "fps: {}",
+                            compact_number_string(fps_meter.next() as f32)
+                        ));
+                        let sim_step_avg_time_str = if simulation_steps_per_frame == 0 {
+                            "sim. step avg time: ON PAUSE".to_string()
+                        } else {
+                            format!(
+                                "sim. step avg time: {:.1} ms.",
+                                upd_result.simulation_step_average_time
+                            )
+                        };
+                        ui.label(sim_step_avg_time_str);
+                        ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
+                    });
 
                 egui::Window::new("Toolbox")
-                .default_pos(egui::pos2(5.0, 5.0))
-                .fixed_size(egui::vec2(200., 100.))
-                .show(&platform.context(), |ui| {
-                    ui.heading("Simulation settings");
-                    ui.add(egui::Slider::new(&mut simulation_steps_per_frame, 0..=50).text("Simulation steps per frame"));
-                    ui.separator();
-                    ui.heading("Spawn particles");
-                    ui.add(egui::Slider::new(&mut number_of_cells_to_add, 0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD).text("Number of cells to add"));
-                    ui.label("Click to add");
+                    .default_pos(egui::pos2(5.0, 5.0))
+                    .fixed_size(egui::vec2(200., 100.))
+                    .show(&platform.context(), |ui| {
+                        ui.heading("Simulation settings");
+                        ui.add(
+                            egui::Slider::new(&mut simulation_steps_per_frame, 0..=50)
+                                .text("Simulation steps per frame"),
+                        );
+                        ui.separator();
+                        ui.heading("Spawn particles");
+                        ui.add(
+                            egui::Slider::new(
+                                &mut number_of_cells_to_add,
+                                0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD,
+                            )
+                            .text("Number of cells to add"),
+                        );
+                        ui.label("Click to add");
 
-
-                    if ui.button("Water").clicked() {
-                        let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
-                        _ = getrandom::getrandom(&mut buf);
-            
-                        for i in 0..number_of_cells_to_add
-                        {
-                            let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
-                            let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                            state.diffuse_rgba.put_pixel(px, py, image::Luma([water::id()]));
-                        }
-                    }
-
-                    if ui.button("Embers").clicked() {
-                        let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
-                        _ = getrandom::getrandom(&mut buf);
-            
-                        for i in 0..number_of_cells_to_add
-                        {
-                            let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
-                            let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                            state.diffuse_rgba.put_pixel(px, py, image::Luma([burning_coal::id()]));
-                        }
-                    }
-
-                    ui.separator();
-                    ui.heading("Spawn structures");
-                    ui.add(egui::Slider::new(&mut number_of_structures_to_add, 0..=MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD).text("Number of structures to add"));
-                    ui.label("Click to add");
-
-                    if ui.button("Wooden platforms").clicked() {
-                        for _ in 0..number_of_structures_to_add
-                        {
-                            let mut buf = [0u8; 4];
+                        if ui.button("Water").clicked() {
+                            let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
                             _ = getrandom::getrandom(&mut buf);
 
-                            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+                            for i in 0..number_of_cells_to_add {
+                                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32)
+                                    % cs::SECTOR_SIZE.x as u32;
+                                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
+                                state
+                                    .diffuse_rgba
+                                    .put_pixel(px, py, image::Luma([water::id()]));
+                            }
+                        }
 
-                            for x in 0..50
-                            {
+                        if ui.button("Embers").clicked() {
+                            let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
+                            _ = getrandom::getrandom(&mut buf);
+
+                            for i in 0..number_of_cells_to_add {
+                                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32)
+                                    % cs::SECTOR_SIZE.x as u32;
+                                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
                                 state.diffuse_rgba.put_pixel(
-                                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                    image::Luma([Wood::id()])
+                                    px,
+                                    py,
+                                    image::Luma([burning_coal::id()]),
                                 );
                             }
                         }
-                    }
 
-                    if ui.button("Cubes").clicked() {
-                        for _ in 0..number_of_structures_to_add
-                        {
-                            let mut buf = [0u8; 4];
-                            _ = getrandom::getrandom(&mut buf);
+                        ui.separator();
+                        ui.heading("Spawn structures");
+                        ui.add(
+                            egui::Slider::new(
+                                &mut number_of_structures_to_add,
+                                0..=MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD,
+                            )
+                            .text("Number of structures to add"),
+                        );
+                        ui.label("Click to add");
 
-                            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+                        if ui.button("Wooden platforms").clicked() {
+                            for _ in 0..number_of_structures_to_add {
+                                let mut buf = [0u8; 4];
+                                _ = getrandom::getrandom(&mut buf);
 
-                            for x in 0..20
-                            {
-                                for y in 0..20
-                                {
+                                let nx = (((buf[0] as u32) << 8) | buf[1] as u32)
+                                    % cs::SECTOR_SIZE.x as u32;
+                                let ny = (((buf[2] as u32) << 8) | buf[3] as u32)
+                                    % cs::SECTOR_SIZE.y as u32;
+
+                                for x in 0..50 {
                                     state.diffuse_rgba.put_pixel(
                                         clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                        image::Luma([Wood::id()])
+                                        clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                        image::Luma([Wood::id()]),
                                     );
                                 }
                             }
                         }
-                    }
-                });
+
+                        if ui.button("Cubes").clicked() {
+                            for _ in 0..number_of_structures_to_add {
+                                let mut buf = [0u8; 4];
+                                _ = getrandom::getrandom(&mut buf);
+
+                                let nx = (((buf[0] as u32) << 8) | buf[1] as u32)
+                                    % cs::SECTOR_SIZE.x as u32;
+                                let ny = (((buf[2] as u32) << 8) | buf[3] as u32)
+                                    % cs::SECTOR_SIZE.y as u32;
+
+                                for x in 0..20 {
+                                    for y in 0..20 {
+                                        state.diffuse_rgba.put_pixel(
+                                            clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                            clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                            image::Luma([Wood::id()]),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    });
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));
@@ -885,7 +951,7 @@ pub async fn run(w: f32, h: f32) {
                 // } else {
                 //     *control_flow = ControlFlow::Wait;
                 // }
-            },
+            }
             MainEventsCleared {} => {
                 window.request_redraw();
             }
