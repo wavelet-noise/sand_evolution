@@ -11,5 +11,7 @@
   ],
   "module": "sand_evolution_lib.js",
   "types": "sand_evolution_lib.d.ts",
-  "sideEffects": false
+  "sideEffects": [
+    "./snippets/*"
+  ]
 }
