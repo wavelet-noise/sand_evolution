@@ -156,6 +156,9 @@ impl CellTrait for Void {
         _: &mut Dim,
     ) {
     }
+    fn name(&self) -> String {
+        "void".to_owned()
+    }
 }
 
 pub struct Sand;
@@ -184,5 +187,8 @@ impl CellTrait for Sand {
     }
     fn id(&self) -> CellType {
         1
+    }
+    fn name(&self) -> String {
+        "sand".to_owned()
     }
 }
