@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{CellType, CellTrait, CellRegistry, Dim};
+use super::{CellRegistry, CellTrait, CellType, Dim};
 
 pub struct Stone;
 impl Stone {

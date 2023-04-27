@@ -1,10 +1,10 @@
+mod cells;
 mod cs;
 mod fps_meter;
-mod cells;
 mod update;
 
 use cgmath::num_traits::clamp;
-use egui::{FontDefinitions, CentralPanel, ComboBox};
+use egui::{CentralPanel, ComboBox, FontDefinitions};
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use fps_meter::FpsMeter;
@@ -17,9 +17,9 @@ use winit::{event::Event::*, event_loop::EventLoop};
 use wasm_bindgen::prelude::*;
 use winit::window::{Window, WindowBuilder};
 
-use crate::cells::{CellRegistry, Dim, water, burning_coal};
 use crate::cells::stone::Stone;
 use crate::cells::wood::Wood;
+use crate::cells::{burning_coal, water, CellRegistry, Dim};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -249,11 +249,8 @@ impl State {
             viewport_extent,
             wgpu::TextureFormat::Bgra8UnormSrgb,
         );
-        let glow_texture = create_render_target(
-            &device,
-            viewport_extent,
-            wgpu::TextureFormat::Rgba16Float,
-        );
+        let glow_texture =
+            create_render_target(&device, viewport_extent, wgpu::TextureFormat::Rgba16Float);
 
         queue.write_texture(
             // Tells wgpu where to copy the pixel data
@@ -440,7 +437,7 @@ impl State {
             contents: bytemuck::cast_slice(INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
-        
+
         let num_indices = INDICES.len() as u32;
 
         let a = 0;
@@ -469,7 +466,7 @@ impl State {
             pal_container,
             prng,
             base_texture,
-            glow_texture
+            glow_texture,
         }
     }
 
@@ -698,7 +695,7 @@ pub async fn run(w: f32, h: f32) {
     let mut state = State::new(&device, &queue, &surface_config, &surface).await;
 
     let mut selected_option: String = "water".to_owned();
-    let mut options: Vec<String> = [].to_vec();
+    let mut options: Vec<String> = Vec::new();
 
     for a in state.pal_container.pal.iter() {
         if a.id() != 0 {
@@ -794,10 +791,14 @@ pub async fn run(w: f32, h: f32) {
                             .selected_text(&selected_option)
                             .show_ui(ui, |ui| {
                                 for option in options.iter() {
-                                    ui.selectable_value(&mut selected_option, option.to_string(), option.to_string());
+                                    ui.selectable_value(
+                                        &mut selected_option,
+                                        option.to_string(),
+                                        option.to_string(),
+                                    );
                                 }
                             });
-                
+
                         ui.label(format!("Selected: {}", selected_option));
 
                         if ui.button("Spawn").clicked() {
@@ -808,9 +809,11 @@ pub async fn run(w: f32, h: f32) {
                                 let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32)
                                     % cs::SECTOR_SIZE.x as u32;
                                 let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                                state
-                                    .diffuse_rgba
-                                    .put_pixel(px, py, image::Luma([state.pal_container.dict[&selected_option]]));
+                                state.diffuse_rgba.put_pixel(
+                                    px,
+                                    py,
+                                    image::Luma([state.pal_container.dict[&selected_option]]),
+                                );
                             }
                         }
 

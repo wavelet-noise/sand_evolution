@@ -1,6 +1,6 @@
 use crate::cs;
 
-use super::{Dim, CellRegistry};
+use super::{CellRegistry, Dim};
 
 pub fn sand_faling_helper(
     my_den: i8,

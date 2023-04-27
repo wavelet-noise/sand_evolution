@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{CellType, CellTrait, CellRegistry, Dim, burning_wood};
+use super::{burning_wood, CellRegistry, CellTrait, CellType, Dim};
 
 pub struct Wood;
 impl Wood {

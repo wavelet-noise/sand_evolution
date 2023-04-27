@@ -1,4 +1,4 @@
-use crate::{State, cs};
+use crate::{cs, State};
 
 pub fn update_dim(state: &mut State, sim_steps: u8, dimensions: (u32, u32)) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
@@ -41,4 +41,5 @@ pub fn update_dim(state: &mut State, sim_steps: u8, dimensions: (u32, u32)) {
                 );
             }
         }
-    }}
+    }
+}
