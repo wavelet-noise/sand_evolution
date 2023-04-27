@@ -12,17 +12,6 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly run: (a: number, b: number) => number;
-  readonly wgpu_compute_pass_set_pipeline: (a: number, b: number) => void;
-  readonly wgpu_compute_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly wgpu_compute_pass_set_push_constant: (a: number, b: number, c: number, d: number) => void;
-  readonly wgpu_compute_pass_insert_debug_marker: (a: number, b: number, c: number) => void;
-  readonly wgpu_compute_pass_push_debug_group: (a: number, b: number, c: number) => void;
-  readonly wgpu_compute_pass_pop_debug_group: (a: number) => void;
-  readonly wgpu_compute_pass_write_timestamp: (a: number, b: number, c: number) => void;
-  readonly wgpu_compute_pass_begin_pipeline_statistics_query: (a: number, b: number, c: number) => void;
-  readonly wgpu_compute_pass_end_pipeline_statistics_query: (a: number) => void;
-  readonly wgpu_compute_pass_dispatch_workgroups: (a: number, b: number, c: number, d: number) => void;
-  readonly wgpu_compute_pass_dispatch_workgroups_indirect: (a: number, b: number, c: number) => void;
   readonly wgpu_render_pass_set_pipeline: (a: number, b: number) => void;
   readonly wgpu_render_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_render_pass_set_vertex_buffer: (a: number, b: number, c: number, d: number, e: number) => void;
@@ -45,6 +34,17 @@ export interface InitOutput {
   readonly wgpu_render_pass_write_timestamp: (a: number, b: number, c: number) => void;
   readonly wgpu_render_pass_begin_pipeline_statistics_query: (a: number, b: number, c: number) => void;
   readonly wgpu_render_pass_end_pipeline_statistics_query: (a: number) => void;
+  readonly wgpu_compute_pass_set_pipeline: (a: number, b: number) => void;
+  readonly wgpu_compute_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly wgpu_compute_pass_set_push_constant: (a: number, b: number, c: number, d: number) => void;
+  readonly wgpu_compute_pass_insert_debug_marker: (a: number, b: number, c: number) => void;
+  readonly wgpu_compute_pass_push_debug_group: (a: number, b: number, c: number) => void;
+  readonly wgpu_compute_pass_pop_debug_group: (a: number) => void;
+  readonly wgpu_compute_pass_write_timestamp: (a: number, b: number, c: number) => void;
+  readonly wgpu_compute_pass_begin_pipeline_statistics_query: (a: number, b: number, c: number) => void;
+  readonly wgpu_compute_pass_end_pipeline_statistics_query: (a: number) => void;
+  readonly wgpu_compute_pass_dispatch_workgroups: (a: number, b: number, c: number, d: number) => void;
+  readonly wgpu_compute_pass_dispatch_workgroups_indirect: (a: number, b: number, c: number) => void;
   readonly wgpu_render_bundle_set_pipeline: (a: number, b: number) => void;
   readonly wgpu_render_bundle_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_render_bundle_set_vertex_buffer: (a: number, b: number, c: number, d: number, e: number) => void;
@@ -53,21 +53,21 @@ export interface InitOutput {
   readonly wgpu_render_bundle_draw_indexed: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly wgpu_render_bundle_draw_indirect: (a: number, b: number, c: number) => void;
   readonly wgpu_render_bundle_draw_indexed_indirect: (a: number, b: number, c: number) => void;
+  readonly wgpu_render_pass_set_index_buffer: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly wgpu_render_pass_execute_bundles: (a: number, b: number, c: number) => void;
   readonly wgpu_render_bundle_set_index_buffer: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_render_bundle_pop_debug_group: (a: number) => void;
   readonly wgpu_render_bundle_insert_debug_marker: (a: number, b: number) => void;
   readonly wgpu_render_bundle_push_debug_group: (a: number, b: number) => void;
-  readonly wgpu_render_pass_set_index_buffer: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly wgpu_render_pass_execute_bundles: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number) => number;
   readonly __wbindgen_export_2: WebAssembly.Table;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h425ce5bededc3201: (a: number, b: number, c: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h88fef46e7650d834: (a: number, b: number) => void;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h18c276a0c76fa778: (a: number, b: number, c: number) => void;
+  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h0927ce2c4284398b: (a: number, b: number, c: number) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__he711c497ff3ee93d: (a: number, b: number) => void;
+  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h648936b1a63def1b: (a: number, b: number, c: number) => void;
   readonly __wbindgen_free: (a: number, b: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
-  readonly wasm_bindgen__convert__closures__invoke2_mut__h26f7f58d6c4d90c1: (a: number, b: number, c: number, d: number) => void;
+  readonly wasm_bindgen__convert__closures__invoke2_mut__h1ac7aee877d09bb9: (a: number, b: number, c: number, d: number) => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
