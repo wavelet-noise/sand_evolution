@@ -1,13 +1,14 @@
 mod cs;
 mod fps_meter;
-mod types;
+mod cells;
+mod update;
 
 use cgmath::num_traits::clamp;
-use egui::FontDefinitions;
+use egui::{FontDefinitions, CentralPanel, ComboBox};
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use fps_meter::FpsMeter;
-use types::*;
+use update::update_dim;
 use wgpu::{util::DeviceExt, TextureFormat};
 use winit::event_loop::ControlFlow;
 use winit::{event::Event::*, event_loop::EventLoop};
@@ -15,6 +16,10 @@ use winit::{event::Event::*, event_loop::EventLoop};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::window::{Window, WindowBuilder};
+
+use crate::cells::{CellRegistry, Dim, water, burning_coal};
+use crate::cells::stone::Stone;
+use crate::cells::wood::Wood;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -109,7 +114,7 @@ impl Camera {
     }
 }
 
-struct State {
+pub struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -124,8 +129,8 @@ struct State {
     a: cs::PointType,
     b: cs::PointType,
     last_spawn: f32,
-    pal_container: types::Palette,
-    prng: types::Dim,
+    pal_container: cells::CellRegistry,
+    prng: cells::Dim,
     base_texture: wgpu::Texture,
     glow_texture: wgpu::Texture,
 }
@@ -443,7 +448,7 @@ impl State {
 
         let last_spawn = -5.0;
 
-        let pal_container = Palette::new();
+        let pal_container = CellRegistry::new();
         let prng = Dim::new();
 
         Self {
@@ -492,63 +497,19 @@ impl State {
             bytemuck::cast_slice(&[self.world_settings.time]),
         );
 
+        let sim_upd_start_time = instant::now();
+
         let dimensions = self.diffuse_rgba.dimensions();
+
+        update_dim(self, sim_steps, dimensions);
+
+        let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
             height: dimensions.1,
             depth_or_array_layers: 1,
         };
-
-        //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
-
-        let mut b_index = 0;
-
-        const BUF_SIZE: usize = 50;
-        let mut buf = [0u8; BUF_SIZE];
-        _ = getrandom::getrandom(&mut buf);
-
-        let sim_upd_start_time = instant::now();
-
-        for _sim_update in 0..sim_steps {
-            self.a += 1;
-            if self.a > 1 {
-                self.a = 0;
-                self.b += 1;
-                if self.b > 1 {
-                    self.b = 0;
-                }
-            }
-
-            self.prng.gen();
-
-            for i in (1..(cs::SECTOR_SIZE.x - 2 - self.a)).rev().step_by(2) {
-                for j in (1..(cs::SECTOR_SIZE.y - 2 - self.b)).rev().step_by(2) {
-                    b_index += 1;
-                    if b_index >= BUF_SIZE {
-                        b_index = 0;
-                    }
-
-                    if buf[b_index] > 200 {
-                        continue;
-                    }
-
-                    let cur = cs::xy_to_index(i, j);
-                    let cur_v = *self.diffuse_rgba.get(cur).unwrap();
-
-                    self.pal_container.pal[cur_v as usize].update(
-                        i,
-                        j,
-                        cur,
-                        self.diffuse_rgba.as_mut(),
-                        &self.pal_container,
-                        &mut self.prng,
-                    );
-                }
-            }
-        }
-
-        let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 
         //self.diffuse_rgba = output;
 
@@ -732,9 +693,18 @@ pub async fn run(w: f32, h: f32) {
     let mut egui_rpass = RenderPass::new(&device, surface_format, 1);
 
     // Display the demo application that ships with egui.
-    let mut demo_app = egui_demo_lib::DemoWindows::default();
+    //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
     let mut state = State::new(&device, &queue, &surface_config, &surface).await;
+
+    let mut selected_option: String = "water".to_owned();
+    let mut options: Vec<String> = [].to_vec();
+
+    for a in state.pal_container.pal.iter() {
+        if a.id() != 0 {
+            options.push(a.name());
+        }
+    }
 
     let start_time = instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -820,7 +790,17 @@ pub async fn run(w: f32, h: f32) {
                         );
                         ui.label("Click to add");
 
-                        if ui.button("Water").clicked() {
+                        let combo = ComboBox::from_id_source("dropdown_list")
+                            .selected_text(&selected_option)
+                            .show_ui(ui, |ui| {
+                                for option in options.iter() {
+                                    ui.selectable_value(&mut selected_option, option.to_string(), option.to_string());
+                                }
+                            });
+                
+                        ui.label(format!("Selected: {}", selected_option));
+
+                        if ui.button("Spawn").clicked() {
                             let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
                             _ = getrandom::getrandom(&mut buf);
 
@@ -830,23 +810,7 @@ pub async fn run(w: f32, h: f32) {
                                 let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
                                 state
                                     .diffuse_rgba
-                                    .put_pixel(px, py, image::Luma([water::id()]));
-                            }
-                        }
-
-                        if ui.button("Embers").clicked() {
-                            let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
-                            _ = getrandom::getrandom(&mut buf);
-
-                            for i in 0..number_of_cells_to_add {
-                                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32)
-                                    % cs::SECTOR_SIZE.x as u32;
-                                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                                state.diffuse_rgba.put_pixel(
-                                    px,
-                                    py,
-                                    image::Luma([burning_coal::id()]),
-                                );
+                                    .put_pixel(px, py, image::Luma([state.pal_container.dict[&selected_option]]));
                             }
                         }
 

@@ -19,7 +19,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &Palette,
+        pal_container: &CellRegistry,
         prng: &mut Dim,
     ) {
         fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
@@ -27,5 +27,13 @@ impl CellTrait for Cell {
 
     fn den(&self) -> i8 {
         -1
+    }
+
+    fn name(&self) -> String {
+        "steram".to_owned()
+    }
+
+    fn id(&self) -> CellType {
+        3
     }
 }

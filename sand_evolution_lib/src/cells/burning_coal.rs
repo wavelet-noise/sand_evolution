@@ -7,10 +7,10 @@ pub const fn new() -> Cell {
 pub fn boxed() -> Box<Cell> {
     Box::new(new())
 }
+
 pub fn id() -> CellType {
     7
 }
-
 pub struct Cell;
 impl CellTrait for Cell {
     fn update(
@@ -19,7 +19,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &Palette,
+        pal_container: &CellRegistry,
         prng: &mut Dim,
     ) {
         if !sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
@@ -71,5 +71,13 @@ impl CellTrait for Cell {
 
     fn den(&self) -> i8 {
         2
+    }
+
+    fn name(&self) -> String {
+        "burning coal".to_owned()
+    }
+
+    fn id(&self) -> CellType {
+        7
     }
 }
