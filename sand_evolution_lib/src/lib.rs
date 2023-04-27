@@ -3,13 +3,16 @@ mod cs;
 mod fps_meter;
 mod update;
 
+use std::f32::consts::E;
+
 use cgmath::num_traits::clamp;
-use egui::{CentralPanel, ComboBox, FontDefinitions};
+use egui::{CentralPanel, ComboBox, Context, FontDefinitions};
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use fps_meter::FpsMeter;
 use update::update_dim;
 use wgpu::{util::DeviceExt, TextureFormat};
+use winit::dpi::{LogicalPosition, PhysicalPosition, PhysicalSize};
 use winit::event_loop::ControlFlow;
 use winit::{event::Event::*, event_loop::EventLoop};
 
@@ -20,6 +23,175 @@ use winit::window::{Window, WindowBuilder};
 use crate::cells::stone::Stone;
 use crate::cells::wood::Wood;
 use crate::cells::{burning_coal, water, CellRegistry, Dim};
+
+struct EvolutionApp {
+    number_of_cells_to_add: i32,
+    number_of_structures_to_add: i32,
+    simulation_steps_per_frame: i32,
+    selected_option: String,
+    options: Vec<String>,
+    cursor_position: Option<PhysicalPosition<f64>>,
+    pressed: bool,
+}
+
+impl EvolutionApp {
+    pub fn ui(
+        &mut self,
+        context: &Context,
+        state: &mut State,
+        fps_meter: &mut FpsMeter,
+        upd_result: &UpdateResult,
+    ) {
+        egui::Window::new("Monitor")
+            .default_pos(egui::pos2(340.0, 5.0))
+            .fixed_size(egui::vec2(200.0, 100.0))
+            .show(context, |ui| {
+                ui.label(
+                    [
+                        "CO2 level:",
+                        compact_number_string(state.prng.carb() as f32).as_str(),
+                    ]
+                    .join(" "),
+                );
+                ui.separator();
+                ui.label(format!(
+                    "fps: {}",
+                    compact_number_string(fps_meter.next() as f32)
+                ));
+                let sim_step_avg_time_str = if self.simulation_steps_per_frame == 0 {
+                    "sim. step avg time: ON PAUSE".to_string()
+                } else {
+                    format!(
+                        "sim. step avg time: {:.1} ms.",
+                        upd_result.simulation_step_average_time
+                    )
+                };
+                ui.label(sim_step_avg_time_str);
+                ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
+            });
+
+        egui::Window::new("Toolbox")
+            .default_pos(egui::pos2(5.0, 5.0))
+            .fixed_size(egui::vec2(200., 100.))
+            .show(context, |ui| {
+                ui.heading("Simulation settings");
+                ui.add(
+                    egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=50)
+                        .text("Simulation steps per frame"),
+                );
+                ui.separator();
+                ui.heading("Spawn particles");
+                ui.add(
+                    egui::Slider::new(
+                        &mut self.number_of_cells_to_add,
+                        0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD as i32,
+                    )
+                    .text("Number of cells to add"),
+                );
+                ui.label("Click to add");
+
+                let combo = ComboBox::from_id_source("dropdown_list")
+                    .selected_text(&self.selected_option)
+                    .show_ui(ui, |ui| {
+                        for option in self.options.iter() {
+                            ui.selectable_value(
+                                &mut self.selected_option,
+                                option.to_string(),
+                                option.to_string(),
+                            );
+                        }
+                    });
+
+                ui.label(format!("Selected: {}", self.selected_option));
+
+                if ui.button("Spawn").clicked() {
+                    let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
+                    _ = getrandom::getrandom(&mut buf);
+
+                    for i in 0..self.number_of_cells_to_add as usize {
+                        let px =
+                            (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
+                        let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
+                        state.diffuse_rgba.put_pixel(
+                            px,
+                            py,
+                            image::Luma([state.pal_container.dict[&self.selected_option]]),
+                        );
+                    }
+                }
+
+                ui.separator();
+                ui.heading("Spawn structures");
+                ui.add(
+                    egui::Slider::new(
+                        &mut self.number_of_structures_to_add,
+                        0..=MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD as i32,
+                    )
+                    .text("Number of structures to add"),
+                );
+                ui.label("Click to add");
+
+                if ui.button("Wooden platforms").clicked() {
+                    for _ in 0..self.number_of_structures_to_add {
+                        let mut buf = [0u8; 4];
+                        _ = getrandom::getrandom(&mut buf);
+
+                        let nx =
+                            (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                        let ny =
+                            (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                        for x in 0..50 {
+                            state.diffuse_rgba.put_pixel(
+                                clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                image::Luma([Wood::id()]),
+                            );
+                        }
+                    }
+                }
+
+                if ui.button("Cubes").clicked() {
+                    for _ in 0..self.number_of_structures_to_add {
+                        let mut buf = [0u8; 4];
+                        _ = getrandom::getrandom(&mut buf);
+
+                        let nx =
+                            (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                        let ny =
+                            (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                        for x in 0..20 {
+                            for y in 0..20 {
+                                state.diffuse_rgba.put_pixel(
+                                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                    clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                    image::Luma([Wood::id()]),
+                                );
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
+    fn new() -> Self {
+        let number_of_cells_to_add = 500;
+        let number_of_structures_to_add = 100;
+        let simulation_steps_per_frame = 5;
+        let selected_option: String = "water".to_owned();
+        let options: Vec<String> = Vec::new();
+        Self {
+            number_of_cells_to_add,
+            number_of_structures_to_add,
+            simulation_steps_per_frame,
+            selected_option,
+            options,
+            cursor_position: None,
+            pressed: false
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -484,7 +656,39 @@ impl State {
     //     false
     // }
 
-    fn update(&mut self, queue: &wgpu::Queue, sim_steps: u8) -> UpdateResult {
+    fn spawn(&mut self, evolution_app: &mut EvolutionApp, window: &Window) {
+        if let Some(position) = evolution_app.cursor_position {
+            let scale_factor = window.scale_factor();
+            let logical_position: LogicalPosition<f64> =
+                LogicalPosition::from_physical(position, scale_factor);
+            let window_size = window.inner_size();
+            let scaled_window_size = PhysicalSize::new(
+                window_size.width as f64 / scale_factor,
+                window_size.height as f64 / scale_factor,
+            );
+            let percentage_position: (f64, f64) = (
+                logical_position.x / scaled_window_size.width as f64,
+                1.0 - logical_position.y / scaled_window_size.height as f64,
+            );
+
+            let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
+            _ = getrandom::getrandom(&mut buf);
+
+            for i in 0..evolution_app.number_of_cells_to_add as usize {
+                let px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
+                    + (self.prng.next() as f64 - 128.0) / 25.0;
+                let py = percentage_position.1 * cs::SECTOR_SIZE.y as f64
+                    + (self.prng.next() as f64 - 128.0) / 25.0;
+                    self.diffuse_rgba.put_pixel(
+                    px as u32,
+                    py as u32,
+                    image::Luma([self.pal_container.dict[&evolution_app.selected_option]]),
+                );
+            }
+        }
+    }
+
+    fn update(&mut self, queue: &wgpu::Queue, sim_steps: u8, evolution_app: &mut EvolutionApp, window: &Window) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
 
@@ -497,6 +701,10 @@ impl State {
         let sim_upd_start_time = instant::now();
 
         let dimensions = self.diffuse_rgba.dimensions();
+
+        if evolution_app.pressed {
+            self.spawn(evolution_app, window);
+        }
 
         update_dim(self, sim_steps, dimensions);
 
@@ -591,10 +799,6 @@ pub fn compact_number_string(n: f32) -> String {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
-    let mut number_of_cells_to_add = 500;
-    let mut number_of_structures_to_add = 100;
-    let mut simulation_steps_per_frame = 5;
-
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -694,12 +898,11 @@ pub async fn run(w: f32, h: f32) {
 
     let mut state = State::new(&device, &queue, &surface_config, &surface).await;
 
-    let mut selected_option: String = "water".to_owned();
-    let mut options: Vec<String> = Vec::new();
+    let mut evolution_app = EvolutionApp::new();
 
     for a in state.pal_container.pal.iter() {
         if a.id() != 0 {
-            options.push(a.name());
+            evolution_app.options.push(a.name());
         }
     }
 
@@ -730,146 +933,20 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let upd_result = state.update(&queue, simulation_steps_per_frame);
+                let upd_result =
+                    state.update(&queue, evolution_app.simulation_steps_per_frame as u8, &mut evolution_app, &window);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
+                //
+                //    //////
+                //    /    /
+                //    //////
+                //
+
                 platform.begin_frame();
 
-                // Draw the demo application.
-                //demo_app.ui(&platform.context());
-
-                egui::Window::new("Monitor")
-                    .default_pos(egui::pos2(340.0, 5.0))
-                    .fixed_size(egui::vec2(200.0, 100.0))
-                    .show(&platform.context(), |ui| {
-                        ui.label(
-                            [
-                                "CO2 level:",
-                                compact_number_string(state.prng.carb() as f32).as_str(),
-                            ]
-                            .join(" "),
-                        );
-                        ui.separator();
-                        ui.label(format!(
-                            "fps: {}",
-                            compact_number_string(fps_meter.next() as f32)
-                        ));
-                        let sim_step_avg_time_str = if simulation_steps_per_frame == 0 {
-                            "sim. step avg time: ON PAUSE".to_string()
-                        } else {
-                            format!(
-                                "sim. step avg time: {:.1} ms.",
-                                upd_result.simulation_step_average_time
-                            )
-                        };
-                        ui.label(sim_step_avg_time_str);
-                        ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
-                    });
-
-                egui::Window::new("Toolbox")
-                    .default_pos(egui::pos2(5.0, 5.0))
-                    .fixed_size(egui::vec2(200., 100.))
-                    .show(&platform.context(), |ui| {
-                        ui.heading("Simulation settings");
-                        ui.add(
-                            egui::Slider::new(&mut simulation_steps_per_frame, 0..=50)
-                                .text("Simulation steps per frame"),
-                        );
-                        ui.separator();
-                        ui.heading("Spawn particles");
-                        ui.add(
-                            egui::Slider::new(
-                                &mut number_of_cells_to_add,
-                                0..=MAXIMUM_NUMBER_OF_CELLS_TO_ADD,
-                            )
-                            .text("Number of cells to add"),
-                        );
-                        ui.label("Click to add");
-
-                        let combo = ComboBox::from_id_source("dropdown_list")
-                            .selected_text(&selected_option)
-                            .show_ui(ui, |ui| {
-                                for option in options.iter() {
-                                    ui.selectable_value(
-                                        &mut selected_option,
-                                        option.to_string(),
-                                        option.to_string(),
-                                    );
-                                }
-                            });
-
-                        ui.label(format!("Selected: {}", selected_option));
-
-                        if ui.button("Spawn").clicked() {
-                            let mut buf = [0u8; MAXIMUM_NUMBER_OF_CELLS_TO_ADD + 1];
-                            _ = getrandom::getrandom(&mut buf);
-
-                            for i in 0..number_of_cells_to_add {
-                                let px = (((buf[i] as u32) << 8) | buf[i + 1] as u32)
-                                    % cs::SECTOR_SIZE.x as u32;
-                                let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                                state.diffuse_rgba.put_pixel(
-                                    px,
-                                    py,
-                                    image::Luma([state.pal_container.dict[&selected_option]]),
-                                );
-                            }
-                        }
-
-                        ui.separator();
-                        ui.heading("Spawn structures");
-                        ui.add(
-                            egui::Slider::new(
-                                &mut number_of_structures_to_add,
-                                0..=MAXIMUM_NUMBER_OF_STRUCTURES_TO_ADD,
-                            )
-                            .text("Number of structures to add"),
-                        );
-                        ui.label("Click to add");
-
-                        if ui.button("Wooden platforms").clicked() {
-                            for _ in 0..number_of_structures_to_add {
-                                let mut buf = [0u8; 4];
-                                _ = getrandom::getrandom(&mut buf);
-
-                                let nx = (((buf[0] as u32) << 8) | buf[1] as u32)
-                                    % cs::SECTOR_SIZE.x as u32;
-                                let ny = (((buf[2] as u32) << 8) | buf[3] as u32)
-                                    % cs::SECTOR_SIZE.y as u32;
-
-                                for x in 0..50 {
-                                    state.diffuse_rgba.put_pixel(
-                                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                        clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                        image::Luma([Wood::id()]),
-                                    );
-                                }
-                            }
-                        }
-
-                        if ui.button("Cubes").clicked() {
-                            for _ in 0..number_of_structures_to_add {
-                                let mut buf = [0u8; 4];
-                                _ = getrandom::getrandom(&mut buf);
-
-                                let nx = (((buf[0] as u32) << 8) | buf[1] as u32)
-                                    % cs::SECTOR_SIZE.x as u32;
-                                let ny = (((buf[2] as u32) << 8) | buf[3] as u32)
-                                    % cs::SECTOR_SIZE.y as u32;
-
-                                for x in 0..20 {
-                                    for y in 0..20 {
-                                        state.diffuse_rgba.put_pixel(
-                                            clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                            clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                            image::Luma([Wood::id()]),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    });
+                evolution_app.ui(&platform.context(), &mut state, &mut fps_meter, &upd_result);
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));
@@ -933,8 +1010,20 @@ pub async fn run(w: f32, h: f32) {
                         surface.configure(&device, &surface_config);
                     }
                 }
+                winit::event::WindowEvent::CursorMoved { position, .. } => {
+                    evolution_app.cursor_position = Some(position);
+                }
                 winit::event::WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
+                }
+                winit::event::WindowEvent::MouseInput { state, button, .. } => {
+                    if button == winit::event::MouseButton::Left {
+                        if state == winit::event::ElementState::Pressed {
+                            evolution_app.pressed = true;
+                        } else {
+                            evolution_app.pressed = false;
+                        }
+                    }
                 }
                 _ => {}
             },
