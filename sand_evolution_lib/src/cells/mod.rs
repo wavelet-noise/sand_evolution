@@ -1,18 +1,18 @@
 pub mod burning_coal;
 pub mod burning_wood;
+pub mod coal;
 pub mod fire;
 mod helper;
 pub mod steam;
+pub mod stone;
 pub mod water;
 pub mod wood;
-pub mod stone;
-pub mod coal;
 
-use std::{iter::Map, collections::HashMap};
+use std::{collections::HashMap, iter::Map};
 
 use crate::cs::{self, PointType};
 
-use self::{helper::sand_faling_helper, wood::Wood, coal::Coal};
+use self::{coal::Coal, helper::sand_faling_helper, wood::Wood};
 pub type CellType = u8;
 
 pub struct Dim {
@@ -67,12 +67,15 @@ impl Dim {
 pub struct CellRegistry {
     pub pal: Vec<Box<dyn CellTrait>>,
 
-    pub dict: HashMap<String, u8>
+    pub dict: HashMap<String, u8>,
 }
 
 impl CellRegistry {
     pub fn new() -> Self {
-        let mut me = Self { pal: Vec::new(), dict: HashMap::new() };
+        let mut me = Self {
+            pal: Vec::new(),
+            dict: HashMap::new(),
+        };
         setup_palette(&mut me);
         return me;
     }
@@ -143,7 +146,15 @@ impl Void {
     }
 }
 impl CellTrait for Void {
-    fn update(&self, _: PointType, _: PointType, _: usize, _: &mut [u8], _: &CellRegistry, _: &mut Dim) {
+    fn update(
+        &self,
+        _: PointType,
+        _: PointType,
+        _: usize,
+        _: &mut [u8],
+        _: &CellRegistry,
+        _: &mut Dim,
+    ) {
     }
 }
 

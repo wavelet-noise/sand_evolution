@@ -1471,6 +1471,7 @@ dependencies = [
 name = "sand_evolution"
 version = "0.1.0"
 dependencies = [
+ "ndk-sys",
  "pollster",
  "sand_evolution_lib",
 ]

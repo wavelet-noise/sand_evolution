@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{CellType, CellTrait, CellRegistry, Dim, helper::sand_faling_helper, burning_coal};
+use super::{burning_coal, helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Dim};
 
 pub struct Coal;
 impl Coal {
