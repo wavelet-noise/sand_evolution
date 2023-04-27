@@ -7,6 +7,7 @@ pub const fn new() -> Cell {
 pub fn boxed() -> Box<Cell> {
     Box::new(new())
 }
+
 pub fn id() -> CellType {
     6
 }
@@ -19,7 +20,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &Palette,
+        pal_container: &CellRegistry,
         prng: &mut Dim,
     ) {
         if prng.next() > 200 {
@@ -47,5 +48,13 @@ impl CellTrait for Cell {
 
     fn stat(&self) -> bool {
         true
+    }
+
+    fn name(&self) -> String {
+        "burning wood".to_owned()
+    }
+
+    fn id(&self) -> CellType {
+        6
     }
 }

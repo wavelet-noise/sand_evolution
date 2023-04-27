@@ -19,7 +19,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &Palette,
+        pal_container: &CellRegistry,
         dim: &mut Dim,
     ) {
         fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim);
@@ -27,5 +27,13 @@ impl CellTrait for Cell {
 
     fn den(&self) -> i8 {
         1
+    }
+
+    fn name(&self) -> String {
+        "water".to_owned()
+    }
+
+    fn id(&self) -> CellType {
+        2
     }
 }

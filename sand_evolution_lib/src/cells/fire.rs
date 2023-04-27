@@ -19,7 +19,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &Palette,
+        pal_container: &CellRegistry,
         prng: &mut Dim,
     ) {
         if prng.next() > 128 {
@@ -85,5 +85,12 @@ impl CellTrait for Cell {
 
     fn den(&self) -> i8 {
         -1
+    }
+
+    fn name(&self) -> String {
+        "fire".to_owned()
+    }
+    fn id(&self) -> CellType {
+        4
     }
 }

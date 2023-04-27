@@ -1,13 +1,13 @@
 use crate::cs;
 
-use super::{Dim, Palette};
+use super::{Dim, CellRegistry};
 
 pub fn sand_faling_helper(
     my_den: i8,
     i: u16,
     j: u16,
     container: &mut [u8],
-    pal_container: &Palette,
+    pal_container: &CellRegistry,
     cur: usize,
     rpng: &mut Dim,
 ) -> bool {
@@ -55,7 +55,7 @@ pub fn fluid_falling_helper(
     i: u16,
     j: u16,
     container: &mut [u8],
-    pal_container: &Palette,
+    pal_container: &CellRegistry,
     cur: usize,
     rpng: &mut Dim,
 ) -> bool {
@@ -127,12 +127,12 @@ pub fn fluid_flying_helper(
     i: u16,
     j: u16,
     container: &mut [u8],
-    pal_container: &Palette,
+    pal_container: &CellRegistry,
     cur: usize,
-    rpng: &mut Dim,
+    dim: &mut Dim,
 ) -> bool {
     const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
-    let selected_order = ORDER[(rpng.next() % 2) as usize];
+    let selected_order = ORDER[(dim.next() % 2) as usize];
 
     for k in 0..2 {
         match selected_order[k] {
