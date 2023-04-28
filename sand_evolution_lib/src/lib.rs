@@ -36,6 +36,14 @@ enum Event {
     RequestRedraw,
 }
 
+struct ExampleRepaintSignal(std::sync::Mutex<winit::event_loop::EventLoopProxy<Event>>);
+
+impl epi::backend::RepaintSignal for ExampleRepaintSignal {
+    fn request_repaint(&self) {
+        self.0.lock().unwrap().send_event(Event::RequestRedraw).ok();
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
