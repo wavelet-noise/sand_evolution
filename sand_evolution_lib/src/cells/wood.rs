@@ -1,6 +1,10 @@
 use crate::cs::PointType;
 
-use super::{burning_wood, CellRegistry, CellTrait, CellType, Prng};
+use super::{
+    burning_wood,
+    gas::{self, Gas},
+    CellRegistry, CellTrait, CellType, Prng,
+};
 
 pub struct Wood;
 impl Wood {
@@ -31,6 +35,9 @@ impl CellTrait for Wood {
     }
     fn burnable(&self) -> u8 {
         burning_wood::id()
+    }
+    fn proton_transfer(&self) -> CellType {
+        Gas::id()
     }
     fn id(&self) -> CellType {
         5

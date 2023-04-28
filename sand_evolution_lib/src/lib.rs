@@ -3,8 +3,8 @@ pub mod cs;
 pub mod evolution_app;
 pub mod fps_meter;
 pub mod gbuffer;
-pub mod update;
 pub mod state;
+pub mod update;
 
 use ::egui::FontDefinitions;
 use cgmath::num_traits::clamp;
@@ -216,8 +216,12 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let upd_result =
-                    state.update(&queue, evolution_app.simulation_steps_per_frame as u8, &mut evolution_app, &window);
+                let upd_result = state.update(
+                    &queue,
+                    evolution_app.simulation_steps_per_frame as u8,
+                    &mut evolution_app,
+                    &window,
+                );
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
