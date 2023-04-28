@@ -19,7 +19,7 @@ use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
 use winit::dpi::{LogicalPosition, PhysicalSize};
 use winit::event::Event::*;
-use winit::event_loop::ControlFlow;
+use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
 use crate::cells::stone::Stone;
@@ -83,18 +83,46 @@ const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 /// A simple egui + wgpu + winit based example.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
-    let event_loop = winit::event_loop::EventLoop::new();
+    let mut fps_meter = FpsMeter::new();
+
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init_with_level(log::Level::Warn).expect("Could't initialize logger");
+        } else {
+            env_logger::init();
+        }
+    }
+
+    let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_decorations(true)
         .with_resizable(true)
         .with_transparent(false)
-        .with_title("egui-wgpu_winit example")
-        .with_inner_size(winit::dpi::PhysicalSize {
-            width: INITIAL_WIDTH,
-            height: INITIAL_HEIGHT,
+        .with_title("sand evolution v0.1")
+        .with_inner_size(winit::dpi::LogicalSize {
+            width: w,
+            height: h,
         })
         .build(&event_loop)
         .unwrap();
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::dpi::PhysicalSize;
+        window.set_inner_size(winit::dpi::LogicalSize::new(w, h));
+
+        use winit::platform::web::WindowExtWebSys;
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| {
+                let dst = doc.get_element_by_id("wasm-example")?;
+                let canvas = web_sys::Element::from(window.canvas());
+                dst.append_child(&canvas).ok()?;
+                Some(())
+            })
+            .expect("Couldn't append canvas to document body.");
+    }
 
     let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
     let surface = unsafe { instance.create_surface(&window) };
