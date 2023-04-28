@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Prng};
+use super::{gas::Gas, helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Prng};
 
 pub struct Sand;
 impl Sand {
@@ -25,6 +25,9 @@ impl CellTrait for Sand {
     }
     fn den(&self) -> i8 {
         2
+    }
+    fn proton_transfer(&self) -> CellType {
+        Gas::id()
     }
     fn id(&self) -> CellType {
         1

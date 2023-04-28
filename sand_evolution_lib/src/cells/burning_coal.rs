@@ -72,7 +72,9 @@ impl CellTrait for Cell {
     fn den(&self) -> i8 {
         2
     }
-
+    fn proton_transfer(&self) -> CellType {
+        Gas::id()
+    }
     fn name(&self) -> String {
         "burning coal".to_owned()
     }

@@ -1,18 +1,18 @@
 use super::{helper::fluid_falling_helper, *};
 use crate::cs::PointType;
 
-pub const fn new() -> Cell {
-    Cell
+pub const fn new() -> Water {
+    Water
 }
-pub fn boxed() -> Box<Cell> {
+pub fn boxed() -> Box<Water> {
     Box::new(new())
 }
 pub fn id() -> CellType {
     2
 }
 
-pub struct Cell;
-impl CellTrait for Cell {
+pub struct Water;
+impl CellTrait for Water {
     fn update(
         &self,
         i: PointType,

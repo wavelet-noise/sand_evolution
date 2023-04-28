@@ -190,10 +190,11 @@ impl State {
             texture_size,
         );
 
-        let type_render_and_fullscreen_vertex = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
+        let type_render_and_fullscreen_vertex =
+            device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            });
 
         let bloom_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),

@@ -1,7 +1,9 @@
+pub mod acid;
 pub mod burning_coal;
 pub mod burning_wood;
 pub mod coal;
 pub mod fire;
+pub mod gas;
 mod helper;
 pub mod sand;
 pub mod steam;
@@ -14,7 +16,10 @@ use std::{collections::HashMap, iter::Map};
 
 use crate::cs::{self, PointType};
 
-use self::{coal::Coal, helper::sand_faling_helper, sand::Sand, void::Void, wood::Wood};
+use self::{
+    acid::Acid, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::Sand, void::Void,
+    wood::Wood,
+};
 pub type CellType = u8;
 
 pub struct Prng {
@@ -102,6 +107,9 @@ pub trait CellTrait {
     fn burnable(&self) -> CellType {
         Void::id()
     }
+    fn proton_transfer(&self) -> CellType {
+        Void.id()
+    }
     fn heatable(&self) -> CellType {
         Void::id()
     }
@@ -126,6 +134,9 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[6] = burning_wood::boxed();
     cell_registry.pal[7] = burning_coal::boxed();
     cell_registry.pal[8] = Coal::boxed();
+    cell_registry.pal[9] = Acid::boxed();
+    cell_registry.pal[10] = Gas::boxed();
+    cell_registry.pal[11] = BurningGas::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;
