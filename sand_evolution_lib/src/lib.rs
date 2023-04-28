@@ -80,7 +80,6 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 
-/// A simple egui + wgpu + winit based example.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
     let mut fps_meter = FpsMeter::new();
@@ -124,26 +123,35 @@ pub async fn run(w: f32, h: f32) {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window) };
 
-    // WGPU 0.11+ support force fallback (if HW implementation not supported), set it to true or false (optional).
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: Some(&surface),
-        force_fallback_adapter: false,
-    }))
-    .unwrap();
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .unwrap();
 
-    let (device, queue) = pollster::block_on(adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            features: wgpu::Features::default(),
-            limits: wgpu::Limits::default(),
-            label: None,
-        },
-        None,
-    ))
-    .unwrap();
+    let (device, queue) = adapter
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                label: None,
+                features: wgpu::Features::empty(),
+                // WebGL doesn't support all of wgpu's features, so if
+                // we're building for the web we'll have to disable some.
+                limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits::default()
+                },
+            },
+            None, // Trace path
+        )
+        .await
+        .unwrap();
 
     let size = window.inner_size();
     let surface_format = surface.get_supported_formats(&adapter)[0];
@@ -183,7 +191,6 @@ pub async fn run(w: f32, h: f32) {
 
     let start_time = instant::now();
     event_loop.run(move |event, _, control_flow| {
-        let mut fps_meter = FpsMeter::new();
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
 
@@ -209,12 +216,8 @@ pub async fn run(w: f32, h: f32) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let upd_result = state.update(
-                    &queue,
-                    evolution_app.simulation_steps_per_frame as u8,
-                    &mut evolution_app,
-                    &window,
-                );
+                let upd_result =
+                    state.update(&queue, evolution_app.simulation_steps_per_frame as u8, &mut evolution_app, &window);
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.

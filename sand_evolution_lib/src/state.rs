@@ -674,7 +674,7 @@ impl State {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.gbuffer.albedo_view,
+                        view: &output_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -720,29 +720,29 @@ impl State {
                 // render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
             }
 
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
+            // let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            //     label: Some("Render Pass"),
+            //     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            //         view: &output_view,
+            //         resolve_target: None,
+            //         ops: wgpu::Operations {
+            //             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+            //             store: true,
+            //         },
+            //     })],
+            //     depth_stencil_attachment: None,
+            // });
 
-            render_pass.set_pipeline(&self.gbuffer_collect_pipeline);
-            render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.gbuffer_combine_bind_group, &[]);
+            // render_pass.set_pipeline(&self.gbuffer_collect_pipeline);
+            // render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
+            // render_pass.set_bind_group(1, &self.gbuffer_combine_bind_group, &[]);
 
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            // render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
 
-            drop(render_pass);
+            // drop(render_pass);
         }
 
         queue.submit(std::iter::once(encoder.finish()));
