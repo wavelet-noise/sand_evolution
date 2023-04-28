@@ -15,4 +15,4 @@ sand_evolution_lib = { path = "sand_evolution_lib" }
 pollster = "0.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-ndk-sys = "0.4.0+25.0.8775105"
+ndk-sys = "0.4.0"

@@ -28,6 +28,9 @@ use crate::cells::{CellRegistry, Prng};
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 /// A custom event type for the winit app.
 enum Event {
     RequestRedraw,
@@ -83,7 +86,7 @@ const VERTICES: &[Vertex] = &[
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 
 /// A simple egui + wgpu + winit based example.
-//#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
     let event_loop = winit::event_loop::EventLoopBuilder::<Event>::with_user_event().build();
     let window = winit::window::WindowBuilder::new()
