@@ -30,7 +30,7 @@ impl CellTrait for Cell {
     }
 
     fn name(&self) -> String {
-        "steram".to_owned()
+        "steam".to_owned()
     }
 
     fn id(&self) -> CellType {
