@@ -20,7 +20,7 @@ impl CellTrait for Cell {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        prng: &mut Dim,
+        prng: &mut Prng,
     ) {
         if !sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             let bot = cs::xy_to_index(i, j - 1);

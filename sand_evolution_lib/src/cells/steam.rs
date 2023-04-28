@@ -20,7 +20,7 @@ impl CellTrait for Cell {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        prng: &mut Dim,
+        prng: &mut Prng,
     ) {
         fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
     }

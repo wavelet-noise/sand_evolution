@@ -1,0 +1,5 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./sand_evolution_lib/Cargo.toml"
+    ]
+}
