@@ -3,8 +3,10 @@ pub mod burning_wood;
 pub mod coal;
 pub mod fire;
 mod helper;
+pub mod sand;
 pub mod steam;
 pub mod stone;
+pub mod void;
 pub mod water;
 pub mod wood;
 
@@ -12,17 +14,17 @@ use std::{collections::HashMap, iter::Map};
 
 use crate::cs::{self, PointType};
 
-use self::{coal::Coal, helper::sand_faling_helper, wood::Wood};
+use self::{coal::Coal, helper::sand_faling_helper, sand::Sand, void::Void, wood::Wood};
 pub type CellType = u8;
 
-pub struct Dim {
+pub struct Prng {
     rnd: [u8; 256],
     rnd_next: usize,
 
     carb: i32,
 }
 
-impl Dim {
+impl Prng {
     pub fn new() -> Self {
         let mut buf = [0u8; 256];
         _ = getrandom::getrandom(&mut buf);
@@ -89,7 +91,7 @@ pub trait CellTrait {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        prng: &mut Dim,
+        prng: &mut Prng,
     );
     fn den(&self) -> i8 {
         0
@@ -130,65 +132,5 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     for a in cell_registry.pal.iter() {
         cell_registry.dict.insert(a.name(), index);
         index = index.wrapping_add(1)
-    }
-}
-
-pub struct Void;
-impl Void {
-    pub const fn new() -> Self {
-        Self
-    }
-    pub fn boxed() -> Box<Self> {
-        Box::new(Self::new())
-    }
-    pub fn id() -> CellType {
-        0
-    }
-}
-impl CellTrait for Void {
-    fn update(
-        &self,
-        _: PointType,
-        _: PointType,
-        _: usize,
-        _: &mut [u8],
-        _: &CellRegistry,
-        _: &mut Dim,
-    ) {
-    }
-    fn name(&self) -> String {
-        "void".to_owned()
-    }
-}
-
-pub struct Sand;
-impl Sand {
-    pub const fn new() -> Self {
-        Self
-    }
-    pub fn boxed() -> Box<Self> {
-        Box::new(Self::new())
-    }
-}
-impl CellTrait for Sand {
-    fn update(
-        &self,
-        i: PointType,
-        j: PointType,
-        cur: usize,
-        container: &mut [CellType],
-        pal_container: &CellRegistry,
-        dim: &mut Dim,
-    ) {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur, dim);
-    }
-    fn den(&self) -> i8 {
-        2
-    }
-    fn id(&self) -> CellType {
-        1
-    }
-    fn name(&self) -> String {
-        "sand".to_owned()
     }
 }

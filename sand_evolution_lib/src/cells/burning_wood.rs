@@ -21,7 +21,7 @@ impl CellTrait for Cell {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        prng: &mut Dim,
+        prng: &mut Prng,
     ) {
         if prng.next() > 200 {
             return;

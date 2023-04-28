@@ -20,7 +20,7 @@ impl CellTrait for Cell {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        dim: &mut Dim,
+        dim: &mut Prng,
     ) {
         fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim);
     }

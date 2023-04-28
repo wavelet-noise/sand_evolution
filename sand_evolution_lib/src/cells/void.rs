@@ -2,8 +2,8 @@ use crate::cs::PointType;
 
 use super::{CellRegistry, CellTrait, CellType, Prng};
 
-pub struct Stone;
-impl Stone {
+pub struct Void;
+impl Void {
     pub const fn new() -> Self {
         Self
     }
@@ -11,29 +11,21 @@ impl Stone {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        255
+        0
     }
 }
-impl CellTrait for Stone {
+impl CellTrait for Void {
     fn update(
         &self,
         _: PointType,
         _: PointType,
         _: usize,
-        _: &mut [CellType],
+        _: &mut [u8],
         _: &CellRegistry,
         _: &mut Prng,
     ) {
     }
-
-    fn stat(&self) -> bool {
-        true
-    }
-
-    fn id(&self) -> CellType {
-        255
-    }
     fn name(&self) -> String {
-        "stone".to_owned()
+        "void".to_owned()
     }
 }
