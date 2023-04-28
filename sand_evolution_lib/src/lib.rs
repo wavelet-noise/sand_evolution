@@ -83,7 +83,7 @@ const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 /// A simple egui + wgpu + winit based example.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
-    let event_loop = winit::event_loop::EventLoopBuilder::<Event>::with_user_event().build();
+    let event_loop = winit::event_loop::EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_decorations(true)
         .with_resizable(true)
