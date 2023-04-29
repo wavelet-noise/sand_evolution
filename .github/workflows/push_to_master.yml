@@ -33,6 +33,9 @@ jobs:
         cp repo/index.html dest/index.html
         cp repo/favicon.ico dest/favicon.ico
         rm -f dest/sand_evolution_lib/pkg/.gitignore
+        git clone https://github.com/wavelet-noise/sand_evolution_content.git assets
+        rm -rf assets/.git
+        cp -r assets/ dest/
         echo "---  result  ---"
         ls -fR dest
     - name: Deploy 🚀
