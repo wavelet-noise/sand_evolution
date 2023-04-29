@@ -5,6 +5,7 @@ pub mod fps_meter;
 pub mod gbuffer;
 pub mod state;
 pub mod update;
+pub mod ecs;
 
 use ::egui::FontDefinitions;
 use cgmath::num_traits::clamp;
