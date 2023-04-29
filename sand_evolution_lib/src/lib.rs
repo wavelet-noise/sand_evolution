@@ -1,326 +1,288 @@
-pub mod cells;
-pub mod cs;
-pub mod evolution_app;
-pub mod fps_meter;
-pub mod gbuffer;
-pub mod state;
-pub mod update;
 
-use ::egui::FontDefinitions;
-use cgmath::num_traits::clamp;
-use chrono::Timelike;
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
-use egui_winit_platform::{Platform, PlatformDescriptor};
-use evolution_app::EvolutionApp;
-use fps_meter::FpsMeter;
-use instant::Instant;
-use state::State;
-use wgpu::util::DeviceExt;
-use wgpu::TextureFormat;
-use winit::dpi::{LogicalPosition, PhysicalSize};
-use winit::event::Event::*;
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::Window;
-
-use crate::cells::stone::Stone;
-use crate::cells::wood::Wood;
-use crate::cells::{CellRegistry, Prng};
-const INITIAL_WIDTH: u32 = 1920;
-const INITIAL_HEIGHT: u32 = 1080;
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle, render::render_resource::{ShaderRef, AsBindGroup}, reflect::TypeUuid};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    uv: [f32; 2],
+use bevy::{
+    core_pipeline::core_3d::Transparent3d,
+    ecs::{
+        query::QueryItem,
+        system::{lifetimeless::*, SystemParamItem},
+    },
+    pbr::{MeshPipeline, MeshPipelineKey, MeshUniform, SetMeshBindGroup, SetMeshViewBindGroup},
+    prelude::*,
+    window::{PresentMode, WindowResolution},
+    render::{
+        extract_component::{ExtractComponent, ExtractComponentPlugin},
+        mesh::{GpuBufferInfo, MeshVertexBufferLayout},
+        render_asset::RenderAssets,
+        render_phase::{
+            AddRenderCommand, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult,
+            RenderPhase, SetItemPipeline, TrackedRenderPass,
+        },
+        render_resource::*,
+        renderer::RenderDevice,
+        view::{ExtractedView, NoFrustumCulling},
+        RenderApp, RenderSet,
+    },
+};
+use bytemuck::{Pod, Zeroable};
+
+const BIRDS_PER_SECOND: u32 = 10000;
+const GRAVITY: f32 = -9.8 * 100.0;
+const MAX_VELOCITY: f32 = 750.;
+const BIRD_SCALE: f32 = 0.15;
+const HALF_BIRD_SIZE: f32 = 256. * BIRD_SCALE * 0.5;
+
+#[derive(Resource)]
+struct BevyCounter {
+    pub count: usize,
+    pub color: Color,
 }
 
-impl Vertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
-    }
+#[derive(Component)]
+struct Bird {
+    velocity: Vec3,
 }
-
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-1.0, -1.0, 0.0],
-        uv: [0.0, 0.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 0.0],
-        uv: [1.0, 0.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 0.0],
-        uv: [0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, 0.0],
-        uv: [1.0, 1.0],
-    },
-];
-
-const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
-    let mut fps_meter = FpsMeter::new();
+    App::new()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "a title!".into(),
+                resolution: (800., 600.).into(),
+                present_mode: PresentMode::AutoNoVsync,
+                ..default()
+            }),
+            ..default()
+        }))
+        .add_plugin(CustomMaterialPlugin)
+        .add_startup_system(setup)
+        .run();
+}
 
-    cfg_if::cfg_if! {
-        if #[cfg(target_arch = "wasm32")] {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::Warn).expect("Could't initialize logger");
-        } else {
-            env_logger::init();
-        }
-    }
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+    commands.spawn((
+        meshes.add(Mesh::from(shape::Cube { size: 0.5 })),
+        SpatialBundle::INHERITED_IDENTITY,
+        InstanceMaterialData(
+            (1..=10)
+                .flat_map(|x| (1..=10).map(move |y| (x as f32 / 10.0, y as f32 / 10.0)))
+                .map(|(x, y)| InstanceData {
+                    position: Vec3::new(x * 10.0 - 5.0, y * 10.0 - 5.0, 0.0),
+                    scale: 1.0,
+                    color: Color::hsla(x * 360., y, 0.5, 1.0).as_rgba_f32(),
+                })
+                .collect(),
+        ),
+        // NOTE: Frustum culling is done based on the Aabb of the Mesh and the GlobalTransform.
+        // As the cube is at the origin, if its Aabb moves outside the view frustum, all the
+        // instanced cubes will be culled.
+        // The InstanceMaterialData contains the 'GlobalTransform' information for this custom
+        // instancing, and that is not taken into account with the built-in frustum culling.
+        // We must disable the built-in frustum culling by adding the `NoFrustumCulling` marker
+        // component to avoid incorrect culling.
+        NoFrustumCulling,
+    ));
 
-    let event_loop = EventLoop::new();
-    let window = winit::window::WindowBuilder::new()
-        .with_decorations(true)
-        .with_resizable(true)
-        .with_transparent(false)
-        .with_title("sand evolution v0.1")
-        .with_inner_size(winit::dpi::LogicalSize {
-            width: w,
-            height: h,
-        })
-        .build(&event_loop)
-        .unwrap();
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::dpi::PhysicalSize;
-        window.set_inner_size(winit::dpi::LogicalSize::new(w, h));
-
-        use winit::platform::web::WindowExtWebSys;
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| {
-                let dst = doc.get_element_by_id("wasm-example")?;
-                let canvas = web_sys::Element::from(window.canvas());
-                dst.append_child(&canvas).ok()?;
-                Some(())
-            })
-            .expect("Couldn't append canvas to document body.");
-    }
-
-    let instance = wgpu::Instance::new(wgpu::Backends::all());
-    let surface = unsafe { instance.create_surface(&window) };
-
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        })
-        .await
-        .unwrap();
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                features: wgpu::Features::empty(),
-                // WebGL doesn't support all of wgpu's features, so if
-                // we're building for the web we'll have to disable some.
-                limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
-                },
-            },
-            None, // Trace path
-        )
-        .await
-        .unwrap();
-
-    let size = window.inner_size();
-    let surface_format = surface.get_supported_formats(&adapter)[0];
-    let mut surface_config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: surface_format,
-        width: size.width as u32,
-        height: size.height as u32,
-        present_mode: wgpu::PresentMode::Fifo,
-    };
-    surface.configure(&device, &surface_config);
-
-    // We use the egui_winit_platform crate as the platform.
-    let mut platform = Platform::new(PlatformDescriptor {
-        physical_width: size.width as u32,
-        physical_height: size.height as u32,
-        scale_factor: window.scale_factor(),
-        font_definitions: FontDefinitions::default(),
-        style: Default::default(),
-    });
-
-    // We use the egui_wgpu_backend crate as the render backend.
-    let mut egui_rpass = RenderPass::new(&device, surface_format, 1);
-
-    // Display the demo application that ships with egui.
-    //let mut demo_app = egui_demo_lib::DemoWindows::default();
-
-    let mut state = State::new(&device, &queue, &surface_config, &surface).await;
-
-    let mut evolution_app = EvolutionApp::new();
-
-    for a in state.pal_container.pal.iter() {
-        if a.id() != 0 {
-            evolution_app.options.push(a.name());
-        }
-    }
-
-    let start_time = instant::now();
-    event_loop.run(move |event, _, control_flow| {
-        // Pass the winit events to the platform integration.
-        platform.handle_event(&event);
-
-        match event {
-            RedrawRequested(..) => {
-                platform.update_time((instant::now() - start_time) / 1000.0);
-
-                let output_frame = match surface.get_current_texture() {
-                    Ok(frame) => frame,
-                    Err(wgpu::SurfaceError::Outdated) => {
-                        // This error occurs when the app is minimized on Windows.
-                        // Silently return here to prevent spamming the console with:
-                        // "The underlying surface has changed, and therefore the swap chain must be updated"
-                        return;
-                    }
-                    Err(e) => {
-                        eprintln!("Dropped frame with error: {}", e);
-                        return;
-                    }
-                };
-
-                let output_view = output_frame
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-
-                let upd_result = state.update(
-                    &queue,
-                    evolution_app.simulation_steps_per_frame as u8,
-                    &mut evolution_app,
-                    &window,
-                );
-                _ = state.render(&device, &queue, &output_view);
-
-                // Begin to draw the UI frame.
-                //
-                //    //////
-                //    /    /
-                //    //////
-                //
-
-                platform.begin_frame();
-
-                evolution_app.ui(&platform.context(), &mut state, &mut fps_meter, &upd_result);
-
-                // End the UI frame. We could now handle the output and draw the UI with the backend.
-                let full_output = platform.end_frame(Some(&window));
-                let paint_jobs = platform.context().tessellate(full_output.shapes);
-
-                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-                // Upload all resources for the GPU.
-                let screen_descriptor = ScreenDescriptor {
-                    physical_width: surface_config.width,
-                    physical_height: surface_config.height,
-                    scale_factor: window.scale_factor() as f32,
-                };
-                let tdelta: egui::TexturesDelta = full_output.textures_delta;
-                egui_rpass
-                    .add_textures(&device, &queue, &tdelta)
-                    .expect("add texture ok");
-                egui_rpass.update_buffers(&device, &queue, &paint_jobs, &screen_descriptor);
-
-                // Record all render passes.
-                egui_rpass
-                    .execute(
-                        &mut encoder,
-                        &output_view,
-                        &paint_jobs,
-                        &screen_descriptor,
-                        None,
-                    )
-                    .unwrap();
-
-                // Submit the commands.
-                queue.submit(std::iter::once(encoder.finish()));
-
-                // Redraw egui
-                output_frame.present();
-
-                egui_rpass
-                    .remove_textures(tdelta)
-                    .expect("remove texture ok");
-
-                // Support reactive on windows only, but not on linux.
-                // if _output.needs_repaint {
-                //     *control_flow = ControlFlow::Poll;
-                // } else {
-                //     *control_flow = ControlFlow::Wait;
-                // }
-            }
-            MainEventsCleared {} => {
-                window.request_redraw();
-            }
-            WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::Resized(size) => {
-                    // Resize with 0 width and height is used by winit to signal a minimize event on Windows.
-                    // See: https://github.com/rust-windowing/winit/issues/208
-                    // This solves an issue where the app would panic when minimizing on Windows.
-                    if size.width > 0 && size.height > 0 {
-                        surface_config.width = size.width;
-                        surface_config.height = size.height;
-                        surface.configure(&device, &surface_config);
-                    }
-                }
-                winit::event::WindowEvent::CursorMoved { position, .. } => {
-                    evolution_app.cursor_position = Some(position);
-                }
-                winit::event::WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                winit::event::WindowEvent::MouseInput { state, button, .. } => {
-                    if button == winit::event::MouseButton::Left {
-                        if state == winit::event::ElementState::Pressed {
-                            evolution_app.pressed = true;
-                        } else {
-                            evolution_app.pressed = false;
-                        }
-                    }
-                }
-                _ => {}
-            },
-            _ => (),
-        }
+    // camera
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(0.0, 0.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..default()
     });
 }
 
-/// Time of day as seconds since midnight. Used for clock in demo app.
-pub fn seconds_since_midnight() -> f64 {
-    let time = chrono::Local::now().time();
-    time.num_seconds_from_midnight() as f64 + 1e-9 * (time.nanosecond() as f64)
+#[derive(Component, Deref)]
+struct InstanceMaterialData(Vec<InstanceData>);
+
+impl ExtractComponent for InstanceMaterialData {
+    type Query = &'static InstanceMaterialData;
+    type Filter = ();
+    type Out = Self;
+
+    fn extract_component(item: QueryItem<'_, Self::Query>) -> Option<Self> {
+        Some(InstanceMaterialData(item.0.clone()))
+    }
+}
+
+pub struct CustomMaterialPlugin;
+
+impl Plugin for CustomMaterialPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugin(ExtractComponentPlugin::<InstanceMaterialData>::default());
+        app.sub_app_mut(RenderApp)
+            .add_render_command::<Transparent3d, DrawCustom>()
+            .init_resource::<CustomPipeline>()
+            .init_resource::<SpecializedMeshPipelines<CustomPipeline>>()
+            .add_system(queue_custom.in_set(RenderSet::Queue))
+            .add_system(prepare_instance_buffers.in_set(RenderSet::Prepare));
+    }
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+struct InstanceData {
+    position: Vec3,
+    scale: f32,
+    color: [f32; 4],
+}
+
+#[allow(clippy::too_many_arguments)]
+fn queue_custom(
+    transparent_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
+    custom_pipeline: Res<CustomPipeline>,
+    msaa: Res<Msaa>,
+    mut pipelines: ResMut<SpecializedMeshPipelines<CustomPipeline>>,
+    pipeline_cache: Res<PipelineCache>,
+    meshes: Res<RenderAssets<Mesh>>,
+    material_meshes: Query<(Entity, &MeshUniform, &Handle<Mesh>), With<InstanceMaterialData>>,
+    mut views: Query<(&ExtractedView, &mut RenderPhase<Transparent3d>)>,
+) {
+    let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
+
+    let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
+
+    for (view, mut transparent_phase) in &mut views {
+        let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
+        let rangefinder = view.rangefinder3d();
+        for (entity, mesh_uniform, mesh_handle) in &material_meshes {
+            if let Some(mesh) = meshes.get(mesh_handle) {
+                let key =
+                    view_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology);
+                let pipeline = pipelines
+                    .specialize(&pipeline_cache, &custom_pipeline, key, &mesh.layout)
+                    .unwrap();
+                transparent_phase.add(Transparent3d {
+                    entity,
+                    pipeline,
+                    draw_function: draw_custom,
+                    distance: rangefinder.distance(&mesh_uniform.transform),
+                });
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct InstanceBuffer {
+    buffer: Buffer,
+    length: usize,
+}
+
+fn prepare_instance_buffers(
+    mut commands: Commands,
+    query: Query<(Entity, &InstanceMaterialData)>,
+    render_device: Res<RenderDevice>,
+) {
+    for (entity, instance_data) in &query {
+        let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("instance data buffer"),
+            contents: bytemuck::cast_slice(instance_data.as_slice()),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+        commands.entity(entity).insert(InstanceBuffer {
+            buffer,
+            length: instance_data.len(),
+        });
+    }
+}
+
+#[derive(Resource)]
+pub struct CustomPipeline {
+    shader: Handle<Shader>,
+    mesh_pipeline: MeshPipeline,
+}
+
+impl FromWorld for CustomPipeline {
+    fn from_world(world: &mut World) -> Self {
+        let asset_server = world.resource::<AssetServer>();
+        let shader = asset_server.load("instancing.wgsl");
+
+        let mesh_pipeline = world.resource::<MeshPipeline>();
+
+        CustomPipeline {
+            shader,
+            mesh_pipeline: mesh_pipeline.clone(),
+        }
+    }
+}
+
+impl SpecializedMeshPipeline for CustomPipeline {
+    type Key = MeshPipelineKey;
+
+    fn specialize(
+        &self,
+        key: Self::Key,
+        layout: &MeshVertexBufferLayout,
+    ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
+        let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
+        descriptor.vertex.shader = self.shader.clone();
+        descriptor.vertex.buffers.push(VertexBufferLayout {
+            array_stride: std::mem::size_of::<InstanceData>() as u64,
+            step_mode: VertexStepMode::Instance,
+            attributes: vec![
+                VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: 0,
+                    shader_location: 3, // shader locations 0-2 are taken up by Position, Normal and UV attributes
+                },
+                VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: VertexFormat::Float32x4.size(),
+                    shader_location: 4,
+                },
+            ],
+        });
+        descriptor.fragment.as_mut().unwrap().shader = self.shader.clone();
+        Ok(descriptor)
+    }
+}
+
+type DrawCustom = (
+    SetItemPipeline,
+    SetMeshViewBindGroup<0>,
+    SetMeshBindGroup<1>,
+    DrawMeshInstanced,
+);
+
+pub struct DrawMeshInstanced;
+
+impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
+    type Param = SRes<RenderAssets<Mesh>>;
+    type ViewWorldQuery = ();
+    type ItemWorldQuery = (Read<Handle<Mesh>>, Read<InstanceBuffer>);
+
+    #[inline]
+    fn render<'w>(
+        _item: &P,
+        _view: (),
+        (mesh_handle, instance_buffer): (&'w Handle<Mesh>, &'w InstanceBuffer),
+        meshes: SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let gpu_mesh = match meshes.into_inner().get(mesh_handle) {
+            Some(gpu_mesh) => gpu_mesh,
+            None => return RenderCommandResult::Failure,
+        };
+
+        pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+        pass.set_vertex_buffer(1, instance_buffer.buffer.slice(..));
+
+        match &gpu_mesh.buffer_info {
+            GpuBufferInfo::Indexed {
+                buffer,
+                index_format,
+                count,
+            } => {
+                pass.set_index_buffer(buffer.slice(..), 0, *index_format);
+                pass.draw_indexed(0..*count, 0, 0..instance_buffer.length as u32);
+            }
+            GpuBufferInfo::NonIndexed { vertex_count } => {
+                pass.draw(0..*vertex_count, 0..instance_buffer.length as u32);
+            }
+        }
+        RenderCommandResult::Success
+    }
 }
