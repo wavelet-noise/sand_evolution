@@ -154,25 +154,25 @@ impl CellTrait for SaltyWater {
         dim: &mut Prng,
     ) {
         if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim) {
-            let top = cs::xy_to_index(i, j + 1);
-            let down = cs::xy_to_index(i, j - 1);
-            let r = cs::xy_to_index(i + 1, j);
-            let l = cs::xy_to_index(i - 1, j);
+            // let top = cs::xy_to_index(i, j + 1);
+            // let down = cs::xy_to_index(i, j - 1);
+            // let r = cs::xy_to_index(i + 1, j);
+            // let l = cs::xy_to_index(i - 1, j);
 
-            let arr = [top, down, l, r];
-            let cc = arr[(dim.next() % 4) as usize];
+            // let arr = [top, down, l, r];
+            // let cc = arr[(dim.next() % 4) as usize];
 
-            if dim.next() > 50 {
-                let cc_v = container[cc] as usize;
-                let cc_c = &pal_container.pal[cc_v];
-                let cc_pt = cc_c.dissolve();
+            // if dim.next() > 50 {
+            //     let cc_v = container[cc] as usize;
+            //     let cc_c = &pal_container.pal[cc_v];
+            //     let cc_pt = cc_c.dissolve();
 
-                if cc_pt != Void::id() {
-                    container[cc] = Void::id();
-                    container[cur] = cc_pt;
-                    return;
-                }
-            }
+            //     if cc_pt != Void::id() {
+            //         container[cc] = Void::id();
+            //         container[cur] = cc_pt;
+            //         return;
+            //     }
+            // }
         }
     }
 
