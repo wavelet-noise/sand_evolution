@@ -28,7 +28,7 @@ impl CellTrait for Cell {
 
             let top = cs::xy_to_index(i, j + 1);
 
-            if container[top] == water::id() {
+            if container[top] == Water::id() {
                 container[top] = steam::id();
                 container[cur] = Coal::id();
                 return;
