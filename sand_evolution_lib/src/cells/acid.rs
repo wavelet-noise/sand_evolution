@@ -43,6 +43,12 @@ impl CellTrait for Acid {
                     return;
                 }
 
+                if cc_v == Salt::id() as usize {
+                    container[cc] = SaltyWater::id();
+                    container[cur] = DeluteAcid::id();
+                    return;
+                }
+
                 let cc_h = cc_c.heatable();
 
                 if cc_h != Void::id() {
