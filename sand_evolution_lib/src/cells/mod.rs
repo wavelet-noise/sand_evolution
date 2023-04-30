@@ -17,8 +17,14 @@ use std::{collections::HashMap, iter::Map};
 use crate::cs::{self, PointType};
 
 use self::{
-    acid::{Acid, DeluteAcid}, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::{Sand, Salt, Base}, void::Void,
-    wood::Wood, water::{Water, SaltyWater, BaseWater},
+    acid::{Acid, DeluteAcid},
+    coal::Coal,
+    gas::{BurningGas, Gas},
+    helper::sand_faling_helper,
+    sand::{Base, Salt, Sand},
+    void::Void,
+    water::{BaseWater, SaltyWater, Water},
+    wood::Wood,
 };
 pub type CellType = u8;
 

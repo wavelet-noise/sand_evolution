@@ -1,4 +1,4 @@
-use super::{helper::fluid_falling_helper, *, water::Water};
+use super::{helper::fluid_falling_helper, water::Water, *};
 use crate::cs::PointType;
 
 pub struct Acid;
@@ -71,7 +71,6 @@ impl CellTrait for Acid {
         9
     }
 }
-
 
 pub struct DeluteAcid;
 impl DeluteAcid {

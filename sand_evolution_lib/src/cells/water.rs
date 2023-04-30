@@ -60,7 +60,6 @@ impl CellTrait for Water {
     }
 }
 
-
 pub struct BaseWater;
 impl BaseWater {
     pub const fn new() -> Self {
@@ -128,7 +127,6 @@ impl CellTrait for BaseWater {
         15
     }
 }
-
 
 pub struct SaltyWater;
 impl SaltyWater {

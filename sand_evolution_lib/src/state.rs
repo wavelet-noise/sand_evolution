@@ -586,10 +586,14 @@ impl State {
             _ = getrandom::getrandom(&mut buf);
 
             for i in 0..evolution_app.number_of_cells_to_add as usize {
-                let px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
+                let mut px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
                     + (self.prng.next() as f64 - 128.0) / 25.0;
-                let py = percentage_position.1 * cs::SECTOR_SIZE.y as f64
+                let mut py = percentage_position.1 * cs::SECTOR_SIZE.y as f64
                     + (self.prng.next() as f64 - 128.0) / 25.0;
+
+                px = clamp(px, 0.0, cs::SECTOR_SIZE.x as f64 - 1.0);
+                py = clamp(py, 0.0, cs::SECTOR_SIZE.y as f64 - 1.0);
+
                 self.diffuse_rgba.put_pixel(
                     px as u32,
                     py as u32,
