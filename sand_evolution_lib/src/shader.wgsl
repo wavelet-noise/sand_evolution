@@ -150,6 +150,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(1.0,0.8,0.5,1.0);
     }
+    else if t == 12u // delute acid
+    {
+      col = vec4<f32>(0.2,0.6,0.8,1.0);
+    }
     else
     {
       col = vec4<f32>(0.0,1.0,0.0,1.0);

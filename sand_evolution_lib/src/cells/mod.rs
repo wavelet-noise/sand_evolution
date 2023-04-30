@@ -17,7 +17,7 @@ use std::{collections::HashMap, iter::Map};
 use crate::cs::{self, PointType};
 
 use self::{
-    acid::Acid, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::Sand, void::Void,
+    acid::{Acid, DeluteAcid}, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::Sand, void::Void,
     wood::Wood,
 };
 pub type CellType = u8;
@@ -137,6 +137,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[9] = Acid::boxed();
     cell_registry.pal[10] = Gas::boxed();
     cell_registry.pal[11] = BurningGas::boxed();
+    cell_registry.pal[12] = DeluteAcid::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;

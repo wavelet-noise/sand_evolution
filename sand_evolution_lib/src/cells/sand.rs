@@ -24,7 +24,7 @@ impl CellTrait for Sand {
         sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
     fn den(&self) -> i8 {
-        2
+        10
     }
     fn proton_transfer(&self) -> CellType {
         Gas::id()

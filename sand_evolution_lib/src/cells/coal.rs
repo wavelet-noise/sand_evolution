@@ -1,7 +1,7 @@
 use crate::cs::PointType;
 
 use super::{
-    burning_coal, gas::Gas, helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Prng,
+    burning_coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Prng,
 };
 
 pub struct Coal;
@@ -30,10 +30,10 @@ impl CellTrait for Coal {
     }
 
     fn den(&self) -> i8 {
-        2
+        10
     }
     fn proton_transfer(&self) -> CellType {
-        Gas::id()
+        BurningGas::id()
     }
     fn burnable(&self) -> u8 {
         burning_coal::id()

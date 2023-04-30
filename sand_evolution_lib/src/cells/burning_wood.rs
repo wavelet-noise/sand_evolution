@@ -54,7 +54,7 @@ impl CellTrait for Cell {
         "burning wood".to_owned()
     }
     fn proton_transfer(&self) -> CellType {
-        Gas::id()
+        BurningGas::id()
     }
     fn id(&self) -> CellType {
         6
