@@ -130,6 +130,10 @@ impl EvolutionApp {
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
+                ui.add(
+                    egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=10)
+                        .text("Simulation steps per frame"),
+                );
                 ui.heading("Hold left mouse button to spawn particles");
                 let combo = ComboBox::from_id_source("dropdown_list")
                     .selected_text(&self.selected_option)
