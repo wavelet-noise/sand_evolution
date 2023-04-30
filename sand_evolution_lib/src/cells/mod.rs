@@ -17,8 +17,8 @@ use std::{collections::HashMap, iter::Map};
 use crate::cs::{self, PointType};
 
 use self::{
-    acid::{Acid, DeluteAcid}, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::Sand, void::Void,
-    wood::Wood,
+    acid::{Acid, DeluteAcid}, coal::Coal, gas::{Gas, BurningGas}, helper::sand_faling_helper, sand::{Sand, Salt, Base}, void::Void,
+    wood::Wood, water::{Water, SaltyWater, BaseWater},
 };
 pub type CellType = u8;
 
@@ -110,6 +110,9 @@ pub trait CellTrait {
     fn proton_transfer(&self) -> CellType {
         Void.id()
     }
+    fn dissolve(&self) -> CellType {
+        Void.id()
+    }
     fn heatable(&self) -> CellType {
         Void::id()
     }
@@ -127,7 +130,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     }
 
     cell_registry.pal[1] = Sand::boxed();
-    cell_registry.pal[2] = water::boxed();
+    cell_registry.pal[2] = Water::boxed();
     cell_registry.pal[3] = steam::boxed();
     cell_registry.pal[4] = fire::boxed();
     cell_registry.pal[5] = Wood::boxed();
@@ -138,6 +141,10 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[10] = Gas::boxed();
     cell_registry.pal[11] = BurningGas::boxed();
     cell_registry.pal[12] = DeluteAcid::boxed();
+    cell_registry.pal[13] = Salt::boxed();
+    cell_registry.pal[14] = Base::boxed();
+    cell_registry.pal[15] = SaltyWater::boxed();
+    cell_registry.pal[16] = BaseWater::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;

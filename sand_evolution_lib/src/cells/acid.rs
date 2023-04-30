@@ -35,10 +35,6 @@ impl CellTrait for Acid {
             if dim.next() > 50 {
                 let cc_v = container[cc] as usize;
                 let cc_c = &pal_container.pal[cc_v];
-                if cc_v == water::id() as usize {
-                    container[cc] = DeluteAcid::id();
-                    container[cur] = DeluteAcid::id();
-                }
                 let cc_pt = cc_c.proton_transfer();
 
                 if cc_pt != Void::id() {
@@ -53,29 +49,6 @@ impl CellTrait for Acid {
                     container[cc] = cc_h;
                     return;
                 }
-            }
-
-            let top_v = container[top];
-
-            if top_v == Void::id() {
-                container.swap(cur, top);
-                return;
-            }
-
-            let topl = cs::xy_to_index(i - 1, j + 1);
-            let topl_v = container[topl];
-
-            if topl_v == Void::id() {
-                container.swap(cur, topl);
-                return;
-            }
-
-            let topr = cs::xy_to_index(i + 1, j + 1);
-            let topr_v = container[topr];
-
-            if topr_v == Void::id() {
-                container.swap(cur, topr);
-                return;
             }
         }
     }
@@ -125,6 +98,18 @@ impl CellTrait for DeluteAcid {
             let arr = [top, down, l, r];
             let cc = arr[(dim.next() % 4) as usize];
 
+            if dim.next() > 50 {
+                let cc_v = container[cc] as usize;
+                let cc_c = &pal_container.pal[cc_v];
+                let cc_pt = cc_c.dissolve();
+
+                if cc_pt != Void::id() {
+                    container[cc] = Void::id();
+                    container[cur] = cc_pt;
+                    return;
+                }
+            }
+
             if dim.next() > 240 {
                 let cc_v = container[cc] as usize;
                 let cc_c = &pal_container.pal[cc_v];
@@ -132,32 +117,9 @@ impl CellTrait for DeluteAcid {
 
                 if cc_pt != Void::id() {
                     container[cc] = cc_pt;
-                    container[cur] = water::id();
+                    container[cur] = Water::id();
                     return;
                 }
-            }
-
-            let top_v = container[top];
-
-            if top_v == Void::id() {
-                container.swap(cur, top);
-                return;
-            }
-
-            let topl = cs::xy_to_index(i - 1, j + 1);
-            let topl_v = container[topl];
-
-            if topl_v == Void::id() {
-                container.swap(cur, topl);
-                return;
-            }
-
-            let topr = cs::xy_to_index(i + 1, j + 1);
-            let topr_v = container[topr];
-
-            if topr_v == Void::id() {
-                container.swap(cur, topr);
-                return;
             }
         }
     }
