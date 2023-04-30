@@ -15,7 +15,7 @@ impl Wood {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        5
+        50
     }
 }
 impl CellTrait for Wood {
@@ -40,7 +40,7 @@ impl CellTrait for Wood {
         Gas::id()
     }
     fn id(&self) -> CellType {
-        5
+        50
     }
     fn name(&self) -> String {
         "wood".to_owned()

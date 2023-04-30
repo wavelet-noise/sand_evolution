@@ -120,7 +120,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         noisy_mixer - 0.04
       );
     }
-    else if t == 5u // wood
+    else if t == 50u // wood
     {
       col = vec4<f32>(0.5, 0.2, 0.2, 1.0)*((sprite_pixel+1.0)/3.0);
     }
