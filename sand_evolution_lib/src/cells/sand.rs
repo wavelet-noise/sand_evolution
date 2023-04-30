@@ -1,6 +1,11 @@
 use crate::cs::PointType;
 
-use super::{gas::Gas, helper::sand_faling_helper, CellRegistry, CellTrait, CellType, Prng, water::{BaseWater, SaltyWater}};
+use super::{
+    gas::Gas,
+    helper::sand_faling_helper,
+    water::{BaseWater, SaltyWater},
+    CellRegistry, CellTrait, CellType, Prng,
+};
 
 pub struct Sand;
 impl Sand {
@@ -77,7 +82,6 @@ impl CellTrait for Salt {
         "salt".to_owned()
     }
 }
-
 
 pub struct Base;
 impl Base {

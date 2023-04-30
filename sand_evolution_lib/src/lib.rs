@@ -1,6 +1,7 @@
 pub mod cells;
 pub mod cs;
 pub mod evolution_app;
+pub mod export_file;
 pub mod fps_meter;
 pub mod gbuffer;
 pub mod state;
@@ -19,12 +20,13 @@ use wgpu::util::DeviceExt;
 use wgpu::TextureFormat;
 use winit::dpi::{LogicalPosition, PhysicalSize};
 use winit::event::Event::*;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::Window;
 
 use crate::cells::stone::Stone;
 use crate::cells::wood::Wood;
 use crate::cells::{CellRegistry, Prng};
+use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
 
@@ -93,7 +95,9 @@ pub async fn run(w: f32, h: f32) {
         }
     }
 
-    let event_loop = EventLoop::new();
+    let event_loop: EventLoop<UserEventInfo> =
+        EventLoopBuilder::<UserEventInfo>::with_user_event().build();
+
     let window = winit::window::WindowBuilder::new()
         .with_decorations(true)
         .with_resizable(true)
@@ -189,9 +193,11 @@ pub async fn run(w: f32, h: f32) {
         }
     }
 
-    let start_time = instant::now();
+    let lopp_proxy = event_loop.create_proxy();
+
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
+        let start_time = instant::now();
         platform.handle_event(&event);
 
         match event {
@@ -233,7 +239,13 @@ pub async fn run(w: f32, h: f32) {
 
                 platform.begin_frame();
 
-                evolution_app.ui(&platform.context(), &mut state, &mut fps_meter, &upd_result);
+                evolution_app.ui(
+                    &platform.context(),
+                    &mut state,
+                    &mut fps_meter,
+                    &upd_result,
+                    &lopp_proxy,
+                );
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));
@@ -312,7 +324,27 @@ pub async fn run(w: f32, h: f32) {
                         }
                     }
                 }
+                winit::event::WindowEvent::DroppedFile(file_path) => {
+                    // Load the image and create a texture from it
+                    let img = image::open(file_path).unwrap().to_luma8();
+                    let dimensions = img.dimensions();
+
+                    if dimensions.0 == cs::SECTOR_SIZE.x as u32
+                        && dimensions.1 == cs::SECTOR_SIZE.y as u32
+                    {
+                        state.diffuse_rgba = img;
+                    }
+                }
                 _ => {}
+            },
+            UserEvent(event) => match event {
+                UserEventInfo::ImageImport(image) => {
+                    let img = match image::load_from_memory(&image) {
+                        Ok(img) => img,
+                        _ => panic!("Invalid image format"),
+                    };
+                    state.diffuse_rgba = img.into_luma8();
+                }
             },
             _ => (),
         }

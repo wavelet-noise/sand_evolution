@@ -1,13 +1,38 @@
 use cgmath::num_traits::clamp;
 use egui::{ComboBox, Context};
-use winit::dpi::PhysicalPosition;
+use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
 use crate::{
-    cells::wood::Wood,
+    cells::{stone::Stone, void::Void, wood::Wood},
     cs,
+    export_file::write_to_file,
     fps_meter::FpsMeter,
     state::{State, UpdateResult},
 };
+
+struct Executor {
+    #[cfg(not(target_arch = "wasm32"))]
+    pool: futures::executor::ThreadPool,
+}
+
+impl Executor {
+    fn new() -> Self {
+        Self {
+            #[cfg(not(target_arch = "wasm32"))]
+            pool: futures::executor::ThreadPool::new().unwrap(),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn execute<F: futures::Future<Output = ()> + Send + 'static>(&self, f: F) {
+        self.pool.spawn_ok(f);
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn execute<F: futures::Future<Output = ()> + 'static>(&self, f: F) {
+        wasm_bindgen_futures::spawn_local(f);
+    }
+}
 
 pub struct EvolutionApp {
     pub number_of_cells_to_add: i32,
@@ -17,6 +42,7 @@ pub struct EvolutionApp {
     pub options: Vec<String>,
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
+    executor: Executor,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -41,6 +67,10 @@ pub fn compact_number_string(n: f32) -> String {
     return format!("{:.2}T", abs as f32 / 1000000000000.0);
 }
 
+pub enum UserEventInfo {
+    ImageImport(Vec<u8>),
+}
+
 impl EvolutionApp {
     pub(crate) fn ui(
         &mut self,
@@ -48,6 +78,7 @@ impl EvolutionApp {
         state: &mut State,
         fps_meter: &mut FpsMeter,
         upd_result: &UpdateResult,
+        event_loop_proxy: &EventLoopProxy<UserEventInfo>,
     ) {
         egui::Window::new("Monitor")
             .default_pos(egui::pos2(340.0, 5.0))
@@ -75,25 +106,31 @@ impl EvolutionApp {
                 };
                 ui.label(sim_step_avg_time_str);
                 ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
+
+                if ui.button("Clear screen").clicked() {
+                    state.diffuse_rgba = image::GrayImage::from_fn(
+                        cs::SECTOR_SIZE.x as u32,
+                        cs::SECTOR_SIZE.y as u32,
+                        |x, y| {
+                            if x > 1
+                                && y > 1
+                                && x < cs::SECTOR_SIZE.x as u32 - 2
+                                && y < cs::SECTOR_SIZE.y as u32 - 2
+                            {
+                                return image::Luma([Void::id()]);
+                            } else {
+                                return image::Luma([Stone::id()]);
+                            }
+                        },
+                    );
+                }
             });
 
         egui::Window::new("Toolbox")
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
-                ui.heading("Simulation settings");
-                ui.add(
-                    egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=50)
-                        .text("Simulation steps per frame"),
-                );
-                ui.separator();
-                ui.heading("Spawn particles");
-                ui.add(
-                    egui::Slider::new(&mut self.number_of_cells_to_add, 0..=10000 as i32)
-                        .text("Number of cells to add"),
-                );
-                ui.label("Click to add");
-
+                ui.heading("Hold left mouse button to spawn particles");
                 let combo = ComboBox::from_id_source("dropdown_list")
                     .selected_text(&self.selected_option)
                     .show_ui(ui, |ui| {
@@ -107,22 +144,6 @@ impl EvolutionApp {
                     });
 
                 ui.label(format!("Selected: {}", self.selected_option));
-
-                if ui.button("Spawn").clicked() {
-                    let mut buf = [0u8; 10000 + 1];
-                    _ = getrandom::getrandom(&mut buf);
-
-                    for i in 0..self.number_of_cells_to_add as usize {
-                        let px =
-                            (((buf[i] as u32) << 8) | buf[i + 1] as u32) % cs::SECTOR_SIZE.x as u32;
-                        let py = cs::SECTOR_SIZE.y as u32 - i as u32 % 32 - 2;
-                        state.diffuse_rgba.put_pixel(
-                            px,
-                            py,
-                            image::Luma([state.pal_container.dict[&self.selected_option]]),
-                        );
-                    }
-                }
 
                 ui.separator();
                 ui.heading("Spawn structures");
@@ -173,6 +194,35 @@ impl EvolutionApp {
                         }
                     }
                 }
+
+                ui.separator();
+
+                if ui.button("Export map").clicked() {
+                    let result = write_to_file(&state.diffuse_rgba);
+                    match result {
+                        Ok(()) => {}
+                        Err(err) => {
+                            // handle the error
+                            panic!("Error: {}", err);
+                        }
+                    }
+                }
+
+                if ui.button("Open map").clicked() {
+                    let dialog = rfd::AsyncFileDialog::new()
+                        .add_filter("Images", &["png"])
+                        .pick_file();
+
+                    let event_loop_proxy = event_loop_proxy.clone();
+                    self.executor.execute(async move {
+                        if let Some(file) = dialog.await {
+                            let bytes = file.read().await;
+                            event_loop_proxy
+                                .send_event(create_event_with_data(bytes))
+                                .ok();
+                        }
+                    });
+                }
             });
     }
 
@@ -182,6 +232,7 @@ impl EvolutionApp {
         let simulation_steps_per_frame = 5;
         let selected_option: String = "water".to_owned();
         let options: Vec<String> = Vec::new();
+        let executor = Executor::new();
         Self {
             number_of_cells_to_add,
             number_of_structures_to_add,
@@ -190,6 +241,11 @@ impl EvolutionApp {
             options,
             cursor_position: None,
             pressed: false,
+            executor,
         }
     }
+}
+
+fn create_event_with_data(bytes: Vec<u8>) -> UserEventInfo {
+    UserEventInfo::ImageImport(bytes)
 }
