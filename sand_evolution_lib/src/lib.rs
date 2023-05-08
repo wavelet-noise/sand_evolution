@@ -195,9 +195,9 @@ pub async fn run(w: f32, h: f32) {
 
     let lopp_proxy = event_loop.create_proxy();
 
+    let start_time = instant::now();
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
-        let start_time = instant::now();
         platform.handle_event(&event);
 
         match event {
