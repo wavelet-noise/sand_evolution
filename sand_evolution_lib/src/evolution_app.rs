@@ -85,8 +85,13 @@ impl EvolutionApp {
         egui::Window::new("Monitor")
             .default_pos(egui::pos2(340.0, 5.0))
             .fixed_size(egui::vec2(200.0, 100.0))
-            .show(context, |ui| {                
-                ui.hyperlink("https://github.com/wavelet-noise/sand_evolution".to_owned());
+            .show(context, |ui| {    
+                    
+                let url = "https://github.com/wavelet-noise/sand_evolution";
+                if ui.hyperlink(url).clicked() {
+                    _ = webbrowser::open(url);
+                }
+
                 ui.label(
                     [
                         "CO2 level:",
