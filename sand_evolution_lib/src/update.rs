@@ -24,6 +24,7 @@ pub fn update_dim(state: &mut State, sim_steps: u8, dimensions: (u32, u32)) {
                     b_index = 0;
                 }
 
+                // 21.5 % to skip each cell
                 if buf[b_index] > 200 {
                     continue;
                 }

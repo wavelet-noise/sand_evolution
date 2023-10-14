@@ -1,18 +1,20 @@
 use super::{helper::fluid_flying_helper, *};
 use crate::cs::{self, PointType};
 
-pub const fn new() -> Cell {
-    Cell
-}
-pub fn boxed() -> Box<Cell> {
-    Box::new(new())
-}
-pub fn id() -> CellType {
-    3
+pub struct Steam;
+impl Steam {
+    pub const fn new() -> Self {
+        Self
+    }
+    pub fn boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
+    pub fn id() -> CellType {
+        3
+    }
 }
 
-pub struct Cell;
-impl CellTrait for Cell {
+impl CellTrait for Steam {
     fn update(
         &self,
         i: PointType,

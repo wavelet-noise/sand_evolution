@@ -623,7 +623,7 @@ impl State {
 
         let dimensions = self.diffuse_rgba.dimensions();
 
-        if evolution_app.pressed {
+        if evolution_app.pressed && ! evolution_app.hovered {
             self.spawn(evolution_app, window);
         }
 

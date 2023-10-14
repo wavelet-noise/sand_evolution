@@ -24,7 +24,7 @@ use self::{
     sand::{Base, Salt, Sand},
     void::Void,
     water::{BaseWater, SaltyWater, Water},
-    wood::Wood,
+    wood::Wood, steam::Steam, burning_coal::BurningCoal
 };
 pub type CellType = u8;
 
@@ -137,10 +137,10 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
 
     cell_registry.pal[1] = Sand::boxed();
     cell_registry.pal[2] = Water::boxed();
-    cell_registry.pal[3] = steam::boxed();
+    cell_registry.pal[3] = Steam::boxed();
     cell_registry.pal[4] = fire::boxed();
     cell_registry.pal[6] = burning_wood::boxed();
-    cell_registry.pal[7] = burning_coal::boxed();
+    cell_registry.pal[7] = BurningCoal::boxed();
     cell_registry.pal[8] = Coal::boxed();
     cell_registry.pal[9] = Acid::boxed();
     cell_registry.pal[10] = Gas::boxed();

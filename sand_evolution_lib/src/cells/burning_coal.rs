@@ -1,18 +1,21 @@
 use super::*;
 use crate::cs::{self, PointType};
 
-pub const fn new() -> Cell {
-    Cell
-}
-pub fn boxed() -> Box<Cell> {
-    Box::new(new())
+pub struct BurningCoal;
+impl BurningCoal {
+    pub const fn new() -> Self {
+        Self
+    }
+    pub fn boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
+
+    pub fn id() -> CellType {
+        7
+    }
 }
 
-pub fn id() -> CellType {
-    7
-}
-pub struct Cell;
-impl CellTrait for Cell {
+impl CellTrait for BurningCoal {
     fn update(
         &self,
         i: PointType,
@@ -29,7 +32,7 @@ impl CellTrait for Cell {
             let top = cs::xy_to_index(i, j + 1);
 
             if container[top] == Water::id() {
-                container[top] = steam::id();
+                container[top] = Steam::id();
                 container[cur] = Coal::id();
                 return;
             }
