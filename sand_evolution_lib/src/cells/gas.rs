@@ -77,6 +77,25 @@ impl CellTrait for BurningGas {
         let cc = arr[(dim.next() % 3) as usize];
         let top_v = container[cc];
 
+        let cc_v = container[cc] as usize;
+        let cc_c = &pal_container.pal[cc_v];
+
+        let cc_h = cc_c.heatable();
+
+        if cc_h != Void::id() {
+            container[cc] = cc_h;
+            container[cur] = fire::id();
+            return;
+        }
+
+        let cc_b = cc_c.burnable();
+
+        if cc_b != Void::id() {
+            container[cc] = cc_b;
+            container[cur] = fire::id();
+            return;
+        }
+
         if top_v == Void::id() {
             container[cc] = fire::id();
         }
