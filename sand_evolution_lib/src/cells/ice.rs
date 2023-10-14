@@ -58,9 +58,6 @@ impl CellTrait for Ice {
     fn den(&self) -> i8 {
         10
     }
-    fn proton_transfer(&self) -> CellType {
-        Gas::id()
-    }
     fn id(&self) -> CellType {
         55
     }
