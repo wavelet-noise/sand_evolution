@@ -8,24 +8,15 @@ pub mod state;
 pub mod update;
 
 use ::egui::FontDefinitions;
-use cgmath::num_traits::clamp;
 use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use evolution_app::EvolutionApp;
 use fps_meter::FpsMeter;
-use instant::Instant;
 use state::State;
-use wgpu::util::DeviceExt;
-use wgpu::TextureFormat;
-use winit::dpi::{LogicalPosition, PhysicalSize};
 use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
-use winit::window::Window;
 
-use crate::cells::stone::Stone;
-use crate::cells::wood::Wood;
-use crate::cells::{CellRegistry, Prng};
 use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
@@ -193,7 +184,7 @@ pub async fn run(w: f32, h: f32) {
         }
     }
 
-    let lopp_proxy = event_loop.create_proxy();
+    let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
     event_loop.run(move |event, _, control_flow| {
@@ -239,13 +230,18 @@ pub async fn run(w: f32, h: f32) {
 
                 platform.begin_frame();
 
+                let mut any_win_hovered = false;
+
                 evolution_app.ui(
                     &platform.context(),
                     &mut state,
                     &mut fps_meter,
                     &upd_result,
-                    &lopp_proxy,
+                    &event_loop_proxy,
+                    &mut any_win_hovered
                 );
+
+                evolution_app.hovered = any_win_hovered;
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));

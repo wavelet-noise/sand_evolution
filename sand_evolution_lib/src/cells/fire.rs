@@ -10,7 +10,6 @@ pub fn boxed() -> Box<Cell> {
 pub fn id() -> CellType {
     4
 }
-
 pub struct Cell;
 impl CellTrait for Cell {
     fn update(

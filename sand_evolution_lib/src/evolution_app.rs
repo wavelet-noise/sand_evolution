@@ -42,6 +42,7 @@ pub struct EvolutionApp {
     pub options: Vec<String>,
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
+    pub hovered: bool,
     executor: Executor,
 }
 
@@ -79,11 +80,13 @@ impl EvolutionApp {
         fps_meter: &mut FpsMeter,
         upd_result: &UpdateResult,
         event_loop_proxy: &EventLoopProxy<UserEventInfo>,
+        any_win_hovered: &mut bool
     ) {
         egui::Window::new("Monitor")
             .default_pos(egui::pos2(340.0, 5.0))
             .fixed_size(egui::vec2(200.0, 100.0))
-            .show(context, |ui| {
+            .show(context, |ui| {                
+                ui.hyperlink("https://github.com/wavelet-noise/sand_evolution".to_owned());
                 ui.label(
                     [
                         "CO2 level:",
@@ -124,6 +127,8 @@ impl EvolutionApp {
                         },
                     );
                 }
+
+                *any_win_hovered |= ui.ui_contains_pointer();
             });
 
         egui::Window::new("Toolbox")
@@ -227,6 +232,8 @@ impl EvolutionApp {
                         }
                     });
                 }
+
+                *any_win_hovered |= ui.ui_contains_pointer();
             });
     }
 
@@ -245,6 +252,7 @@ impl EvolutionApp {
             options,
             cursor_position: None,
             pressed: false,
+            hovered: false,
             executor,
         }
     }

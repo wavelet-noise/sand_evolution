@@ -1,7 +1,7 @@
 use crate::cs::PointType;
 
 use super::{
-    burning_coal,
+    burning_coal::{self, BurningCoal},
     gas::{BurningGas, Gas},
     helper::sand_faling_helper,
     CellRegistry, CellTrait, CellType, Prng,
@@ -19,6 +19,7 @@ impl Coal {
         8
     }
 }
+
 impl CellTrait for Coal {
     fn update(
         &self,
@@ -39,7 +40,7 @@ impl CellTrait for Coal {
         BurningGas::id()
     }
     fn burnable(&self) -> u8 {
-        burning_coal::id()
+        BurningCoal::id()
     }
     fn id(&self) -> CellType {
         8
