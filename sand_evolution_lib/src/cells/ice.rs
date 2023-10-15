@@ -43,7 +43,7 @@ impl CellTrait for Ice {
         let top_v = container[cc];
 
         if top_v == Void::id() {
-            container[cc] = Water::id();
+            container[cur] = Water::id();
         }
     }
 
