@@ -2,9 +2,8 @@ use crate::cs::PointType;
 
 use super::{
     burning_coal::{self, BurningCoal},
-    gas::{BurningGas, Gas},
     helper::sand_faling_helper,
-    CellRegistry, CellTrait, CellType, Prng,
+    CellRegistry, CellTrait, CellType, Prng, burning_gas::BurningGas,
 };
 
 pub struct Coal;

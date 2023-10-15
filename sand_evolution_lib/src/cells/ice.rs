@@ -54,6 +54,10 @@ impl CellTrait for Ice {
         Water::id()
     }
 
+    fn heat_proof(&self) -> u8 {
+        240
+    }
+
     fn den(&self) -> i8 {
         10
     }

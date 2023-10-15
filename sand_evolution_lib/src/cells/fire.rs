@@ -50,7 +50,7 @@ impl CellTrait for Cell {
 
             let cc_h = cc_c.heatable();
 
-            if cc_h != Void::id() {
+            if cc_h != Void::id() && prng.next() > cc_c.heat_proof() {
                 container[cc] = cc_h;
                 return;
             }

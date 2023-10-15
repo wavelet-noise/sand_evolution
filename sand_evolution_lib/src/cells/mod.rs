@@ -14,6 +14,7 @@ pub mod wood;
 pub mod ice;
 pub mod crushed_ice;
 pub mod snow;
+pub mod burning_gas;
 
 use std::collections::HashMap;
 
@@ -22,12 +23,12 @@ use crate::cs::{self, PointType};
 use self::{
     acid::{Acid, DeluteAcid},
     coal::Coal,
-    gas::{BurningGas, Gas},
+    gas::Gas,
     helper::sand_faling_helper,
     sand::{Base, Salt, Sand},
     void::Void,
     water::{BaseWater, SaltyWater, Water},
-    wood::Wood, steam::Steam, burning_coal::BurningCoal, ice::Ice, crushed_ice::CrushedIce, snow::Snow
+    wood::Wood, steam::Steam, burning_coal::BurningCoal, ice::Ice, crushed_ice::CrushedIce, snow::Snow, burning_gas::BurningGas
 };
 pub type CellType = u8;
 
@@ -124,6 +125,9 @@ pub trait CellTrait {
     }
     fn heatable(&self) -> CellType {
         Void::id()
+    }
+    fn heat_proof(&self) -> u8 {
+        1
     }
     fn name(&self) -> String {
         "".to_owned()
