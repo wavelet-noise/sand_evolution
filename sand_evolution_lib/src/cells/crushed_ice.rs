@@ -6,8 +6,8 @@ use super::{
     CellRegistry, CellTrait, CellType, Prng, void::Void,
 };
 
-pub struct Ice;
-impl Ice {
+pub struct CrushedIce;
+impl CrushedIce {
     pub const fn new() -> Self {
         Self
     }
@@ -15,10 +15,10 @@ impl Ice {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        55
+        56
     }
 }
-impl CellTrait for Ice {
+impl CellTrait for CrushedIce {
     fn update(
         &self,
         i: PointType,
@@ -28,6 +28,10 @@ impl CellTrait for Ice {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
+        if sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
+            return;
+        }
+
         if prng.next() > 1 {
             return;
         }
@@ -55,12 +59,12 @@ impl CellTrait for Ice {
     }
 
     fn den(&self) -> i8 {
-        10
+        8
     }
     fn id(&self) -> CellType {
         Self::id()
     }
     fn name(&self) -> String {
-        "ice".to_owned()
+        "crushed_ice".to_owned()
     }
 }

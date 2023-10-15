@@ -12,8 +12,10 @@ pub mod void;
 pub mod water;
 pub mod wood;
 pub mod ice;
+pub mod crushed_ice;
+pub mod snow;
 
-use std::{collections::HashMap, iter::Map};
+use std::collections::HashMap;
 
 use crate::cs::{self, PointType};
 
@@ -25,7 +27,7 @@ use self::{
     sand::{Base, Salt, Sand},
     void::Void,
     water::{BaseWater, SaltyWater, Water},
-    wood::Wood, steam::Steam, burning_coal::BurningCoal, ice::Ice
+    wood::Wood, steam::Steam, burning_coal::BurningCoal, ice::Ice, crushed_ice::CrushedIce, snow::Snow
 };
 pub type CellType = u8;
 
@@ -153,6 +155,8 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[16] = BaseWater::boxed();
     cell_registry.pal[50] = Wood::boxed();
     cell_registry.pal[55] = Ice::boxed();
+    cell_registry.pal[56] = CrushedIce::boxed();
+    cell_registry.pal[57] = Snow::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;

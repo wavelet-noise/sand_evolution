@@ -105,6 +105,7 @@ pub fn fluid_falling_helper(
     pal_container: &CellRegistry,
     cur: usize,
     rpng: &mut Prng,
+    thickness: u8
 ) -> bool {
     const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
     let selected_order = [0, 1]; //ORDER[(rpng.next() % 2) as usize];
@@ -141,27 +142,29 @@ pub fn fluid_falling_helper(
         }
     }
 
-    for k in 0..2 {
-        match selected_order[k] {
-            0 => {
-                let dr = cs::xy_to_index(i + 1, j);
-                let dr_v = container[dr] as usize;
-                let dr_c = &pal_container.pal[dr_v];
-                if dr_c.den() < my_den && !dr_c.stat() {
-                    container.swap(cur, dr);
-                    return true;
+    if thickness == 1 || rpng.next() > (255 - 255 / thickness) {
+        for k in 0..2 {
+            match selected_order[k] {
+                0 => {
+                    let dr = cs::xy_to_index(i + 1, j);
+                    let dr_v = container[dr] as usize;
+                    let dr_c = &pal_container.pal[dr_v];
+                    if dr_c.den() < my_den && !dr_c.stat() {
+                        container.swap(cur, dr);
+                        return true;
+                    }
                 }
-            }
-            1 => {
-                let dl = cs::xy_to_index(i - 1, j);
-                let dl_v = container[dl] as usize;
-                let dl_c = &pal_container.pal[dl_v];
-                if dl_c.den() < my_den && !dl_c.stat() {
-                    container.swap(cur, dl);
-                    return true;
+                1 => {
+                    let dl = cs::xy_to_index(i - 1, j);
+                    let dl_v = container[dl] as usize;
+                    let dl_c = &pal_container.pal[dl_v];
+                    if dl_c.den() < my_den && !dl_c.stat() {
+                        container.swap(cur, dl);
+                        return true;
+                    }
                 }
+                _ => (),
             }
-            _ => (),
         }
     }
 
