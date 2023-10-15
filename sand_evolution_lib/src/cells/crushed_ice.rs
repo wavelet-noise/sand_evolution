@@ -42,10 +42,10 @@ impl CellTrait for CrushedIce {
         let right = cs::xy_to_index(i - 1, j);
 
         let arr = [top, left, right, bot];
-        let cc = arr[(prng.next() % 3) as usize];
+        let cc = arr[(prng.next() % 3) as usize];ßß
         let top_v = container[cc];
 
-        if top_v == Void::id() {
+        if top_v == Void::id() || top_v == Water::id() {
             container[cur] = Water::id();
         }
     }

@@ -45,7 +45,7 @@ impl CellTrait for Snow {
         let cc = arr[(prng.next() % 3) as usize];
         let top_v = container[cc];
 
-        if top_v == Void::id() {
+        if top_v == Void::id() || top_v == Water::id() {
             container[cur] = Water::id();
         }
     }
