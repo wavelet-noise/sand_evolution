@@ -6,8 +6,8 @@ use super::{
     CellRegistry, CellTrait, CellType, Prng, void::Void,
 };
 
-pub struct CrushedIce;
-impl CrushedIce {
+pub struct DryIce;
+impl DryIce {
     pub const fn new() -> Self {
         Self
     }
@@ -18,7 +18,7 @@ impl CrushedIce {
         56
     }
 }
-impl CellTrait for CrushedIce {
+impl CellTrait for DryIce {
     fn update(
         &self,
         i: PointType,
@@ -58,12 +58,8 @@ impl CellTrait for CrushedIce {
         Water::id()
     }
 
-    fn heat_proof(&self) -> u8 {
-        200
-    }
-
     fn den(&self) -> i8 {
-        5
+        8
     }
     fn id(&self) -> CellType {
         Self::id()
