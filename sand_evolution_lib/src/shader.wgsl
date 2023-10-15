@@ -128,6 +128,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.4, 0.7, 1.0, 1.0)*((noise_pixel+1.0)/3.0);
     }
+    else if t == 56u // crushed_ice
+    {
+      col = vec4<f32>(0.5, 0.8, 1.0, 1.0)*((noise_pixel+1.0)/2.0);
+    }
+    else if t == 57u // snow
+    {
+      col = vec4<f32>(0.8, 0.9, 1.0, 1.0)*((noise_pixel+1.0)/2.0);
+    }
     else if t == 6u
     {
       col = vec4<f32>(0.8, 1.0, 0.5, 1.0);

@@ -23,7 +23,7 @@ impl CellTrait for Acid {
         pal_container: &CellRegistry,
         dim: &mut Prng,
     ) {
-        if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim) {
+        if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);
             let down = cs::xy_to_index(i, j - 1);
             let r = cs::xy_to_index(i + 1, j);
@@ -94,7 +94,7 @@ impl CellTrait for DeluteAcid {
         pal_container: &CellRegistry,
         dim: &mut Prng,
     ) {
-        if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim) {
+        if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);
             let down = cs::xy_to_index(i, j - 1);
             let r = cs::xy_to_index(i + 1, j);

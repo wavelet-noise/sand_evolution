@@ -115,6 +115,6 @@ impl CellTrait for BurningGas {
     }
 
     fn id(&self) -> CellType {
-        11
+        Self::id()
     }
 }

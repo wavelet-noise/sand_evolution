@@ -1,13 +1,13 @@
 use crate::cs::{PointType, self};
 
 use super::{
-    helper::sand_faling_helper,
+    helper::{sand_faling_helper, fluid_falling_helper},
     water::{BaseWater, SaltyWater, Water},
     CellRegistry, CellTrait, CellType, Prng, void::Void,
 };
 
-pub struct Ice;
-impl Ice {
+pub struct Snow;
+impl Snow {
     pub const fn new() -> Self {
         Self
     }
@@ -15,10 +15,10 @@ impl Ice {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        55
+        57
     }
 }
-impl CellTrait for Ice {
+impl CellTrait for Snow {
     fn update(
         &self,
         i: PointType,
@@ -28,6 +28,10 @@ impl CellTrait for Ice {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
+        if prng.next() > 128 && fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 10) {
+            return;
+        }
+
         if prng.next() > 1 {
             return;
         }
@@ -55,12 +59,12 @@ impl CellTrait for Ice {
     }
 
     fn den(&self) -> i8 {
-        10
+        5
     }
     fn id(&self) -> CellType {
         Self::id()
     }
     fn name(&self) -> String {
-        "ice".to_owned()
+        "snow".to_owned()
     }
 }
