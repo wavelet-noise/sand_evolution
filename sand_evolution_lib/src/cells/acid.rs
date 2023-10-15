@@ -122,7 +122,12 @@ impl CellTrait for DeluteAcid {
 
                 if cc_pt != Void::id() {
                     container[cc] = cc_pt;
-                    container[cur] = Water::id();
+
+                    if dim.next() > 120 {
+                        container[cur] = Water::id();
+                    } else {
+                        container[cur] = Void::id();
+                    }
                     return;
                 }
             }
