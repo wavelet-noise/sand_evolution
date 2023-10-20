@@ -14,19 +14,19 @@ pub struct GBuffer {
 }
 
 impl GBuffer {
-    pub fn new(device: &wgpu::Device, width: u32, height: u32) -> GBuffer {
+    pub fn new(device: &wgpu::Device, width: u32, height: u32, surface_format: wgpu::TextureFormat) -> GBuffer {
         let albedo = create_texture(
             device,
             width,
             height,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            surface_format,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
         let normal = create_texture(
             device,
             width,
             height,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            surface_format,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
         let depth = create_texture(
@@ -41,13 +41,13 @@ impl GBuffer {
             device,
             width,
             height,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            surface_format,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         );
 
         let descr = &wgpu::TextureViewDescriptor {
             label: Some("color_view"),
-            format: Some(wgpu::TextureFormat::Bgra8UnormSrgb),
+            format: Some(surface_format),
             dimension: Some(wgpu::TextureViewDimension::D2),
             aspect: wgpu::TextureAspect::All,
             base_mip_level: 0,
