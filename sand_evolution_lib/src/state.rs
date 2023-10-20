@@ -89,6 +89,8 @@ impl State {
             },
         );
 
+        let pal_container = CellRegistry::new();
+
         fn create_render_target(
             device: &wgpu::Device,
             size: wgpu::Extent3d,
@@ -134,6 +136,27 @@ impl State {
                         clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
                         image::Luma([Wood::id()]),
                     );
+                }
+            }
+        }
+
+        for _ in 0..3 {
+            for cell in pal_container.pal.iter() {
+                if cell.id() != 0 {
+                    _ = getrandom::getrandom(&mut buf);
+
+                    let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                    let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                    for x in 0..20 {
+                        for y in 0..20 {
+                            diffuse_rgba.put_pixel(
+                                clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                image::Luma([cell.id()]),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -665,8 +688,6 @@ impl State {
         let b = 0;
 
         let last_spawn = -5.0;
-
-        let pal_container = CellRegistry::new();
         let prng = Prng::new();
 
         Self {
