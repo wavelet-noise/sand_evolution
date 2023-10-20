@@ -342,7 +342,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 3u // steam
     {
-      col = vec4<f32>(0.5)*((noise_pixel+1.0)/3.0);
+      col = vec4<f32>(0.5)*((tdnoise_fast+2.0)/3.0);
     }
     else if t == 4u // fire
     {
@@ -403,7 +403,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 10u // gas
     {
-      col = vec4<f32>(0.2,0.8,0.2,0.4)*((tdnoise_fast+1.0)/3.0);
+      col = vec4<f32>(0.2,0.8,0.2,0.4)*((tdnoise_fast+2.0)/3.0);
     }
     else if t == 11u // burning gas
     {
