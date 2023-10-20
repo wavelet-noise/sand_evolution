@@ -23,14 +23,12 @@ const INITIAL_HEIGHT: u32 = 1080;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
     uv: [f32; 2],
 }
-
 impl Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
@@ -51,7 +49,6 @@ impl Vertex {
         }
     }
 }
-
 const VERTICES: &[Vertex] = &[
     Vertex {
         position: [-1.0, -1.0, 0.0],
@@ -70,9 +67,7 @@ const VERTICES: &[Vertex] = &[
         uv: [1.0, 1.0],
     },
 ];
-
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
-
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub async fn run(w: f32, h: f32) {
     let mut fps_meter = FpsMeter::new();

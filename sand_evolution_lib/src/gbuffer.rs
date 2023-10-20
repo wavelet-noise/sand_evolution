@@ -7,9 +7,9 @@ pub struct GBuffer {
     pub bloom: Texture,
 
     pub albedo_view: TextureView,
-    pub normal_view: TextureView,
+    pub blur_1_texture_view: TextureView,
     pub depth_view: TextureView,
-    pub bloom_view: TextureView,
+    pub blur_2_texture_view: TextureView,
     // Add more texture fields as needed
 }
 
@@ -68,9 +68,9 @@ impl GBuffer {
             bloom,
 
             albedo_view,
-            normal_view,
+            blur_1_texture_view: normal_view,
             depth_view,
-            bloom_view,
+            blur_2_texture_view: bloom_view,
         }
     }
 }

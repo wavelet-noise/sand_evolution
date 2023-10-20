@@ -15,8 +15,10 @@ pub mod ice;
 pub mod crushed_ice;
 pub mod snow;
 pub mod burning_gas;
+pub mod electricity;
 
 use std::collections::HashMap;
+use crate::cells::electricity::Electricity;
 
 use crate::cs::{self, PointType};
 
@@ -161,6 +163,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[55] = Ice::boxed();
     cell_registry.pal[56] = CrushedIce::boxed();
     cell_registry.pal[57] = Snow::boxed();
+    cell_registry.pal[60] = Electricity::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;
