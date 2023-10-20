@@ -144,9 +144,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(0.2, 0.4, 1.0, 1.0)*noise_pixel*noise_pixel*10.0;
     }
-    else if t == 6u
+    else if t == 6u // burning_wood
     {
-      col = vec4<f32>(0.8, 1.0, 0.5, 1.0);
+      col = vec4<f32>(0.8, 1.0, 0.5, 1.0)*10.0;
     }
     else if t == 7u
     {
