@@ -198,9 +198,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     var out: FragmentOutput;
-    out.albedo = normalize(col);
+    out.albedo = col;
 
-    if (length(col.rgb) > 3.0) {
+    if (col.r > 1.0 || col.g > 1.0 || col.b > 1.0) {
+        out.albedo = normalize(col);
         out.bloom = out.albedo;
     } else {
         out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
