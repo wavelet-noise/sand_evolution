@@ -379,7 +379,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 6u // burning_wood
     {
-      col = vec4<f32>(0.8, 1.0, 0.5, 1.0)*10.0;
+      col = vec4<f32>(0.8, 1.0, 0.5, 1.0)*1.1;
     }
     else if t == 7u
     {
