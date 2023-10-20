@@ -49,12 +49,12 @@ pub struct State {
     pub a: cs::PointType,
     pub b: cs::PointType,
     last_spawn: f32,
-    pub pal_container: cells::CellRegistry,
-    pub prng: cells::Prng,
+    pub pal_container: CellRegistry,
+    pub prng: Prng,
     base_texture: wgpu::Texture,
     glow_texture: wgpu::Texture,
     gbuffer: GBuffer,
-    surface_format: wgpu::TextureFormat,
+    surface_format: TextureFormat,
 }
 
 impl State {
@@ -77,7 +77,7 @@ impl State {
                 {
                     _ = getrandom::getrandom(&mut buf);
                     return image::Luma([
-                        if (buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2) {
+                        if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
                             buf[1] % 4
                         } else {
                             0
@@ -149,16 +149,11 @@ impl State {
         };
 
         let cell_type_texture = device.create_texture(&wgpu::TextureDescriptor {
-            // All textures are stored as 3D, we represent our 2D texture
-            // by setting depth to 1.
             size: texture_size,
-            mip_level_count: 1, // We'll talk about this a little later
+            mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            // Most images are stored using sRGB so we need to reflect that here.
-            format: wgpu::TextureFormat::R8Uint,
-            // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
-            // COPY_DST means that we want to copy data to this texture
+            format: TextureFormat::R8Uint,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some("diffuse_texture"),
         });
@@ -974,9 +969,9 @@ impl State {
                     address_mode_u: wgpu::AddressMode::ClampToEdge,
                     address_mode_v: wgpu::AddressMode::ClampToEdge,
                     address_mode_w: wgpu::AddressMode::ClampToEdge,
-                    mag_filter: wgpu::FilterMode::Linear,
-                    min_filter: wgpu::FilterMode::Linear,
-                    mipmap_filter: wgpu::FilterMode::Linear,
+                    mag_filter: wgpu::FilterMode::Nearest,
+                    min_filter: wgpu::FilterMode::Nearest,
+                    mipmap_filter: wgpu::FilterMode::Nearest,
                     ..Default::default()
                 });
 
