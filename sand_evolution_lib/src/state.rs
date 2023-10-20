@@ -54,6 +54,7 @@ pub struct State {
     base_texture: wgpu::Texture,
     glow_texture: wgpu::Texture,
     gbuffer: GBuffer,
+    surface_format: wgpu::TextureFormat,
 }
 
 impl State {
@@ -62,6 +63,7 @@ impl State {
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
         surface: &wgpu::Surface,
+        surface_format: wgpu::TextureFormat
     ) -> Self {
         let mut buf = [0u8; 4];
         let mut diffuse_rgba = image::GrayImage::from_fn(
@@ -138,7 +140,7 @@ impl State {
 
         let dimensions = diffuse_rgba.dimensions();
 
-        let gbuffer = GBuffer::new(device, dimensions.0, dimensions.1);
+        let gbuffer = GBuffer::new(device, dimensions.0, dimensions.1, surface_format);
 
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
@@ -170,7 +172,7 @@ impl State {
         let base_texture = create_render_target(
             &device,
             viewport_extent,
-            wgpu::TextureFormat::Bgra8UnormSrgb,
+            surface_format,
         );
         let glow_texture =
             create_render_target(&device, viewport_extent, wgpu::TextureFormat::Rgba16Float);
@@ -269,7 +271,7 @@ impl State {
         type_texture_view.format = Some(TextureFormat::R8Uint);
 
         let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-        color_texture_view.format = Some(TextureFormat::Bgra8UnormSrgb);
+        color_texture_view.format = Some(surface_format);
 
         let cell_type_texture_view = cell_type_texture.create_view(&type_texture_view);
 
@@ -699,6 +701,7 @@ impl State {
             base_texture,
             glow_texture,
             gbuffer,
+            surface_format,
         }
     }
 
@@ -861,7 +864,7 @@ impl State {
             {
 
                 let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(TextureFormat::Bgra8UnormSrgb);
+                color_texture_view.format = Some(self.surface_format);
 
                 let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
                     address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -913,7 +916,7 @@ impl State {
 
             {
                 let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(TextureFormat::Bgra8UnormSrgb);
+                color_texture_view.format = Some(self.surface_format);
 
                 let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
                     address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -965,7 +968,7 @@ impl State {
 
             {
                 let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(TextureFormat::Bgra8UnormSrgb);
+                color_texture_view.format = Some(self.surface_format);
 
                 let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
                     address_mode_u: wgpu::AddressMode::ClampToEdge,

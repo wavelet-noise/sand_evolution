@@ -169,7 +169,7 @@ pub async fn run(w: f32, h: f32) {
     // Display the demo application that ships with egui.
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
-    let mut state = State::new(&device, &queue, &surface_config, &surface).await;
+    let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
 
     let mut evolution_app = EvolutionApp::new();
 
