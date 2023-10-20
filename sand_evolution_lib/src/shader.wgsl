@@ -371,7 +371,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 57u // snow
     {
-      col = vec4<f32>(0.8, 0.9, 1.0, 1.0)*((noise_pixel+1.0)/2.0);
+      col = mix(vec4<f32>(0.8, 0.9, 1.0, 2.0) * 0.8, vec4<f32>(0.8, 0.9, 2.0, 1.0), tdnoise);
+      if (col.b > 1.0) {
+        col = mix(vec4<f32>(0.8, 0.8, 1.1,1.0),vec4<f32>(0.3, 0.3, 0.8,1.0),noise_pixel);
+      }
     }
     else if t == 60u // electricity
     {
