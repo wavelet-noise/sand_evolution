@@ -71,6 +71,10 @@ fn noise2(n: vec2<f32>) -> f32 {
   return mix(mix(rand2(b), rand2(b + d.yx), f.x), mix(rand2(b + d.xy), rand2(b + d.yy), f.x), f.y);
 }
 
+struct FragmentOutput {
+    @location(0) albedo: vec4<f32>,
+    @location(1) bloom: vec4<f32>
+}
 
 @group(1) @binding(0)
 var t_diffuse: texture_2d<u32>;
@@ -78,7 +82,7 @@ var t_diffuse: texture_2d<u32>;
 var s_diffuse: sampler;
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
     //return vec4<f32>(temp,temp,temp, 1.0);
 
@@ -112,13 +116,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.5)*((noise_pixel+1.0)/3.0);
     }
-    else if t == 4u
+    else if t == 4u // fire
     {
       col = mix(
         vec4<f32>(1.0, 0.0, 0.0, 1.0),
         vec4<f32>(1.0, 1.0, 0.0, 1.0),
         noisy_mixer - 0.04
-      );
+      ) * 10.0;
     }
     else if t == 50u // wood
     {
@@ -136,6 +140,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     {
       col = vec4<f32>(0.8, 0.9, 1.0, 1.0)*((noise_pixel+1.0)/2.0);
     }
+    else if t == 60u // snow
+    {
+      col = vec4<f32>(0.2, 0.4, 1.0, 1.0)*noise_pixel*noise_pixel*10.0;
+    }
     else if t == 6u
     {
       col = vec4<f32>(0.8, 1.0, 0.5, 1.0);
@@ -146,7 +154,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         vec4<f32>(8.0, 0.0, 0.0, 1.0),
         vec4<f32>(8.0, 0.5, 0.0, 1.0),
         noisy_mixer
-      );
+      ) * 10.0;
     }
     else if t == 8u // coal
     {
@@ -162,7 +170,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     else if t == 11u // burning gas
     {
-      col = vec4<f32>(1.0,0.8,0.5,1.0);
+      col = vec4<f32>(1.0,0.8,0.5,1.0) * 10.0;
     }
     else if t == 12u // delute acid
     {
@@ -189,5 +197,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
     }
 
-    return col;
+    var out: FragmentOutput;
+    out.albedo = normalize(col);
+
+    if (length(col.rgb) > 3.0) {
+        out.bloom = out.albedo;
+    } else {
+        out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+
+    return out;
 }

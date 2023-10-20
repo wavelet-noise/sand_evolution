@@ -43,9 +43,9 @@ impl CellTrait for CrushedIce {
 
         let arr = [top, left, right, bot];
         let cc = arr[(prng.next() % 3) as usize];
-        let top_v = container[cc];
+        let rand_v = container[cc];
 
-        if top_v == Void::id() || top_v == Water::id() {
+        if rand_v == Void::id() || rand_v == Water::id() {
             container[cur] = Water::id();
         }
     }

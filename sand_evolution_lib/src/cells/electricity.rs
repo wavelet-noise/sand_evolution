@@ -1,0 +1,59 @@
+use crate::cs::{PointType, self};
+
+use super::{
+    helper::sand_faling_helper,
+    water::{BaseWater, SaltyWater, Water},
+    CellRegistry, CellTrait, CellType, Prng, void::Void,
+};
+
+pub struct Electricity;
+impl Electricity {
+    pub const fn new() -> Self {
+        Self
+    }
+    pub fn boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
+    pub fn id() -> CellType {
+        60
+    }
+}
+impl CellTrait for Electricity {
+    fn update(
+        &self,
+        i: PointType,
+        j: PointType,
+        cur: usize,
+        container: &mut [CellType],
+        pal_container: &CellRegistry,
+        prng: &mut Prng,
+    ) {
+        if prng.next() > 110 {
+            let top = cs::xy_to_index(i, j + 1);
+            let bot = cs::xy_to_index(i, j - 1);
+            let left = cs::xy_to_index(i + 1, j);
+            let right = cs::xy_to_index(i - 1, j);
+
+            let arr = [top, left, right, bot];
+            let cc = arr[(prng.next() % 3) as usize];
+            let rand_v = container[cc];
+
+            if rand_v == Void::id() {
+                container[cc] = Electricity::id();
+            }
+        }
+        else {
+            container[cur] = Void::id();
+        }
+    }
+
+    fn den(&self) -> i8 {
+        0
+    }
+    fn id(&self) -> CellType {
+        Self::id()
+    }
+    fn name(&self) -> String {
+        "electricity".to_owned()
+    }
+}
