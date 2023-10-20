@@ -35,7 +35,7 @@ impl CellTrait for Electricity {
             let right = cs::xy_to_index(i - 1, j);
 
             let arr = [top, left, right, bot];
-            let cc = arr[(prng.next() % 3) as usize];
+            let cc = arr[(prng.next() % 4) as usize];
             let rand_v = container[cc];
 
             if rand_v == Void::id() {
