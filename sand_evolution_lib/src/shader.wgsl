@@ -317,6 +317,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let sprite_pixel = noise2(floor(in.uv * vec2<f32>(settings.res_x, settings.res_y))) * noise2(floor(in.uv * vec2<f32>(settings.res_x / 10.0, settings.res_y)));
 
     let tdnoise = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time / 5.0), 4, 0.9, 0.1);
+    let tdnoise_fast = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time), 4, 0.9, 0.1);
 
     var col = vec4<f32>(0.0);
 
@@ -400,13 +401,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(0.0,0.4,0.0,0.8);
     }
-    else if t == 10u
+    else if t == 10u // gas
     {
-      col = vec4<f32>(0.2,0.8,0.2,0.4);
+      col = vec4<f32>(0.2,0.8,0.2,0.4)*((tdnoise_fast+1.0)/3.0);
     }
     else if t == 11u // burning gas
     {
-      col = vec4<f32>(1.0,0.8,0.5,1.0) * 10.0;
+      col = vec4<f32>(1.0,0.8,0.5,1.0) * 10.0 * tdnoise_fast;
     }
     else if t == 12u // delute acid
     {
