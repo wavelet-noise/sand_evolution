@@ -53,21 +53,15 @@ fn getOffset(index: u32) -> f32 {
     }
 }
 
+fn gaussian(x: f32, sigma: f32) -> f32 {
+    let pi: f32 = 3.14159265359;
+    return exp(-x * x / (2.0 * sigma * sigma)) / sqrt(2.0 * pi * sigma * sigma);
+}
+
 fn getWeight(index: u32) -> f32 {
-    switch (index) {
-        case 0u:  { return 0.01; }
-        case 1u:  { return 0.02; }
-        case 2u:  { return 0.04; }
-        case 3u:  { return 0.06; }
-        case 4u:  { return 0.09; }
-        case 5u:  { return 0.12; }
-        case 6u:  { return 0.09; }
-        case 7u:  { return 0.06; }
-        case 8u:  { return 0.04; }
-        case 9u:  { return 0.02; }
-        case 10u: { return 0.01; }
-        default:  { return 0.0; }
-    }
+    let sigma: f32 = 1.5;
+    let x: f32 = f32(index) - 5.0; // Assuming the kernel size is 11 and the middle is at 5
+    return gaussian(x, sigma);
 }
 
 @fragment
