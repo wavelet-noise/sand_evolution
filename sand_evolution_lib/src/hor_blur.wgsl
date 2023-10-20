@@ -79,7 +79,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
    let range: f32 = 1.0 / settings.res_x;
 
    for (var i = 0u; i < 11u; i = i + 1u) {
-       let offset: f32 = getOffset(i);
+       let offset: f32 = getOffset(i) + 0.5;
        let weight: f32 = getWeight(i)*3.0;
        let sample_uv: vec2<f32> = vec2<f32>(uv.x + offset * range, uv.y);
        color = color + textureSample(t_diffuse, s_diffuse, sample_uv) * weight;
