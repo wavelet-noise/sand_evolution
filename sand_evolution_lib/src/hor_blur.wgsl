@@ -76,7 +76,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
    uv.y = 1.0 - uv.y;
 
    var color: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-   let range: f32 = 0.0015;
+   let range: f32 = 0.001;
 
    for (var i = 0u; i < 11u; i = i + 1u) {
        let offset: f32 = getOffset(i);
