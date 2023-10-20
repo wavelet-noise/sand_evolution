@@ -1,6 +1,5 @@
 use super::{helper::fluid_falling_helper, *};
 use crate::cs::PointType;
-
 pub struct Water;
 impl Water {
     pub const fn new() -> Self {
@@ -13,7 +12,6 @@ impl Water {
         2
     }
 }
-
 impl CellTrait for Water {
     fn update(
         &self,

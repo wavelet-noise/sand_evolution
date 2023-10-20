@@ -17,8 +17,8 @@ use crate::{
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct WorldSettings {
     time: f32,
-    _wasm_padding0: f32,
-    _wasm_padding1: f32,
+    res_x: f32,
+    res_y: f32,
     _wasm_padding2: f32,
 }
 
@@ -221,8 +221,8 @@ impl State {
 
         let world_settings = WorldSettings {
             time: 0.0,
-            _wasm_padding0: 0.0,
-            _wasm_padding1: 1.0,
+            res_x: dimensions.0 as f32,
+            res_y: dimensions.1 as f32,
             _wasm_padding2: 2.0,
         };
 

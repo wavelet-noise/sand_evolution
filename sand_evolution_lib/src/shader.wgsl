@@ -2,8 +2,8 @@
 
 struct WorldSettings {
     time: f32,
-    _wasm_padding0: f32,
-    _wasm_padding1: f32,
+    res_x: f32,
+    res_y: f32,
     _wasm_padding2: f32,
 };
 @group(0) @binding(0)
@@ -86,13 +86,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
     //return vec4<f32>(temp,temp,temp, 1.0);
 
-    let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * 1024.0), i32(in.uv.y * 512.0)), 0);
+    let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * settings.res_x), i32(in.uv.y * settings.res_y)), 0);
     let t = texel.x;
 
     let noisy_mixer: f32 = pow(noise2(in.uv * 800.0 + settings.time*400.0), 2.0);
 
-    let noise_pixel = noise2(in.uv * vec2<f32>(1024.0, 512.0)*2.0);
-    let sprite_pixel = noise2(in.uv * vec2<f32>(50.0, 512.0)*2.0);
+    let noise_pixel = noise2(in.uv * vec2<f32>(settings.res_x, settings.res_y)*2.0);
+    let sprite_pixel = noise2(in.uv * vec2<f32>(50.0, settings.res_y)*2.0);
 
     var col = vec4<f32>(0.0);
 
