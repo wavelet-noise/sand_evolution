@@ -179,6 +179,7 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
     else
     {
         let res = image::load_from_memory(data).expect("Load from memory failed");
+        state.loaded_rgba = res.to_luma8();
         state.diffuse_rgba = res.to_luma8();
         println!("Some image loaded");
     }

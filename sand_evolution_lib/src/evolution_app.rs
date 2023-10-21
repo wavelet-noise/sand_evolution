@@ -137,6 +137,10 @@ impl EvolutionApp {
                     state.generate_simple();
                 }
 
+                if ui.button("Reload url map").clicked() {
+                    state.diffuse_rgba = state.loaded_rgba.clone();
+                }
+
                 *any_win_hovered |= ui.ui_contains_pointer();
             });
 
