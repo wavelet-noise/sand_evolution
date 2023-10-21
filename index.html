@@ -41,23 +41,13 @@
             console.log("x = " + vw + ", y = " + vh);
 
             const response = await fetch(saveString);
+            console.log(response);
             const blob = await response.blob();
 
-            let wasmInstance;
+            // Convert blob to Uint8Array
+            const fileData = await blobToArrayBuffer(blob);
 
-            WebAssembly.instantiateStreaming(fetch('./sand_evolution_lib/pkg/sand_evolution_lib_bg.wasm'))
-                .then(result => {
-                    wasmInstance = result.instance;
-                    // you can now use wasmInstance.exports to access your Rust functions
-                })
-                .catch(console.error);
-
-            const imageUint8Array = await blobToArrayBuffer(blob);
-            const { memory, run } = wasmInstance.exports; // wasmInstance is your WebAssembly module instance
-            const imagePtr = wasmInstance.exports.allocate(imageUint8Array.length); // allocate is a Rust function to allocate memory
-            new Uint8Array(memory.buffer, imagePtr, imageUint8Array.length).set(imageUint8Array);
-
-            run(vw, vh, imagePtr, imageUint8Array.length);
+            run(vw, vh, fileData);
         }
 
         gameloop();

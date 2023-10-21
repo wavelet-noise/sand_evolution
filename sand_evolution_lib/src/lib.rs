@@ -70,7 +70,7 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub async fn run(w: f32, h: f32, image_ptr: *const u8, length: usize) {
+pub async fn run(w: f32, h: f32, data: &[u8]) {
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -172,13 +172,15 @@ pub async fn run(w: f32, h: f32, image_ptr: *const u8, length: usize) {
 
     let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
 
-    if length == 0
+    if data.is_empty()
     {
         state.generate_simple();
     }
     else
     {
-        eprintln!("Some image loaded");
+        let res = image::load_from_memory(data).expect("Load from memory failed");
+        state.diffuse_rgba = res.to_luma8();
+        println!("Some image loaded");
     }
 
     let mut evolution_app = EvolutionApp::new();
