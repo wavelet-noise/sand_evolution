@@ -29,7 +29,7 @@ impl CellTrait for Cell {
 
         if prng.next() > 250 {
             container[cur] = BurningCoal::id();
-            prng.add_carb();
+            //prng.add_carb();
             return;
         }
 
