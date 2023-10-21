@@ -3,11 +3,10 @@
 /**
 * @param {number} w
 * @param {number} h
-* @param {number} image_ptr
-* @param {number} length
+* @param {Uint8Array} data
 * @returns {Promise<void>}
 */
-export function run(w: number, h: number, image_ptr: number, length: number): Promise<void>;
+export function run(w: number, h: number, data: Uint8Array): Promise<void>;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
