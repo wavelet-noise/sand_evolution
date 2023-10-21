@@ -9,8 +9,18 @@
 </head>
 
 <body id="wasm-example">
-    <script type="module"> 
+    <script type="module">
         import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
+
+        async function blobToArrayBuffer(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(new Uint8Array(reader.result));
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(blob);
+            });
+        }
+
         async function gameloop() {
             console.log("initialization");
             await init();
@@ -19,12 +29,35 @@
             var body = document.body,
             html = document.documentElement;
 
+            var saveString = new URLSearchParams(location.search).get("save") || "null";
+            saveString = decodeURIComponent(saveString);
+            saveString = saveString.replace(/^"|"$/g, '');
+
+            console.log(saveString);
+
             const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
             const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
 
             console.log("x = " + vw + ", y = " + vh);
 
-            run(vw, vh);
+            const response = await fetch(saveString);
+            const blob = await response.blob();
+
+            let wasmInstance;
+
+            WebAssembly.instantiateStreaming(fetch('./sand_evolution_lib/pkg/sand_evolution_lib_bg.wasm'))
+                .then(result => {
+                    wasmInstance = result.instance;
+                    // you can now use wasmInstance.exports to access your Rust functions
+                })
+                .catch(console.error);
+
+            const imageUint8Array = await blobToArrayBuffer(blob);
+            const { memory, run } = wasmInstance.exports; // wasmInstance is your WebAssembly module instance
+            const imagePtr = wasmInstance.exports.allocate(imageUint8Array.length); // allocate is a Rust function to allocate memory
+            new Uint8Array(memory.buffer, imagePtr, imageUint8Array.length).set(imageUint8Array);
+
+            run(vw, vh, imagePtr, imageUint8Array.length);
         }
 
         gameloop();
