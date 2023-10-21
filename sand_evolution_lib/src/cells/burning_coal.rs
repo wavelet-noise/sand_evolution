@@ -31,19 +31,21 @@ impl CellTrait for BurningCoal {
 
             let top = cs::xy_to_index(i, j + 1);
 
-            if container[top] == Water::id() {
-                container[top] = Steam::id();
-                container[cur] = Coal::id();
+            if prng.next() > 200 {
                 return;
             }
 
-            if prng.next() > 200 {
+            if container[top] == Water::id() {
+                container[top] = Steam::id();
+                if prng.next() > 200 {
+                    container[cur] = Coal::id();
+                }
                 return;
             }
 
             if prng.next() > 250 {
                 container[cur] = Void::id();
-                prng.add_carb();
+                //prng.add_carb();
                 return;
             }
 
