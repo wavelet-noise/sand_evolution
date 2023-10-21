@@ -67,9 +67,10 @@ const VERTICES: &[Vertex] = &[
         uv: [1.0, 1.0],
     },
 ];
+
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub async fn run(w: f32, h: f32) {
+pub async fn run(w: f32, h: f32, image_ptr: *const u8, length: usize) {
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -170,6 +171,15 @@ pub async fn run(w: f32, h: f32) {
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
     let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
+
+    if length == 0
+    {
+        state.generate_simple();
+    }
+    else
+    {
+        eprintln!("Some image loaded");
+    }
 
     let mut evolution_app = EvolutionApp::new();
 

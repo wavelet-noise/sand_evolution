@@ -58,6 +58,85 @@ pub struct State {
 }
 
 impl State {
+
+    pub fn generate_simple(&mut self) {
+        let mut buf = [0u8; 4];
+        self.diffuse_rgba = image::GrayImage::from_fn(
+            cs::SECTOR_SIZE.x as u32,
+            cs::SECTOR_SIZE.y as u32,
+            |x, y| {
+                if x > 1
+                    && y > 1
+                    && x < cs::SECTOR_SIZE.x as u32 - 2
+                    && y < cs::SECTOR_SIZE.y as u32 - 2
+                {
+                    _ = getrandom::getrandom(&mut buf);
+                    return image::Luma([
+                        if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
+                            buf[1] % 4
+                        } else {
+                            0
+                        },
+                    ]);
+                } else {
+                    return image::Luma([Stone::id()]);
+                }
+            },
+        );
+
+        for _ in 0..150 {
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+            for x in 0..50 {
+                self.diffuse_rgba.put_pixel(
+                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                    image::Luma([Wood::id()]),
+                );
+            }
+        }
+
+        for _ in 0..100 {
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+            for x in 0..20 {
+                for y in 0..20 {
+                    self.diffuse_rgba.put_pixel(
+                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                        image::Luma([Wood::id()]),
+                    );
+                }
+            }
+        }
+
+        for _ in 0..3 {
+            for cell in self.pal_container.pal.iter() {
+                if cell.id() != 0 {
+                    _ = getrandom::getrandom(&mut buf);
+
+                    let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+                    let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+                    for x in 0..35 {
+                        for y in 0..20 {
+                            self.diffuse_rgba.put_pixel(
+                                clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                                clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                                image::Luma([cell.id()]),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
     pub async fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -75,14 +154,7 @@ impl State {
                     && x < cs::SECTOR_SIZE.x as u32 - 2
                     && y < cs::SECTOR_SIZE.y as u32 - 2
                 {
-                    _ = getrandom::getrandom(&mut buf);
-                    return image::Luma([
-                        if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
-                            buf[1] % 4
-                        } else {
-                            0
-                        },
-                    ]);
+                    return image::Luma([0]);
                 } else {
                     return image::Luma([Stone::id()]);
                 }
@@ -106,59 +178,6 @@ impl State {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
             })
-        }
-
-        for _ in 0..150 {
-            _ = getrandom::getrandom(&mut buf);
-
-            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
-
-            for x in 0..50 {
-                diffuse_rgba.put_pixel(
-                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                    image::Luma([Wood::id()]),
-                );
-            }
-        }
-
-        for _ in 0..100 {
-            _ = getrandom::getrandom(&mut buf);
-
-            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
-
-            for x in 0..20 {
-                for y in 0..20 {
-                    diffuse_rgba.put_pixel(
-                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                        image::Luma([Wood::id()]),
-                    );
-                }
-            }
-        }
-
-        for _ in 0..3 {
-            for cell in pal_container.pal.iter() {
-                if cell.id() != 0 {
-                    _ = getrandom::getrandom(&mut buf);
-
-                    let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                    let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
-
-                    for x in 0..20 {
-                        for y in 0..20 {
-                            diffuse_rgba.put_pixel(
-                                clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                image::Luma([cell.id()]),
-                            );
-                        }
-                    }
-                }
-            }
         }
 
         let dimensions = diffuse_rgba.dimensions();

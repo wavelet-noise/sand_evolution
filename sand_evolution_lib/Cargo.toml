@@ -31,6 +31,12 @@ bytemuck = { version = "1.4", features = [ "derive" ] }
 cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
+web-sys = { version = "0.3.61", features = [
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "XmlHttpRequest"
+]}
 
 #[patch.crates-io]
 # egui = { version = "0.5", git = "https://github.com/emilk/egui" }
@@ -57,7 +63,7 @@ web-sys = { version = "0.3.61", features = [
     "Blob",
     "BlobPropertyBag",
     "Url",
-    "Window",
-    "File"
+    "File",
+    "XmlHttpRequest"
 ]}
 js-sys = "0.3.45"

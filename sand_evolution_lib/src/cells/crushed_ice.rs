@@ -36,6 +36,10 @@ impl CellTrait for CrushedIce {
             return;
         }
 
+        if prng.next() > 32 {
+            return;
+        }
+
         let top = cs::xy_to_index(i, j + 1);
         let bot = cs::xy_to_index(i, j - 1);
         let left = cs::xy_to_index(i + 1, j);

@@ -1,10 +1,6 @@
 use crate::cs::{PointType, self};
 
-use super::{
-    helper::{sand_faling_helper, fluid_falling_helper},
-    water::{BaseWater, SaltyWater, Water},
-    CellRegistry, CellTrait, CellType, Prng, void::Void,
-};
+use super::{helper::{sand_faling_helper, fluid_falling_helper}, water::{BaseWater, SaltyWater, Water}, CellRegistry, CellTrait, CellType, Prng, void::Void, snow};
 
 pub struct Snow;
 impl Snow {
@@ -36,6 +32,10 @@ impl CellTrait for Snow {
             return;
         }
 
+        if prng.next() > 50 {
+            return;
+        }
+
         let top = cs::xy_to_index(i, j + 1);
         let bot = cs::xy_to_index(i, j - 1);
         let left = cs::xy_to_index(i + 1, j);
@@ -45,7 +45,7 @@ impl CellTrait for Snow {
         let cc = arr[(prng.next() % 4) as usize];
         let top_v = container[cc];
 
-        if top_v == Void::id() || top_v == Water::id() {
+        if top_v != Void::id() && top_v != Snow::id() {
             container[cur] = Water::id();
         }
     }
