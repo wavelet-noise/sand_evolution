@@ -133,6 +133,10 @@ impl EvolutionApp {
                     );
                 }
 
+                if ui.button("Simple random map").clicked() {
+                    state.generate_simple();
+                }
+
                 *any_win_hovered |= ui.ui_contains_pointer();
             });
 

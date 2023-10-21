@@ -1,3 +1,4 @@
+use crate::cells::crushed_ice::CrushedIce;
 use crate::cs::{PointType, self};
 
 use super::{
@@ -32,6 +33,10 @@ impl CellTrait for Ice {
             return;
         }
 
+        if prng.next() > 20 {
+            return;
+        }
+
         let top = cs::xy_to_index(i, j + 1);
         let bot = cs::xy_to_index(i, j - 1);
         let left = cs::xy_to_index(i + 1, j);
@@ -42,7 +47,11 @@ impl CellTrait for Ice {
         let top_v = container[cc];
 
         if top_v == Void::id() || top_v == Water::id() {
-            container[cur] = Water::id();
+            if prng.next() > 1 {
+                container[cur] = Water::id();
+            } else {
+                container[cur] = CrushedIce::id();
+            }
         }
     }
 

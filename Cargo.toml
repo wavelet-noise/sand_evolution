@@ -14,4 +14,5 @@ path = "src/main.rs"
 sand_evolution_lib = { path = "sand_evolution_lib" }
 pollster = "0.2"
 js-sys = "0.3.61"
+web-sys = "0.3.64"
 
