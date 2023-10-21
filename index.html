@@ -29,16 +29,16 @@
             var body = document.body,
             html = document.documentElement;
 
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
+
+            console.log("x = " + vw + ", y = " + vh);
+
             var saveString = new URLSearchParams(location.search).get("save") || "null";
             saveString = decodeURIComponent(saveString);
             saveString = saveString.replace(/^"|"$/g, '');
 
             console.log(saveString);
-
-            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
-            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
-
-            console.log("x = " + vw + ", y = " + vh);
 
             const response = await fetch(saveString);
             console.log(response);
