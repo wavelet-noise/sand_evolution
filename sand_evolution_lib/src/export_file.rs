@@ -1,15 +1,9 @@
-use egui::Ui;
-use image::{DynamicImage, ImageEncoder, Luma};
-use std::io::{Cursor, Write};
-use std::{error::Error, fs::File};
+use std::error::Error;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::{BlobPropertyBag, Url};
-
-use crate::cs;
-
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,

@@ -2,8 +2,7 @@ use crate::cells::crushed_ice::CrushedIce;
 use crate::cs::{PointType, self};
 
 use super::{
-    helper::sand_faling_helper,
-    water::{BaseWater, SaltyWater, Water},
+    water::Water,
     CellRegistry, CellTrait, CellType, Prng, void::Void,
 };
 
