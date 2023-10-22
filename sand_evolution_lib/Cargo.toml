@@ -32,7 +32,8 @@ cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 specs = "0.20.0"
-mlua = { version = "0.9.1", features = ["luau"] }
+wasmtime = "14"
+anyhow = "1.0.75"
 
 #[patch.crates-io]
 # egui = { version = "0.5", git = "https://github.com/emilk/egui" }
