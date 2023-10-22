@@ -82,40 +82,18 @@ impl EvolutionApp {
         event_loop_proxy: &EventLoopProxy<UserEventInfo>,
         any_win_hovered: &mut bool
     ) {
-        egui::Window::new("Monitor")
+        egui::Window::new("Configuration")
             .default_pos(egui::pos2(340.0, 5.0))
             .fixed_size(egui::vec2(200.0, 100.0))
-            .show(context, |ui| {    
-                    
+            .show(context, |ui| {
                 let url = "https://github.com/wavelet-noise/sand_evolution";
                 if ui.hyperlink(url).clicked() {
                     _ = webbrowser::open(url);
                 }
 
-                ui.label(
-                    [
-                        "CO2 level:",
-                        compact_number_string(state.prng.carb() as f32).as_str(),
-                    ]
-                    .join(" "),
-                );
                 ui.separator();
-                ui.label(format!(
-                    "fps: {}",
-                    compact_number_string(fps_meter.next() as f32)
-                ));
-                let sim_step_avg_time_str = if self.simulation_steps_per_frame == 0 {
-                    "sim. step avg time: ON PAUSE".to_string()
-                } else {
-                    format!(
-                        "sim. step avg time: {:.1} ms.",
-                        upd_result.simulation_step_average_time
-                    )
-                };
-                ui.label(sim_step_avg_time_str);
-                ui.label(format!("frame time: {:.1} ms.", upd_result.update_time));
 
-                if ui.button("Clear screen").clicked() {
+                if ui.button("Clear Map").clicked() {
                     state.diffuse_rgba = image::GrayImage::from_fn(
                         cs::SECTOR_SIZE.x as u32,
                         cs::SECTOR_SIZE.y as u32,
@@ -133,46 +111,83 @@ impl EvolutionApp {
                     );
                 }
 
-                if ui.button("Simple random map").clicked() {
+                if ui.button("Generate Basic Random Map").clicked() {
                     state.generate_simple();
                 }
 
-                if ui.button("Reload url map").clicked() {
+                if ui.button("Restore Map from URL").clicked() {
                     state.diffuse_rgba = state.loaded_rgba.clone();
+                }
+
+                // Map Operations
+                ui.separator();
+                ui.heading("Map Operations");
+                if ui.button("Export map").clicked() {
+                    if let Err(err) = write_to_file(&state.diffuse_rgba) {
+                        panic!("Error: {}", err);
+                    }
+                }
+
+                if ui.button("Open map").clicked() {
+                    let dialog = rfd::AsyncFileDialog::new()
+                        .add_filter("Images", &["png"])
+                        .pick_file();
+
+                    let event_loop_proxy = event_loop_proxy.clone();
+                    self.executor.execute(async move {
+                        if let Some(file) = dialog.await {
+                            let bytes = file.read().await;
+                            event_loop_proxy
+                                .send_event(create_event_with_data(bytes))
+                                .ok();
+                        }
+                    });
                 }
 
                 *any_win_hovered |= ui.ui_contains_pointer();
             });
 
-        egui::Window::new("Toolbox")
+        egui::Window::new("Simulation")
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
-                ui.add(
-                    egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=10)
-                        .text("Simulation steps per frame"),
-                );
-                ui.heading("Hold left mouse button to spawn particles");
-                let combo = ComboBox::from_id_source("dropdown_list")
-                    .selected_text(&self.selected_option)
-                    .show_ui(ui, |ui| {
-                        for option in self.options.iter() {
-                            ui.selectable_value(
-                                &mut self.selected_option,
-                                option.to_string(),
-                                option.to_string(),
-                            );
-                        }
-                    });
-
-                ui.label(format!("Selected: {}", self.selected_option));
+                // Simulation Configuration
+                ui.heading("Pause or simulation speed");
+                ui.add(egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=20).text("Simulation steps per frame"));
 
                 ui.separator();
-                ui.heading("Spawn structures");
-                ui.add(
-                    egui::Slider::new(&mut self.number_of_structures_to_add, 0..=10000 as i32)
-                        .text("Number of structures to add"),
-                );
+                ui.label(format!(
+                    "fps: {}",
+                    compact_number_string(fps_meter.next() as f32)
+                ));
+                let sim_step_avg_time_str = if self.simulation_steps_per_frame == 0 {
+                    "Simulation Step Avg Time: ON PAUSE".to_string()
+                } else {
+                    format!(
+                        "Simulation Step Avg Time: {:.1} ms.",
+                        upd_result.simulation_step_average_time
+                    )
+                };
+                ui.label(sim_step_avg_time_str);
+                ui.label(format!("Frame Processing Time: {:.1} ms.", upd_result.update_time));
+
+                // Particle Spawning
+                ui.separator();
+                ui.heading("Particle Spawning");
+                ui.label("Hold left mouse button to spawn particles");
+                ComboBox::from_id_source("dropdown_list")
+                    .selected_text(&self.selected_option)
+                    .show_ui(ui, |ui| {
+                        self.options.iter().for_each(|option| {
+                            ui.selectable_value(&mut self.selected_option, option.to_string(), option.to_string());
+                        });
+                    });
+                ui.label(format!("Selected: {}", self.selected_option));
+
+                // Structure Spawning
+                ui.separator();
+                ui.heading("Structure Spawning");
+                ui.add(egui::Slider::new(&mut self.number_of_structures_to_add, 0..=10000).text("Number of structures to add"));
                 ui.label("Click to add");
 
                 if ui.button("Wooden platforms").clicked() {
@@ -215,35 +230,6 @@ impl EvolutionApp {
                             }
                         }
                     }
-                }
-
-                ui.separator();
-
-                if ui.button("Export map").clicked() {
-                    let result = write_to_file(&state.diffuse_rgba);
-                    match result {
-                        Ok(()) => {}
-                        Err(err) => {
-                            // handle the error
-                            panic!("Error: {}", err);
-                        }
-                    }
-                }
-
-                if ui.button("Open map").clicked() {
-                    let dialog = rfd::AsyncFileDialog::new()
-                        .add_filter("Images", &["png"])
-                        .pick_file();
-
-                    let event_loop_proxy = event_loop_proxy.clone();
-                    self.executor.execute(async move {
-                        if let Some(file) = dialog.await {
-                            let bytes = file.read().await;
-                            event_loop_proxy
-                                .send_event(create_event_with_data(bytes))
-                                .ok();
-                        }
-                    });
                 }
 
                 *any_win_hovered |= ui.ui_contains_pointer();
