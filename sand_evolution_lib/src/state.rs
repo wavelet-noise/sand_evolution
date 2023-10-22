@@ -73,15 +73,10 @@ impl State {
 
         lua.load("for k,v in pairs(map_table) do print(k,v) end").exec()?;
 
-        let f = lua.create_function(|_, ()| -> LuaResult<()> {
-            panic!("test panic");
-        })?;
-        lua.globals().set("rust_func", f)?;
-
         let _ = lua.load(r#"
-            local status, err = pcall(rust_func)
-            print(err) -- prints: test panic
-            error(err) -- propagate panic
+            "require('jit') if type(jit) == 'table' then print(jit.version) else "
+            "print('jit fatal error') end",
+            "jit_test"
         "#).exec();
 
         Ok(())
