@@ -1,5 +1,5 @@
 use cgmath::num_traits::clamp;
-use wasmtime::{Caller, Engine, Func, Instance, Module, Store};
+use wasmer::{Store, Module, Instance, Value, imports};
 use wgpu::{util::DeviceExt, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
@@ -67,41 +67,25 @@ struct MyState {
 impl State {
 
     fn main1() -> anyhow::Result<()> {
-        let engine = Engine::default();
-        let module = Module::from_file(&engine, "examples/hello.wat")?;
+        let module_wat = r#"
+        (module
+        (type $t0 (func (param i32) (result i32)))
+        (func $add_one (export "add_one") (type $t0) (param $p0 i32) (result i32)
+            get_local $p0
+            i32.const 1
+            i32.add))
+        "#;
 
-        println!("Initializing...");
-        let mut store = Store::new(
-            &engine,
-            MyState {
-                name: "hello, world!".to_string(),
-                count: 0,
-            },
-        );
+        let mut store = Store::default();
+        let module = Module::new(&store, &module_wat)?;
+        // The module doesn't import anything, so we create an empty import object.
+        let import_object = imports! {};
+        let instance = Instance::new(&mut store, &module, &import_object)?;
 
-        println!("Creating callback...");
-        let hello_func = Func::wrap(&mut store, |mut caller: Caller<'_, MyState>| {
-            println!("Calling back...");
-            println!("> {}", caller.data().name);
-            caller.data_mut().count += 1;
-        });
+        let add_one = instance.exports.get_function("add_one")?;
+        let result = add_one.call(&mut store, &[Value::I32(42)])?;
+        assert_eq!(result[0], Value::I32(43));
 
-        // Once we've got that all set up we can then move to the instantiation
-        // phase, pairing together a compiled module as well as a set of imports.
-        // Note that this is where the wasm `start` function, if any, would run.
-        println!("Instantiating module...");
-        let imports = [hello_func.into()];
-        let instance = Instance::new(&mut store, &module, &imports)?;
-
-        // Next we poke around a bit to extract the `run` function from the module.
-        println!("Extracting export...");
-        let run = instance.get_typed_func::<(), ()>(&mut store, "run")?;
-
-        // And last but not least we can call it!
-        println!("Calling export...");
-        run.call(&mut store, ())?;
-
-        println!("Done.");
         Ok(())
     }
 
