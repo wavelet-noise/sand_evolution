@@ -1,5 +1,5 @@
 use super::{helper::fluid_flying_helper, *};
-use crate::cs::{self, PointType};
+use crate::cs::PointType;
 
 pub struct Steam;
 impl Steam {
