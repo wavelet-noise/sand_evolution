@@ -1,5 +1,4 @@
 use cgmath::num_traits::clamp;
-use wasmer::{Store, Module, Instance, Value, imports};
 use wgpu::{util::DeviceExt, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
