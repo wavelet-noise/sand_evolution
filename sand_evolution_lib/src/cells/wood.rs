@@ -2,7 +2,7 @@ use crate::cs::PointType;
 
 use super::{
     burning_wood,
-    gas::{self, Gas},
+    gas::{Gas},
     CellRegistry, CellTrait, CellType, Prng,
 };
 

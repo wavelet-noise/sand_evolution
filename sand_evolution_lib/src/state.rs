@@ -1,13 +1,13 @@
 use cgmath::num_traits::clamp;
 use wasmtime::{Caller, Engine, Func, Instance, Module, Store};
-use wgpu::{util::DeviceExt, Surface, TextureFormat, TextureView};
+use wgpu::{util::DeviceExt, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
     window::Window,
 };
 
 use crate::{
-    cells::{self, stone::Stone, wood::Wood, CellRegistry, Prng},
+    cells::{stone::Stone, wood::Wood, CellRegistry, Prng},
     cs,
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
@@ -187,11 +187,11 @@ impl State {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
-        surface: &wgpu::Surface,
+        _surface: &wgpu::Surface,
         surface_format: wgpu::TextureFormat
     ) -> Self {
-        let result1 = Self::main1();
-        let mut diffuse_rgba = image::GrayImage::from_fn(
+        let _result1 = Self::main1();
+        let diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
             cs::SECTOR_SIZE.y as u32,
             |x, y| {
@@ -819,7 +819,7 @@ impl State {
             let mut buf = [0u8; 10000 + 1];
             _ = getrandom::getrandom(&mut buf);
 
-            for i in 0..evolution_app.number_of_cells_to_add as usize {
+            for _i in 0..evolution_app.number_of_cells_to_add as usize {
                 let mut px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
                     + (self.prng.next() as f64 - 128.0) / 25.0;
                 let mut py = percentage_position.1 * cs::SECTOR_SIZE.y as f64

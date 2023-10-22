@@ -1,8 +1,6 @@
 use crate::cs::{PointType, self};
 
 use super::{
-    helper::sand_faling_helper,
-    water::{BaseWater, SaltyWater, Water},
     CellRegistry, CellTrait, CellType, Prng, void::Void,
 };
 
@@ -25,7 +23,7 @@ impl CellTrait for Electricity {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &CellRegistry,
+        _pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
         if prng.next() > 110 {

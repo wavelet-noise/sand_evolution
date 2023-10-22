@@ -20,7 +20,7 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &CellRegistry,
+        _pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
         if prng.next() > 200 {
