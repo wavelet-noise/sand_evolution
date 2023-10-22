@@ -1,4 +1,6 @@
 use cgmath::num_traits::clamp;
+use mlua::Lua;
+use mlua::prelude::LuaResult;
 use wgpu::{util::DeviceExt, Surface, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
@@ -59,6 +61,31 @@ pub struct State {
 }
 
 impl State {
+
+    fn main1() -> LuaResult<()> {
+        let lua = Lua::new();
+
+        let map_table = lua.create_table()?;
+        map_table.set(1, "one")?;
+        map_table.set("two", 2)?;
+
+        lua.globals().set("map_table", map_table)?;
+
+        lua.load("for k,v in pairs(map_table) do print(k,v) end").exec()?;
+
+        let f = lua.create_function(|_, ()| -> LuaResult<()> {
+            panic!("test panic");
+        })?;
+        lua.globals().set("rust_func", f)?;
+
+        let _ = lua.load(r#"
+            local status, err = pcall(rust_func)
+            print(err) -- prints: test panic
+            error(err) -- propagate panic
+        "#).exec();
+
+        Ok(())
+    }
 
     pub fn generate_simple(&mut self) {
         let mut buf = [0u8; 4];
@@ -145,7 +172,7 @@ impl State {
         surface: &wgpu::Surface,
         surface_format: wgpu::TextureFormat
     ) -> Self {
-        let mut buf = [0u8; 4];
+        let result1 = Self::main1();
         let mut diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
             cs::SECTOR_SIZE.y as u32,
