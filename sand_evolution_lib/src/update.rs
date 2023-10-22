@@ -1,6 +1,6 @@
 use crate::{cs, State};
 
-pub fn update_dim(state: &mut State, sim_steps: u8, dimensions: (u32, u32)) {
+pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32)) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
     let mut b_index = 0;

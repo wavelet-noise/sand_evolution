@@ -1,5 +1,5 @@
 use super::{
-    helper::{fluid_falling_helper, fluid_flying_helper},
+    helper::{fluid_flying_helper},
     *,
 };
 use crate::cs::PointType;

@@ -1,6 +1,6 @@
 use crate::cs::{PointType, self};
 
-use super::{helper::{sand_faling_helper, fluid_falling_helper}, water::{BaseWater, SaltyWater, Water}, CellRegistry, CellTrait, CellType, Prng, void::Void, snow};
+use super::{helper::{fluid_falling_helper}, water::{Water}, CellRegistry, CellTrait, CellType, Prng, void::Void};
 
 pub struct Snow;
 impl Snow {
