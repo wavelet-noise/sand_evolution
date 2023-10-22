@@ -1,6 +1,5 @@
 use cgmath::num_traits::clamp;
-use mlua::Lua;
-use mlua::prelude::LuaResult;
+use wasmtime::{Caller, Engine, Func, Instance, Module, Store};
 use wgpu::{util::DeviceExt, Surface, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
@@ -60,25 +59,49 @@ pub struct State {
     surface_format: TextureFormat,
 }
 
+struct MyState {
+    name: String,
+    count: usize,
+}
+
 impl State {
 
-    fn main1() -> LuaResult<()> {
-        let lua = Lua::new();
+    fn main1() -> anyhow::Result<()> {
+        let engine = Engine::default();
+        let module = Module::from_file(&engine, "examples/hello.wat")?;
 
-        let map_table = lua.create_table()?;
-        map_table.set(1, "one")?;
-        map_table.set("two", 2)?;
+        println!("Initializing...");
+        let mut store = Store::new(
+            &engine,
+            MyState {
+                name: "hello, world!".to_string(),
+                count: 0,
+            },
+        );
 
-        lua.globals().set("map_table", map_table)?;
+        println!("Creating callback...");
+        let hello_func = Func::wrap(&mut store, |mut caller: Caller<'_, MyState>| {
+            println!("Calling back...");
+            println!("> {}", caller.data().name);
+            caller.data_mut().count += 1;
+        });
 
-        lua.load("for k,v in pairs(map_table) do print(k,v) end").exec()?;
+        // Once we've got that all set up we can then move to the instantiation
+        // phase, pairing together a compiled module as well as a set of imports.
+        // Note that this is where the wasm `start` function, if any, would run.
+        println!("Instantiating module...");
+        let imports = [hello_func.into()];
+        let instance = Instance::new(&mut store, &module, &imports)?;
 
-        let _ = lua.load(r#"
-            "require('jit') if type(jit) == 'table' then print(jit.version) else "
-            "print('jit fatal error') end",
-            "jit_test"
-        "#).exec();
+        // Next we poke around a bit to extract the `run` function from the module.
+        println!("Extracting export...");
+        let run = instance.get_typed_func::<(), ()>(&mut store, "run")?;
 
+        // And last but not least we can call it!
+        println!("Calling export...");
+        run.call(&mut store, ())?;
+
+        println!("Done.");
         Ok(())
     }
 
