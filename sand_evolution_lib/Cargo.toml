@@ -11,32 +11,27 @@ path = "src/lib.rs"
 [dependencies]
 egui_wgpu_backend = "0.19"
 chrono = "0.4"
-pollster = "0.2"
+pollster = "0.3"
 egui = "0.19"
 epi = "0.17"
 egui_winit_platform = "0.16"
 wgpu = "0.13"
 winit = { version="0.27.3", features = ["x11"]}
 base64 = "0.21.0"
-rfd = "0.11.3"
+rfd = "0.12.1"
 futures = {version="0.3.10",features=["thread-pool"]}
-serde-wasm-bindgen = "0.5.0"
+serde-wasm-bindgen = "0.6"
 js-sys = "0.3.61"
 webbrowser = "0.5"
 
 cfg-if = "1"
-env_logger = "0.9"
+env_logger = "0.10.0"
 log = "0.4"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
-web-sys = { version = "0.3.61", features = [
-    "Blob",
-    "BlobPropertyBag",
-    "Url",
-    "XmlHttpRequest"
-]}
+specs = "0.20.0"
 
 #[patch.crates-io]
 # egui = { version = "0.5", git = "https://github.com/emilk/egui" }
@@ -50,11 +45,11 @@ features = ["png", "jpeg"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
-console_log = "0.2.0"
+console_log = "1.0"
 wgpu = { version = "0.13", features = ["webgl"]}
 wasm-bindgen = "0.2.76"
 wasm-bindgen-futures = "0.4.30"
-serde-wasm-bindgen = "0.5.0"
+serde-wasm-bindgen = "0.6"
 web-sys = { version = "0.3.61", features = [
     "Document",
     "Window",
