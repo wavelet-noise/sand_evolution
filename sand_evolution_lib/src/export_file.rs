@@ -1,4 +1,5 @@
 use std::error::Error;
+use image::ImageEncoder;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
@@ -19,8 +20,8 @@ pub fn write_to_file(
     let mut buffer = Vec::new();
     let result = image::codecs::png::PngEncoder::new(&mut buffer).write_image(
         &data,
-        cs::SECTOR_SIZE.x as u32,
-        cs::SECTOR_SIZE.y as u32,
+        crate::cs::SECTOR_SIZE.x as u32,
+        crate::cs::SECTOR_SIZE.y as u32,
         image::ColorType::L8,
     )?;
 
