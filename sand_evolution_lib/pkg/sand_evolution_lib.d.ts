@@ -4,15 +4,16 @@
 * @param {number} w
 * @param {number} h
 * @param {Uint8Array} data
+* @param {string} script
 * @returns {Promise<void>}
 */
-export function run(w: number, h: number, data: Uint8Array): Promise<void>;
+export function run(w: number, h: number, data: Uint8Array, script: string): Promise<void>;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly run: (a: number, b: number, c: number, d: number) => number;
+  readonly run: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
   readonly wgpu_render_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_render_pass_set_pipeline: (a: number, b: number) => void;
   readonly wgpu_render_pass_set_blend_constant: (a: number, b: number) => void;
@@ -63,8 +64,8 @@ export interface InitOutput {
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export_2: WebAssembly.Table;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h4d59347ef60f49dc: (a: number, b: number, c: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h8fca5ab3d5bf8792: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures__invoke1_mut__h2088e5c6d63326de: (a: number, b: number, c: number) => void;
+  readonly wasm_bindgen__convert__closures__invoke0_mut__h16270ff919171186: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures__invoke0_mut__h20997912b1f6df0a: (a: number, b: number) => void;
   readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h418bcfa3d9cfb1d7: (a: number, b: number, c: number) => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;

@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export function run(a: number, b: number, c: number, d: number): number;
+export function run(a: number, b: number, c: number, d: number, e: number, f: number): number;
 export function wgpu_render_pass_set_bind_group(a: number, b: number, c: number, d: number, e: number): void;
 export function wgpu_render_pass_set_pipeline(a: number, b: number): void;
 export function wgpu_render_pass_set_blend_constant(a: number, b: number): void;
@@ -52,8 +52,8 @@ export function wgpu_render_pass_execute_bundles(a: number, b: number, c: number
 export function __wbindgen_malloc(a: number, b: number): number;
 export function __wbindgen_realloc(a: number, b: number, c: number, d: number): number;
 export const __wbindgen_export_2: WebAssembly.Table;
-export function _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h4d59347ef60f49dc(a: number, b: number, c: number): void;
-export function _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h8fca5ab3d5bf8792(a: number, b: number): void;
+export function wasm_bindgen__convert__closures__invoke1_mut__h2088e5c6d63326de(a: number, b: number, c: number): void;
+export function wasm_bindgen__convert__closures__invoke0_mut__h16270ff919171186(a: number, b: number): void;
 export function wasm_bindgen__convert__closures__invoke0_mut__h20997912b1f6df0a(a: number, b: number): void;
 export function _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h418bcfa3d9cfb1d7(a: number, b: number, c: number): void;
 export function __wbindgen_free(a: number, b: number, c: number): void;
