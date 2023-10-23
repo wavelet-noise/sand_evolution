@@ -274,23 +274,23 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let start_time = instant::now();
     let mut loop_clone = shared_state.clone();
     event_loop.run(move |event, _, control_flow| {
-        if (state.toggled) {
-            let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, evolution_app.script.as_str());
-        }
-        for (p, c) in loop_clone.borrow_mut().points.iter() {
-            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
-                (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
-                state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, Luma([*c]));
-            }
-        }
-        loop_clone.borrow_mut().points.clear();
-
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
 
         match event {
             RedrawRequested(..) => {
                 platform.update_time((instant::now() - start_time) / 1000.0);
+
+                if (state.toggled) {
+                    let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, evolution_app.script.as_str());
+                }
+                for (p, c) in loop_clone.borrow_mut().points.iter() {
+                    if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
+                        (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
+                        state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, Luma([*c]));
+                    }
+                }
+                loop_clone.borrow_mut().points.clear();
 
                 let output_frame = match surface.get_current_texture() {
                     Ok(frame) => frame,
