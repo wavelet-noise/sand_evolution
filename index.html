@@ -41,7 +41,8 @@
             console.log(saveString);
 
             if (saveString === "null") {
-                run(vw, vh, null)
+                const emptyUint8Array = new Uint8Array(0);
+                run(vw, vh, emptyUint8Array)
             }
             else {
                 const response = await fetch(saveString);
