@@ -1,5 +1,5 @@
 use cgmath::num_traits::clamp;
-use egui::{ComboBox, Context};
+use egui::{Color32, ComboBox, Context};
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
 use crate::{
@@ -43,6 +43,9 @@ pub struct EvolutionApp {
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
     pub hovered: bool,
+    pub script: String,
+    pub script_error: String,
+    pub script_result: String,
     executor: Executor,
 }
 
@@ -145,6 +148,32 @@ impl EvolutionApp {
                 }
 
                 *any_win_hovered |= ui.ui_contains_pointer();
+            });
+
+        egui::Window::new("Level script")
+            .default_pos(egui::pos2(560.0, 5.0))
+            .fixed_size(egui::vec2(200., 100.))
+            .show(context, |ui| {
+                ui.text_edit_multiline(&mut self.script);
+                if ui.button("Run").clicked() {
+                    let result = state.rhai.eval::<i64>(self.script.as_str());
+                    match result {
+                        Ok(value) => {
+                            self.script_result = format!("{}", value);
+                            self.script_error = "".to_owned();
+                        }
+                        Err(err) => {
+                            self.script_result = "".to_owned();
+                            match *err {
+                                rhai::EvalAltResult::ErrorParsing(_, _) => self.script_error = format!("Parsing error"),
+                                rhai::EvalAltResult::ErrorVariableNotFound(var_name, _) => self.script_error = format!("Variable not found: {}", var_name),
+                                _ => self.script_error = format!("An error occurred: {}", err),
+                            }
+                        }
+                    }
+                }
+                ui.colored_label(Color32::from_rgb(0,255,0), &self.script_result);
+                ui.colored_label(Color32::from_rgb(255, 0,0),&self.script_error);
             });
 
         egui::Window::new("Simulation")
@@ -253,6 +282,13 @@ impl EvolutionApp {
             pressed: false,
             hovered: false,
             executor,
+            script: r"let a = 0;
+for i in 0.10 {
+a += i:
+return a;".to_owned(),
+
+            script_error: "".to_owned(),
+            script_result: "".to_owned()
         }
     }
 }
