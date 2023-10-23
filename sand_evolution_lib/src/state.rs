@@ -13,9 +13,7 @@ use crate::{
     update, Vertex, INDICES, VERTICES,
 };
 
-extern crate rlua;
-
-use rlua::Lua;
+use rhai::{Engine, EvalAltResult};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -153,25 +151,11 @@ impl State {
         _surface: &wgpu::Surface,
         surface_format: wgpu::TextureFormat
     ) -> Self {
-        let lua = Lua::new();
-        lua.context(|ctx| {
-            // Execute simple Lua code
-            ctx.load("print('Hello from Lua')").exec().unwrap();
+        let mut engine = Engine::new();
 
-            // Create a global variable in Lua
-            ctx.globals().set("rust_val", 42).unwrap();
+        let result: i64 = engine.eval("40 + 2").expect("script error");
 
-            // Run Lua code that reads the variable
-            ctx.load("print('Value from Rust: ' .. rust_val)").exec().unwrap();
-
-            // Call a Rust function from Lua
-            let rust_function = ctx.create_function(|_, arg: String| {
-                Ok(arg.to_uppercase())
-            }).unwrap();
-
-            ctx.globals().set("rust_to_upper", rust_function).unwrap();
-            ctx.load("print(rust_to_upper('make this uppercase'))").exec().unwrap();
-        });
+        println!("Answer: {}", result);  // prints "Answer: 42"
 
         let diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
