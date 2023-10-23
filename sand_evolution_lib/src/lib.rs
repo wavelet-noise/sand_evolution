@@ -5,8 +5,11 @@ pub mod export_file;
 pub mod fps_meter;
 pub mod gbuffer;
 pub mod state;
+pub mod shared_state;
 pub mod update;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use ::egui::FontDefinitions;
 use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
@@ -68,9 +71,67 @@ const VERTICES: &[Vertex] = &[
     },
 ];
 
+#[cfg(target_arch = "wasm32")]
+use web_sys::{Navigator, Window};
+#[cfg(target_arch = "wasm32")]
+pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Obtain the `window` object
+    //let window = web_sys::window().expect("should have a Window");
+    //let navigator: Navigator = window.navigator();
+
+    // Obtain the Clipboard object from Navigator
+    //let clipboard: Clipboard = navigator.clipboard();
+
+    // Use Clipboard API to write text
+    //clipboard.write_text(text)
+    Ok(())
+}
+#[cfg(target_arch = "wasm32")]
+pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> {
+    Ok("".to_owned())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+use clipboard::ClipboardProvider;
+use image::Luma;
+use crate::shared_state::SharedState;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut ctx: clipboard::ClipboardContext = clipboard::ClipboardProvider::new()?;
+    ctx.set_contents(text.to_owned())?;
+    Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> {
+    let mut ctx: clipboard::ClipboardContext = clipboard::ClipboardProvider::new()?;
+    ctx.get_contents()
+}
+
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+#[cfg(feature = "wasm")]
+extern "C" {
+    #[wasm_bindgen(js_namespace = Math)]
+    fn random() -> f64;
+}
+#[cfg(feature = "wasm")]
+pub fn my_rand() -> i64 {
+    (random() * 10000.0) as i64
+}
+
+#[cfg(not(feature = "wasm"))]
+use rand::Rng;
+#[cfg(not(feature = "wasm"))]
+pub fn my_rand() -> i64 {
+    let mut rng = rand::thread_rng();
+    rng.gen_range(0..10000)  // Generating a random number between 0 and 9999
+}
+
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub async fn run(w: f32, h: f32, data: &[u8]) {
+pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -170,7 +231,18 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
     // Display the demo application that ships with egui.
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
-    let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
+    let mut state= State::new(&device, &queue, &surface_config, &surface, surface_format).await;
+
+    let mut shared_state = Rc::new(RefCell::new(SharedState::new()));
+
+    let retr_clone = shared_state.clone();
+    state.rhai.register_fn("set_cell",  move |x: i64, y: i64, t: i64| {
+        let mut state = retr_clone.borrow_mut();
+        state.set_pixel(x as i32, y as i32, t as u8);
+    });
+    state.rhai.register_fn("rand", move || -> i64 {
+        my_rand()
+    });
 
     if data.is_empty() || data.len() == 0
     {
@@ -185,6 +257,11 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
     }
 
     let mut evolution_app = EvolutionApp::new();
+    if let Ok(decoded) = base64::decode(script) {
+        if let Ok(decoded_str) = String::from_utf8(decoded) {
+            evolution_app.script = decoded_str;
+        }
+    }
 
     for a in state.pal_container.pal.iter() {
         if a.id() != 0 {
@@ -195,7 +272,19 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
     let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
+    let mut loop_clone = shared_state.clone();
     event_loop.run(move |event, _, control_flow| {
+        if (state.toggled) {
+            let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, evolution_app.script.as_str());
+        }
+        for (p, c) in loop_clone.borrow_mut().points.iter() {
+            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
+                (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
+                state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, Luma([*c]));
+            }
+        }
+        loop_clone.borrow_mut().points.clear();
+
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
 
@@ -319,6 +408,29 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
                 winit::event::WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
                 }
+                winit::event::WindowEvent::KeyboardInput {
+                    device_id,
+                    input,
+                    is_synthetic
+                } => {
+                    if let winit::event::ElementState::Pressed = input.state {
+                        if input.modifiers.logo() || input.modifiers.ctrl() { // logo key is Command on macOS
+                            if let Some(virtual_keycode) = input.virtual_keycode {
+                                match virtual_keycode {
+                                    winit::event::VirtualKeyCode::C => {
+                                        _ = copy_text_to_clipboard(evolution_app.script.as_str());
+                                    },
+                                    winit::event::VirtualKeyCode::V => {
+                                        if let Ok(result) = copy_text_from_clipboard() {
+                                            evolution_app.script = result;
+                                        }
+                                    },
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                },
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if button == winit::event::MouseButton::Left {
                         if state == winit::event::ElementState::Pressed {

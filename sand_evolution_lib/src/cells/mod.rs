@@ -148,6 +148,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[2] = Water::boxed();
     cell_registry.pal[3] = Steam::boxed();
     cell_registry.pal[4] = fire::boxed();
+    cell_registry.pal[5] = fire::boxed();
     cell_registry.pal[6] = burning_wood::boxed();
     cell_registry.pal[7] = BurningCoal::boxed();
     cell_registry.pal[8] = Coal::boxed();

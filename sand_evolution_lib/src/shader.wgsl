@@ -352,6 +352,14 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         noisy_mixer - 0.04
       ) * 10.0;
     }
+    else if t == 5u // slow fire
+    {
+      col = mix(
+        vec4<f32>(1.0, 0.0, 0.0, 1.0),
+        vec4<f32>(1.0, 0.5, 0.0, 1.0),
+        noisy_mixer - 0.04
+      ) * 2.0;
+    }
     else if t == 50u // wood
     {
       col = mix(vec4<f32>(0.5, 0.2, 0.2, 1.0) * 1.5, vec4<f32>(0.5, 0.2, 0.2, 1.0) * 0.5, woodColor) * 0.5 * ((noise_pixel+1.0)/3.0);
