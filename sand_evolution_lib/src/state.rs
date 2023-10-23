@@ -13,8 +13,6 @@ use crate::{
     update, Vertex, INDICES, VERTICES,
 };
 
-use rhai::{Engine, EvalAltResult};
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct WorldSettings {
@@ -58,6 +56,7 @@ pub struct State {
     glow_texture: wgpu::Texture,
     gbuffer: GBuffer,
     surface_format: TextureFormat,
+    pub(crate) rhai: rhai::Engine,
 }
 
 struct MyState {
@@ -151,11 +150,7 @@ impl State {
         _surface: &wgpu::Surface,
         surface_format: wgpu::TextureFormat
     ) -> Self {
-        let mut engine = Engine::new();
-
-        let result: i64 = engine.eval("40 + 2").expect("script error");
-
-        println!("Answer: {}", result);  // prints "Answer: 42"
+        let rhai = rhai::Engine::new();
 
         let diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
@@ -750,6 +745,7 @@ impl State {
             glow_texture,
             gbuffer,
             surface_format,
+            rhai
         }
     }
 
