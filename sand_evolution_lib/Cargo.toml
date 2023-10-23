@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+ahash = "0.8.5"
 egui_wgpu_backend = "0.19"
 chrono = "0.4"
 pollster = "0.3"
