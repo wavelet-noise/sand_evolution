@@ -2,13 +2,7 @@ use cgmath::num_traits::clamp;
 use egui::{Color32, ComboBox, Context};
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
-use crate::{
-    cells::{stone::Stone, void::Void, wood::Wood},
-    cs,
-    export_file::write_to_file,
-    fps_meter::FpsMeter,
-    state::{State, UpdateResult},
-};
+use crate::{cells::{stone::Stone, void::Void, wood::Wood}, copy_text_to_clipboard, cs, export_file::write_to_file, fps_meter::FpsMeter, state::{State, UpdateResult}};
 
 struct Executor {
     #[cfg(not(target_arch = "wasm32"))]
@@ -155,8 +149,8 @@ impl EvolutionApp {
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
                 ui.text_edit_multiline(&mut self.script);
-                if ui.button("Run").clicked() {
-                    let result = state.rhai.eval::<i64>(self.script.as_str());
+                if ui.button("Once").clicked() {
+                    let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, self.script.as_str());
                     match result {
                         Ok(value) => {
                             self.script_result = format!("{}", value);
@@ -168,8 +162,15 @@ impl EvolutionApp {
                         }
                     }
                 }
+                if ui.button("Toggle").clicked() {
+                    state.toggled = !state.toggled;
+                }
                 ui.colored_label(Color32::from_rgb(0,255,0), &self.script_result);
                 ui.colored_label(Color32::from_rgb(255, 0,0),&self.script_error);
+
+                if ui.button("Export base64").clicked() {
+                    copy_text_to_clipboard(base64::encode(self.script.as_str()).as_str());
+                }
             });
 
         egui::Window::new("Simulation")

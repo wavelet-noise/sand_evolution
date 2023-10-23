@@ -57,6 +57,8 @@ pub struct State {
     gbuffer: GBuffer,
     surface_format: TextureFormat,
     pub(crate) rhai: rhai::Engine,
+    pub(crate) rhai_scope: rhai::Scope<'static>,
+    pub toggled: bool,
 }
 
 struct MyState {
@@ -150,8 +152,6 @@ impl State {
         _surface: &wgpu::Surface,
         surface_format: wgpu::TextureFormat
     ) -> Self {
-        let rhai = rhai::Engine::new();
-
         let diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
             cs::SECTOR_SIZE.y as u32,
@@ -716,6 +716,13 @@ impl State {
         let last_spawn = -5.0;
         let prng = Prng::new();
 
+        let mut rhai = rhai::Engine::new();
+        let mut rhai_scope = rhai::Scope::new();
+        rhai_scope.push_constant("RES_X", dimensions.0);
+        rhai_scope.push_constant("RES_Y", dimensions.1);
+        rhai_scope.push("time", 0 as f64);
+        //rhai.register_fn("set_cell", State::set_cell);
+
         Self {
             render_pipeline: type_render_pipeline,
             bloom_render_pipeline,
@@ -745,7 +752,9 @@ impl State {
             glow_texture,
             gbuffer,
             surface_format,
-            rhai
+            rhai,
+            rhai_scope,
+            toggled: true
         }
     }
 
@@ -762,6 +771,14 @@ impl State {
     // fn input(&mut self, event: &WindowEvent) -> bool {
     //     falsex
     // }
+
+    fn set_cell(&mut self, x: i32, y: i32, t: u8) {
+        self.diffuse_rgba.put_pixel(
+            x as u32,
+            y as u32,
+            image::Luma([t]),
+        );
+    }
 
     fn spawn(&mut self, evolution_app: &mut EvolutionApp, window: &Window) {
         if let Some(position) = evolution_app.cursor_position {
@@ -808,6 +825,7 @@ impl State {
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
+        self.rhai_scope.push("time", self.world_settings.time as f64);
 
         queue.write_buffer(
             &self.settings_buffer,
