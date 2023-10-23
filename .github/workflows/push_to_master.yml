@@ -17,7 +17,7 @@ jobs:
     - name: wasm-pack-action
       uses: jetli/wasm-pack-action@v0.3.0
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y liblua5.3-dev pkg-config build-essential
+      run: sudo apt-get update && sudo apt-get install -y liblua5.3-dev pkg-config build-essential libc6-dev
     - name: Build 🛠
       run: wasm-pack build --release --target web sand_evolution_lib
     - name: Archive 💼
