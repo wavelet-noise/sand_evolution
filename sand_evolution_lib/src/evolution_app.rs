@@ -164,11 +164,7 @@ impl EvolutionApp {
                         }
                         Err(err) => {
                             self.script_result = "".to_owned();
-                            match *err {
-                                rhai::EvalAltResult::ErrorParsing(_, _) => self.script_error = format!("Parsing error"),
-                                rhai::EvalAltResult::ErrorVariableNotFound(var_name, _) => self.script_error = format!("Variable not found: {}", var_name),
-                                _ => self.script_error = format!("An error occurred: {}", err),
-                            }
+                            self.script_error = err.to_string()
                         }
                     }
                 }
@@ -283,8 +279,8 @@ impl EvolutionApp {
             hovered: false,
             executor,
             script: r"let a = 0;
-for i in 0.10 {
-a += i:
+for i in 0..10 {
+a += i; }
 return a;".to_owned(),
 
             script_error: "".to_owned(),
