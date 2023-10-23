@@ -172,7 +172,7 @@ pub async fn run(w: f32, h: f32, data: &[u8]) {
 
     let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
 
-    if data.is_empty()
+    if data.is_empty() || data.len() == 0
     {
         state.generate_simple();
     }
