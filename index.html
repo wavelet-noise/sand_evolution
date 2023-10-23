@@ -40,14 +40,19 @@
 
             console.log(saveString);
 
-            const response = await fetch(saveString);
-            console.log(response);
-            const blob = await response.blob();
+            if (saveString === "null") {
+                run(vw, vh, null)
+            }
+            else {
+                const response = await fetch(saveString);
+                console.log(response);
+                const blob = await response.blob();
 
-            // Convert blob to Uint8Array
-            const fileData = await blobToArrayBuffer(blob);
+                // Convert blob to Uint8Array
+                const fileData = await blobToArrayBuffer(blob);
 
-            run(vw, vh, fileData);
+                run(vw, vh, fileData);
+            }
         }
 
         gameloop();
