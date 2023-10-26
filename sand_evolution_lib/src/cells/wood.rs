@@ -42,7 +42,7 @@ impl CellTrait for Wood {
     fn id(&self) -> CellType {
         50
     }
-    fn name(&self) -> String {
-        "wood".to_owned()
+    fn name(&self) -> &str {
+        "wood"
     }
 }

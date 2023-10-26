@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use cgmath::num_traits::clamp;
 use egui::{Color32, ComboBox, Context};
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
@@ -38,10 +39,11 @@ pub struct EvolutionApp {
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
     pub hovered: bool,
-    pub script: String,
+    script: String,
+    pub need_to_recompile: bool,
     pub script_error: String,
-    pub script_result: String,
     executor: Executor,
+    pub ast: Option<rhai::AST>
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -72,6 +74,16 @@ pub enum UserEventInfo {
 }
 
 impl EvolutionApp {
+
+    pub fn get_script(&mut self) -> &str {
+        self.script.as_str()
+    }
+
+    pub fn set_script(&mut self, value: &str) -> bool {
+        self.script = value.to_owned();
+        self.need_to_recompile = true;
+        true
+    }
     pub(crate) fn ui(
         &mut self,
         context: &Context,
@@ -93,21 +105,7 @@ impl EvolutionApp {
                 ui.separator();
 
                 if ui.button("Clear Map").clicked() {
-                    state.diffuse_rgba = image::GrayImage::from_fn(
-                        cs::SECTOR_SIZE.x as u32,
-                        cs::SECTOR_SIZE.y as u32,
-                        |x, y| {
-                            if x > 1
-                                && y > 1
-                                && x < cs::SECTOR_SIZE.x as u32 - 2
-                                && y < cs::SECTOR_SIZE.y as u32 - 2
-                            {
-                                return image::Luma([Void::id()]);
-                            } else {
-                                return image::Luma([Stone::id()]);
-                            }
-                        },
-                    );
+                    Self::clear_map(state);
                 }
 
                 if ui.button("Generate Basic Random Map").clicked() {
@@ -148,26 +146,13 @@ impl EvolutionApp {
 
         egui::Window::new("Level script")
             .default_pos(egui::pos2(560.0, 5.0))
-            .fixed_size(egui::vec2(200., 100.))
+            .default_size(egui::vec2(500., 500.))
             .show(context, |ui| {
                 ui.text_edit_multiline(&mut self.script);
-                if ui.button("Check script").clicked() {
-                    let result = state.rhai.eval_with_scope::<()>(&mut state.rhai_scope, self.script.as_str());
-                    match result {
-                        Ok(value) => {
-                            self.script_result = "Ok".to_owned();
-                            self.script_error = "".to_owned();
-                        }
-                        Err(err) => {
-                            self.script_result = "".to_owned();
-                            self.script_error = err.to_string()
-                        }
-                    }
-                }
+
                 if ui.button(if state.toggled { "Disable script" } else { "Enable script" }).clicked() {
                     state.toggled = !state.toggled;
                 }
-                ui.colored_label(Color32::from_rgb(0,255,0), &self.script_result);
                 ui.colored_label(Color32::from_rgb(255, 0,0),&self.script_error);
 
                 if ui.button("Export code").clicked() {
@@ -237,49 +222,89 @@ impl EvolutionApp {
                 ui.label("Click to add");
 
                 if ui.button("Wooden platforms").clicked() {
-                    for _ in 0..self.number_of_structures_to_add {
-                        let mut buf = [0u8; 4];
-                        _ = getrandom::getrandom(&mut buf);
-
-                        let nx =
-                            (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                        let ny =
-                            (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
-
-                        for x in 0..50 {
-                            state.diffuse_rgba.put_pixel(
-                                clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                image::Luma([Wood::id()]),
-                            );
-                        }
-                    }
+                    self.spawn_platforms(state);
                 }
 
                 if ui.button("Cubes").clicked() {
-                    for _ in 0..self.number_of_structures_to_add {
-                        let mut buf = [0u8; 4];
-                        _ = getrandom::getrandom(&mut buf);
-
-                        let nx =
-                            (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                        let ny =
-                            (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
-
-                        for x in 0..20 {
-                            for y in 0..20 {
-                                state.diffuse_rgba.put_pixel(
-                                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
-                                    clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
-                                    image::Luma([Wood::id()]),
-                                );
-                            }
-                        }
-                    }
+                    self.spawn_blocks(state);
                 }
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
+    }
+
+    pub fn compile_script(&mut self, state: &mut State) {
+        let result = state.rhai.compile_with_scope(&mut state.rhai_scope, self.script.as_str());
+        match result {
+            Ok(value) => {
+                self.ast = Some(value);
+                self.script_error = "".to_owned();
+            }
+            Err(err) => {
+                self.ast = None;
+                self.script_error = err.to_string()
+            }
+        }
+    }
+
+    fn spawn_blocks(&mut self, state: &mut State) {
+        for _ in 0..self.number_of_structures_to_add {
+            let mut buf = [0u8; 4];
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx =
+                (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny =
+                (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+            for x in 0..20 {
+                for y in 0..20 {
+                    state.diffuse_rgba.put_pixel(
+                        clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                        clamp(ny + y, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                        image::Luma([Wood::id()]),
+                    );
+                }
+            }
+        }
+    }
+
+    fn spawn_platforms(&mut self, state: &mut State) {
+        for _ in 0..self.number_of_structures_to_add {
+            let mut buf = [0u8; 4];
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx =
+                (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny =
+                (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+
+            for x in 0..50 {
+                state.diffuse_rgba.put_pixel(
+                    clamp(nx + x, 0, cs::SECTOR_SIZE.x as u32 - 1),
+                    clamp(ny, 0, cs::SECTOR_SIZE.y as u32 - 1),
+                    image::Luma([Wood::id()]),
+                );
+            }
+        }
+    }
+
+    fn clear_map(state: &mut State) {
+        state.diffuse_rgba = image::GrayImage::from_fn(
+            cs::SECTOR_SIZE.x as u32,
+            cs::SECTOR_SIZE.y as u32,
+            |x, y| {
+                if x > 1
+                    && y > 1
+                    && x < cs::SECTOR_SIZE.x as u32 - 2
+                    && y < cs::SECTOR_SIZE.y as u32 - 2
+                {
+                    return image::Luma([Void::id()]);
+                } else {
+                    return image::Luma([Stone::id()]);
+                }
+            },
+        );
     }
 
     pub fn new() -> Self {
@@ -299,13 +324,11 @@ impl EvolutionApp {
             pressed: false,
             hovered: false,
             executor,
-            script: r"let a = 0;
-for i in 0..10 {
-a += i; }
-return a;".to_owned(),
+            script: r"let a = 0; for i in 0..10 { a += i; };".to_owned(),
 
             script_error: "".to_owned(),
-            script_result: "".to_owned()
+            ast: None,
+            need_to_recompile: true,
         }
     }
 }

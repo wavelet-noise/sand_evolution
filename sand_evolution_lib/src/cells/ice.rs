@@ -72,7 +72,7 @@ impl CellTrait for Ice {
     fn id(&self) -> CellType {
         Self::id()
     }
-    fn name(&self) -> String {
-        "ice".to_owned()
+    fn name(&self) -> &str {
+        "ice"
     }
 }

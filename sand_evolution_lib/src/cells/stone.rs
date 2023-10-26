@@ -33,7 +33,7 @@ impl CellTrait for Stone {
     fn id(&self) -> CellType {
         255
     }
-    fn name(&self) -> String {
-        "stone".to_owned()
+    fn name(&self) -> &str {
+        "stone"
     }
 }

@@ -31,8 +31,8 @@ impl CellTrait for Steam {
         -1
     }
 
-    fn name(&self) -> String {
-        "steam".to_owned()
+    fn name(&self) -> &str {
+        "steam"
     }
 
     fn id(&self) -> CellType {

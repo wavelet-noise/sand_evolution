@@ -44,7 +44,7 @@ impl CellTrait for Coal {
     fn id(&self) -> CellType {
         8
     }
-    fn name(&self) -> String {
-        "coal".to_owned()
+    fn name(&self) -> &str {
+        "coal"
     }
 }

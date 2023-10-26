@@ -86,8 +86,8 @@ impl CellTrait for Cell {
         -1
     }
 
-    fn name(&self) -> String {
-        "fire".to_owned()
+    fn name(&self) -> &str {
+        "fire"
     }
     fn id(&self) -> CellType {
         4

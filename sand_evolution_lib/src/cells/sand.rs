@@ -40,8 +40,8 @@ impl CellTrait for Sand {
     fn id(&self) -> CellType {
         1
     }
-    fn name(&self) -> String {
-        "sand".to_owned()
+    fn name(&self) -> &str {
+        "sand"
     }
 }
 
@@ -78,9 +78,7 @@ impl CellTrait for Salt {
     fn id(&self) -> CellType {
         13
     }
-    fn name(&self) -> String {
-        "salt".to_owned()
-    }
+    fn name(&self) -> &str { "salt" }
 }
 
 pub struct Base;
@@ -119,7 +117,7 @@ impl CellTrait for Base {
     fn id(&self) -> CellType {
         14
     }
-    fn name(&self) -> String {
-        "base".to_owned()
+    fn name(&self) -> &str {
+        "base"
     }
 }

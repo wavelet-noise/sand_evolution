@@ -49,8 +49,8 @@ impl CellTrait for Water {
         1
     }
 
-    fn name(&self) -> String {
-        "water".to_owned()
+    fn name(&self) -> &str {
+        "water"
     }
 
     fn id(&self) -> CellType {
@@ -117,8 +117,8 @@ impl CellTrait for BaseWater {
     fn proton_transfer(&self) -> CellType {
         SaltyWater::id()
     }
-    fn name(&self) -> String {
-        "base water".to_owned()
+    fn name(&self) -> &str {
+        "base water"
     }
 
     fn id(&self) -> CellType {
@@ -176,8 +176,8 @@ impl CellTrait for SaltyWater {
         2
     }
 
-    fn name(&self) -> String {
-        "salty water".to_owned()
+    fn name(&self) -> &str {
+        "salty water"
     }
 
     fn id(&self) -> CellType {

@@ -63,8 +63,8 @@ impl CellTrait for Acid {
         3
     }
 
-    fn name(&self) -> String {
-        "acid".to_owned()
+    fn name(&self) -> &str {
+        "acid"
     }
 
     fn id(&self) -> CellType {
@@ -138,8 +138,8 @@ impl CellTrait for DeluteAcid {
         2
     }
 
-    fn name(&self) -> String {
-        "delute acid".to_owned()
+    fn name(&self) -> &str {
+        "delute acid"
     }
 
     fn id(&self) -> CellType {

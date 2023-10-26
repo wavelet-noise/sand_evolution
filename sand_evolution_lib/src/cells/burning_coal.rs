@@ -80,8 +80,8 @@ impl CellTrait for BurningCoal {
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
     }
-    fn name(&self) -> String {
-        "burning coal".to_owned()
+    fn name(&self) -> &str {
+        "burning coal"
     }
 
     fn id(&self) -> CellType {
