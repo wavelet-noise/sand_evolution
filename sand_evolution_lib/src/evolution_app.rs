@@ -189,6 +189,8 @@ impl EvolutionApp {
                         }
                     });
                 }
+
+                *any_win_hovered |= ui.ui_contains_pointer();
             });
 
         egui::Window::new("Simulation")
