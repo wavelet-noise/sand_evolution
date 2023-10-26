@@ -64,7 +64,7 @@ impl CellTrait for Snow {
     fn id(&self) -> CellType {
         Self::id()
     }
-    fn name(&self) -> String {
-        "snow".to_owned()
+    fn name(&self) -> &str {
+        "snow"
     }
 }

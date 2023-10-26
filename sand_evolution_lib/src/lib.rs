@@ -253,13 +253,13 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let mut evolution_app = EvolutionApp::new();
     if let Ok(decoded) = base64::decode(script) {
         if let Ok(decoded_str) = String::from_utf8(decoded) {
-            evolution_app.script = decoded_str;
+            evolution_app.set_script(decoded_str.as_str());
         }
     }
 
     for a in state.pal_container.pal.iter() {
         if a.id() != 0 {
-            evolution_app.options.push(a.name());
+            evolution_app.options.push(a.name().to_owned());
         }
     }
 
@@ -276,7 +276,15 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 platform.update_time((instant::now() - start_time) / 1000.0);
 
                 if (state.toggled) {
-                    let result = state.rhai.eval_with_scope::<()>(&mut state.rhai_scope, evolution_app.script.as_str());
+                    if (evolution_app.need_to_recompile) {
+                        evolution_app.compile_script(&mut state);
+                    }
+                    if let Some(ast) = &evolution_app.ast {
+                        let result = state.rhai.eval_ast_with_scope::<()>(&mut state.rhai_scope, ast);
+                        if let Err(err) = &result {
+                            evolution_app.script_error = err.to_string();
+                        }
+                    }
                 }
                 for (p, c) in loop_clone.borrow_mut().points.iter() {
                     if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
@@ -412,11 +420,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                             if let Some(virtual_keycode) = input.virtual_keycode {
                                 match virtual_keycode {
                                     winit::event::VirtualKeyCode::C => {
-                                        _ = copy_text_to_clipboard(evolution_app.script.as_str());
+                                        _ = copy_text_to_clipboard(evolution_app.get_script());
                                     },
                                     winit::event::VirtualKeyCode::V => {
                                         if let Ok(result) = copy_text_from_clipboard() {
-                                            evolution_app.script = result;
+                                            evolution_app.set_script(result.as_str());
                                         }
                                     },
                                     _ => {}
@@ -457,7 +465,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 UserEventInfo::TextImport(text) => {
                     match String::from_utf8(text) {  // Assuming `image` is a Vec<u8>
                         Ok(text) => {
-                            evolution_app.script = text;
+                            evolution_app.set_script(text.as_str());
                         },
                         Err(_) => {
                             panic!("Invalid UTF-8 data");  // Or handle this error more gracefully

@@ -38,8 +38,8 @@ impl CellTrait for Gas {
     fn heatable(&self) -> CellType {
         BurningGas::id()
     }
-    fn name(&self) -> String {
-        "gas".to_owned()
+    fn name(&self) -> &str {
+        "gas"
     }
 
     fn id(&self) -> CellType {

@@ -65,8 +65,8 @@ impl CellTrait for BurningGas {
     fn den(&self) -> i8 {
         -10
     }
-    fn name(&self) -> String {
-        "burning gas".to_owned()
+    fn name(&self) -> &str {
+        "burning gas"
     }
 
     fn id(&self) -> CellType {

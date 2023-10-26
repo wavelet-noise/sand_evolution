@@ -25,7 +25,7 @@ impl CellTrait for Void {
         _: &mut Prng,
     ) {
     }
-    fn name(&self) -> String {
-        "void".to_owned()
+    fn name(&self) -> &str {
+        "void"
     }
 }

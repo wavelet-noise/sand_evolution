@@ -51,7 +51,7 @@ impl CellTrait for Electricity {
     fn id(&self) -> CellType {
         Self::id()
     }
-    fn name(&self) -> String {
-        "electricity".to_owned()
+    fn name(&self) -> &str {
+        "electricity"
     }
 }

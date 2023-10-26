@@ -131,8 +131,8 @@ pub trait CellTrait {
     fn heat_proof(&self) -> u8 {
         1
     }
-    fn name(&self) -> String {
-        "".to_owned()
+    fn name(&self) -> &str {
+        ""
     }
     fn id(&self) -> CellType {
         0
@@ -169,7 +169,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
 
     let mut index = 0;
     for a in cell_registry.pal.iter() {
-        cell_registry.dict.insert(a.name(), index);
+        cell_registry.dict.insert(a.name().to_owned(), index);
         index = index.wrapping_add(1)
     }
 }
