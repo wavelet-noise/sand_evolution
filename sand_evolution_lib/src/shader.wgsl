@@ -318,6 +318,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     let tdnoise = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time / 5.0), 4, 0.9, 0.1);
     let tdnoise_fast = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time), 4, 0.9, 0.1);
+    let tdnoise_faster = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y) * 0.5, settings.time* 20.0), 4, 0.9, 0.1);
 
     var col = vec4<f32>(0.0);
 
@@ -349,7 +350,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
       col = mix(
         vec4<f32>(1.0, 0.0, 0.0, 1.0),
         vec4<f32>(1.0, 1.0, 0.0, 1.0),
-        noisy_mixer - 0.04
+        tdnoise_faster - 0.04
       ) * 10.0;
     }
     else if t == 5u // slow fire
@@ -357,7 +358,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
       col = mix(
         vec4<f32>(1.0, 0.0, 0.0, 1.0),
         vec4<f32>(1.0, 0.5, 0.0, 1.0),
-        noisy_mixer - 0.04
+        tdnoise_faster - 0.04
       ) * 2.0;
     }
     else if t == 50u // wood
