@@ -318,7 +318,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     let tdnoise = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time / 5.0), 4, 0.9, 0.1);
     let tdnoise_fast = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y), settings.time), 4, 0.9, 0.1);
-    let tdnoise_faster = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y) * 0.5, settings.time* 20.0), 4, 0.9, 0.1);
+    let tdnoise_faster = fbm_simplex_3d(vec3<f32>(uv * vec2<f32>(settings.res_x, settings.res_y) * 0.25, settings.time* 2.0), 6, 0.9, 0.1);
 
     var col = vec4<f32>(0.0);
 
