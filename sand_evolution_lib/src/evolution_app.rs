@@ -143,7 +143,7 @@ impl EvolutionApp {
                     });
                 }
 
-                *any_win_hovered |= ui.ui_contains_pointer();
+                *any_win_hovered |= context.is_pointer_over_area()
             });
 
         egui::Window::new("Level script")
@@ -190,7 +190,7 @@ impl EvolutionApp {
                     });
                 }
 
-                *any_win_hovered |= ui.ui_contains_pointer();
+                *any_win_hovered |= context.is_pointer_over_area()
             });
 
         egui::Window::new("Simulation")
@@ -278,7 +278,7 @@ impl EvolutionApp {
                     }
                 }
 
-                *any_win_hovered |= ui.ui_contains_pointer();
+                *any_win_hovered |= context.is_pointer_over_area()
             });
     }
 
