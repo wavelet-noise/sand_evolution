@@ -5,6 +5,52 @@ use image::ImageEncoder;
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
 use web_sys::{BlobPropertyBag, Url};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::Write;
+#[cfg(not(target_arch = "wasm32"))]
+pub fn code_to_file(
+    data: &str,
+) -> Result<(), Box<dyn Error>> {
+    fs::write("exported.txt", data)?;
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn code_to_file(
+    data: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(data.as_bytes());
+
+    // Create a Uint8Array object from the binary buffer
+    let data_url = format!("data:text/plain;base64,{}", base64::encode(&buffer));
+
+    let window = web_sys::window().expect("window not found");
+    let document = window.document().expect("document not found");
+    let body = document.body().expect("body not found");
+    let link = data_url.clone();
+
+    let link_element = document
+        .create_element("a")
+        .expect("link element creation failed");
+    body.append_child(&link_element)
+        .expect("link element appending failed");
+    link_element
+        .set_attribute("href", &link)
+        .expect("failed to set an attribute");
+    link_element
+        .set_attribute("download", "exported.txt")
+        .expect("failed to set an attribute");
+    let html_link_element = link_element
+        .dyn_into::<web_sys::HtmlElement>()
+        .expect("html link element casting failed");
+    html_link_element.click();
+    Ok(())
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
@@ -48,7 +94,5 @@ pub fn write_to_file(
         .dyn_into::<web_sys::HtmlElement>()
         .expect("html link element casting failed");
     html_link_element.click();
-
-
     Ok(())
 }

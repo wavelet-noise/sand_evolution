@@ -3,6 +3,7 @@ use egui::{Color32, ComboBox, Context};
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
 use crate::{cells::{stone::Stone, void::Void, wood::Wood}, copy_text_to_clipboard, cs, export_file::write_to_file, fps_meter::FpsMeter, state::{State, UpdateResult}};
+use crate::export_file::code_to_file;
 
 struct Executor {
     #[cfg(not(target_arch = "wasm32"))]
@@ -67,6 +68,7 @@ pub fn compact_number_string(n: f32) -> String {
 
 pub enum UserEventInfo {
     ImageImport(Vec<u8>),
+    TextImport(Vec<u8>),
 }
 
 impl EvolutionApp {
@@ -149,11 +151,11 @@ impl EvolutionApp {
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
                 ui.text_edit_multiline(&mut self.script);
-                if ui.button("Once").clicked() {
-                    let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, self.script.as_str());
+                if ui.button("Check script").clicked() {
+                    let result = state.rhai.eval_with_scope::<()>(&mut state.rhai_scope, self.script.as_str());
                     match result {
                         Ok(value) => {
-                            self.script_result = format!("{}", value);
+                            self.script_result = "Ok".to_owned();
                             self.script_error = "".to_owned();
                         }
                         Err(err) => {
@@ -162,14 +164,30 @@ impl EvolutionApp {
                         }
                     }
                 }
-                if ui.button("Toggle").clicked() {
+                if ui.button(if state.toggled { "Disable script" } else { "Enable script" }).clicked() {
                     state.toggled = !state.toggled;
                 }
                 ui.colored_label(Color32::from_rgb(0,255,0), &self.script_result);
                 ui.colored_label(Color32::from_rgb(255, 0,0),&self.script_error);
 
-                if ui.button("Export base64").clicked() {
-                    copy_text_to_clipboard(base64::encode(self.script.as_str()).as_str());
+                if ui.button("Export code").clicked() {
+                     code_to_file(self.script.as_str());
+                }
+
+                if ui.button("Import code").clicked() {
+                    let dialog = rfd::AsyncFileDialog::new()
+                        .add_filter("Text", &["txt"])
+                        .pick_file();
+
+                    let event_loop_proxy = event_loop_proxy.clone();
+                    self.executor.execute(async move {
+                        if let Some(file) = dialog.await {
+                            let bytes = file.read().await;
+                            event_loop_proxy
+                                .send_event(create_event_with_text(bytes))
+                                .ok();
+                        }
+                    });
                 }
             });
 
@@ -292,4 +310,8 @@ return a;".to_owned(),
 
 fn create_event_with_data(bytes: Vec<u8>) -> UserEventInfo {
     UserEventInfo::ImageImport(bytes)
+}
+
+fn create_event_with_text(bytes: Vec<u8>) -> UserEventInfo {
+    UserEventInfo::TextImport(bytes)
 }

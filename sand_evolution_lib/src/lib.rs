@@ -75,15 +75,7 @@ const VERTICES: &[Vertex] = &[
 use web_sys::{Navigator, Window};
 #[cfg(target_arch = "wasm32")]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // Obtain the `window` object
-    //let window = web_sys::window().expect("should have a Window");
-    //let navigator: Navigator = window.navigator();
-
-    // Obtain the Clipboard object from Navigator
-    //let clipboard: Clipboard = navigator.clipboard();
-
-    // Use Clipboard API to write text
-    //clipboard.write_text(text)
+    code_to_file(&text.to_owned());
     Ok(())
 }
 #[cfg(target_arch = "wasm32")]
@@ -123,6 +115,8 @@ pub fn my_rand() -> i64 {
 
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
+use crate::export_file::code_to_file;
+
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
     let mut rng = rand::thread_rng();
@@ -282,7 +276,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 platform.update_time((instant::now() - start_time) / 1000.0);
 
                 if (state.toggled) {
-                    let result = state.rhai.eval_with_scope::<i64>(&mut state.rhai_scope, evolution_app.script.as_str());
+                    let result = state.rhai.eval_with_scope::<()>(&mut state.rhai_scope, evolution_app.script.as_str());
                 }
                 for (p, c) in loop_clone.borrow_mut().points.iter() {
                     if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
@@ -455,11 +449,20 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
             },
             UserEvent(event) => match event {
                 UserEventInfo::ImageImport(image) => {
-                    let img = match image::load_from_memory(&image) {
-                        Ok(img) => img,
+                    match image::load_from_memory(&image) {
+                        Ok(img) => state.diffuse_rgba = img.into_luma8(),
                         _ => panic!("Invalid image format"),
                     };
-                    state.diffuse_rgba = img.into_luma8();
+                }
+                UserEventInfo::TextImport(text) => {
+                    match String::from_utf8(text) {  // Assuming `image` is a Vec<u8>
+                        Ok(text) => {
+                            evolution_app.script = text;
+                        },
+                        Err(_) => {
+                            panic!("Invalid UTF-8 data");  // Or handle this error more gracefully
+                        }
+                    }
                 }
             },
             _ => (),
