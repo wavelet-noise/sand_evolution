@@ -227,11 +227,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
     let mut state= State::new(&device, &queue, &surface_config, &surface, surface_format).await;
 
-    let mut shared_state = Rc::new(RefCell::new(SharedState::new()));
+    let mut shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
 
-    let retr_clone = shared_state.clone();
+    let set_cell_shared_state = shared_state_rc.clone();
     state.rhai.register_fn("set_cell",  move |x: i64, y: i64, t: i64| {
-        let mut state = retr_clone.borrow_mut();
+        let mut state = set_cell_shared_state.borrow_mut();
         state.set_pixel(x as i32, y as i32, t as u8);
     });
     state.rhai.register_fn("rand", move || -> i64 {
@@ -266,7 +266,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
-    let mut loop_clone = shared_state.clone();
+    let mut event_loop_shared_state = shared_state_rc.clone();
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
@@ -286,13 +286,13 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         }
                     }
                 }
-                for (p, c) in loop_clone.borrow_mut().points.iter() {
+                for (p, c) in event_loop_shared_state.borrow_mut().points.iter() {
                     if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
                         (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
                         state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, Luma([*c]));
                     }
                 }
-                loop_clone.borrow_mut().points.clear();
+                event_loop_shared_state.borrow_mut().points.clear();
 
                 let output_frame = match surface.get_current_texture() {
                     Ok(frame) => frame,
