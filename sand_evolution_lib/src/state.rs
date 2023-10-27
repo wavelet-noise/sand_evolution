@@ -65,7 +65,7 @@ pub struct State {
 }
 
 impl State {
-    pub(crate) fn update_with_data(&mut self, p0: &[u8]) -> &mut Self {
+    pub(crate) fn update_with_data(&mut self, p0: &[u8]) {
         if p0.is_empty() || p0.len() == 0 {
             self.generate_simple();
         } else {
@@ -74,8 +74,6 @@ impl State {
             self.diffuse_rgba = res.to_luma8();
             println!("Some image loaded");
         }
-
-        self
     }
 }
 
@@ -785,7 +783,12 @@ impl State {
             .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
-    fn spawn(&mut self, evolution_app: &mut EvolutionApp, size: PhysicalSize<u32>, scale_factor: f64) {
+    fn spawn(
+        &mut self,
+        evolution_app: &mut EvolutionApp,
+        size: PhysicalSize<u32>,
+        scale_factor: f64,
+    ) {
         if let Some(position) = evolution_app.cursor_position {
             let scale_factor = scale_factor;
             let logical_position: LogicalPosition<f64> =
@@ -830,7 +833,8 @@ impl State {
         shared_state: &Rc<RefCell<SharedState>>,
         size: PhysicalSize<u32>,
         scale_factor: f64,
-    ) -> UpdateResult {
+    ) -> UpdateResult
+    {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
 
@@ -861,7 +865,7 @@ impl State {
             evolution_app,
             world,
             shared_state,
-            update_start_time
+            update_start_time,
         );
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;

@@ -176,7 +176,7 @@ impl GameContext {
             &mut self.world,
             shared_state,
             size,
-            scale_factor
+            scale_factor,
         )
     }
 }
@@ -284,15 +284,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
     let shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
-    let game_context_rc = Rc::new(RefCell::new(GameContext::new(State::new(
+    let mut game_context = GameContext::new(State::new(
         &device,
         &queue,
         &surface_config,
         &surface,
         surface_format,
-    ))));
-    game_context_rc.borrow_mut().state.update_with_data(data);
-    let mut game_context = game_context_rc.clone();
+    ));
+    game_context.state.update_with_data(data);
 
     let mut evolution_app = EvolutionApp::new();
     if let Ok(decoded) = base64::decode(script) {
@@ -301,7 +300,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         }
     }
 
-    for a in game_context.borrow_mut().state.pal_container.pal.iter() {
+    for a in game_context.state.pal_container.pal.iter() {
         if a.id() != 0 {
             evolution_app.options.push(a.name().to_owned());
         }
@@ -323,7 +322,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         }
         rhai.register_fn("rand", move || -> i64 { my_rand() });
         rhai_scope.push("time", 0f64);
-        game_context.borrow_mut().world.insert(RhaiResource {
+        game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
                 engine: rhai,
                 scope: rhai_scope,
@@ -336,7 +335,6 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let start_time = instant::now();
     let mut last_frame_time = start_time;
     let mut collected_delta = 0.0;
-    let mut event_loop_game_context = game_context_rc.clone();
     let mut event_loop_shared_state = shared_state_rc.clone();
     let mut upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
@@ -375,8 +373,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
                     if evolution_app.need_to_recompile {
-                        if let Some(mut rhai_resource) = event_loop_game_context
-                            .borrow_mut()
+                        if let Some(mut rhai_resource) = game_context
                             .world
                             .get_mut::<RhaiResource>()
                         {
@@ -390,20 +387,19 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         }
                     }
                     let sim_steps = steps_per_this_frame as i32;
-                    let event_loop_clone = event_loop_game_context.clone();
 
                     ///
                     /// UPDATE
                     ///
-                    let upd_result = event_loop_game_context.borrow_mut().update(
+                    let upd_result = game_context.update(
                         &queue,
                         sim_steps,
                         &mut evolution_app,
                         &event_loop_shared_state,
                         window.inner_size(),
-                        window.scale_factor()
+                        window.scale_factor(),
                     );
-                    event_loop_game_context.borrow_mut().dispatch();
+                    game_context.dispatch();
                     if upd_result.dropping {
                         evolution_app.simulation_steps_per_second -= 10;
                         if evolution_app.simulation_steps_per_second < 0 {
@@ -412,7 +408,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     }
                 }
 
-                _ = event_loop_game_context.borrow_mut().state.render(
+                _ = game_context.state.render(
                     &device,
                     &queue,
                     &output_view,
@@ -431,7 +427,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
                 evolution_app.ui(
                     &platform.context(),
-                    &mut event_loop_game_context.borrow_mut().state,
+                    &mut game_context.state,
                     &mut fps_meter,
                     &upd_result,
                     &event_loop_proxy,
@@ -549,7 +545,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     if dimensions.0 == cs::SECTOR_SIZE.x as u32
                         && dimensions.1 == cs::SECTOR_SIZE.y as u32
                     {
-                        event_loop_game_context.borrow_mut().state.diffuse_rgba = img;
+                        game_context.state.diffuse_rgba = img;
                     }
                 }
                 _ => {}
@@ -558,7 +554,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 UserEventInfo::ImageImport(image) => {
                     match image::load_from_memory(&image) {
                         Ok(img) => {
-                            event_loop_game_context.borrow_mut().state.diffuse_rgba =
+                            game_context.state.diffuse_rgba =
                                 img.into_luma8()
                         }
                         _ => panic!("Invalid image format"),

@@ -13,7 +13,7 @@ pub fn update_tick(
     evolution_app: &mut EvolutionApp,
     world: &mut specs::World,
     shared_state: &Rc<RefCell<SharedState>>,
-    update_start_time: f64
+    update_start_time: f64,
 ) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
@@ -27,10 +27,9 @@ pub fn update_tick(
         if state.toggled {
             if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
                 if let Some(storage) = &mut rhai_resource.storage {
-                    storage.scope.set_value(
-                        "time",
-                        f64::fract(update_start_time), /*TODO*/
-                    );
+                    storage
+                        .scope
+                        .set_value("time", f64::fract(update_start_time) /*TODO*/);
                     if let Some(ast) = &evolution_app.ast {
                         let result = storage
                             .engine
