@@ -1,10 +1,17 @@
-use std::io::ErrorKind;
 use cgmath::num_traits::clamp;
 use egui::{Color32, ComboBox, Context};
+use std::io::ErrorKind;
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
-use crate::{cells::{stone::Stone, void::Void, wood::Wood}, copy_text_to_clipboard, cs, export_file::write_to_file, fps_meter::FpsMeter, state::{State, UpdateResult}};
 use crate::export_file::code_to_file;
+use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
+use crate::{
+    cells::{stone::Stone, void::Void, wood::Wood},
+    copy_text_to_clipboard, cs,
+    export_file::write_to_file,
+    fps_meter::FpsMeter,
+    state::{State, UpdateResult},
+};
 
 struct Executor {
     #[cfg(not(target_arch = "wasm32"))]
@@ -43,7 +50,7 @@ pub struct EvolutionApp {
     pub need_to_recompile: bool,
     pub script_error: String,
     executor: Executor,
-    pub ast: Option<rhai::AST>
+    pub ast: Option<rhai::AST>,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -74,7 +81,6 @@ pub enum UserEventInfo {
 }
 
 impl EvolutionApp {
-
     pub fn get_script(&mut self) -> &str {
         self.script.as_str()
     }
@@ -91,7 +97,7 @@ impl EvolutionApp {
         fps_meter: &mut FpsMeter,
         upd_result: &UpdateResult,
         event_loop_proxy: &EventLoopProxy<UserEventInfo>,
-        any_win_hovered: &mut bool
+        any_win_hovered: &mut bool,
     ) {
         egui::Window::new("Configuration")
             .default_pos(egui::pos2(340.0, 5.0))
@@ -150,13 +156,20 @@ impl EvolutionApp {
             .show(context, |ui| {
                 ui.text_edit_multiline(&mut self.script);
 
-                if ui.button(if state.toggled { "Disable script" } else { "Enable script" }).clicked() {
+                if ui
+                    .button(if state.toggled {
+                        "Disable script"
+                    } else {
+                        "Enable script"
+                    })
+                    .clicked()
+                {
                     state.toggled = !state.toggled;
                 }
-                ui.colored_label(Color32::from_rgb(255, 0,0),&self.script_error);
+                ui.colored_label(Color32::from_rgb(255, 0, 0), &self.script_error);
 
                 if ui.button("Export code").clicked() {
-                     code_to_file(self.script.as_str());
+                    code_to_file(self.script.as_str());
                 }
 
                 if ui.button("Import code").clicked() {
@@ -184,7 +197,10 @@ impl EvolutionApp {
             .show(context, |ui| {
                 // Simulation Configuration
                 ui.heading("Pause or simulation speed");
-                ui.add(egui::Slider::new(&mut self.simulation_steps_per_second, 0..=240).text("Simulation steps per second"));
+                ui.add(
+                    egui::Slider::new(&mut self.simulation_steps_per_second, 0..=240)
+                        .text("Simulation steps per second"),
+                );
 
                 ui.separator();
                 ui.label(format!(
@@ -200,12 +216,13 @@ impl EvolutionApp {
                     )
                 };
                 ui.label(sim_step_avg_time_str);
-                ui.label(format!("Frame Processing Time: {:.1} ms.", upd_result.update_time));
+                ui.label(format!(
+                    "Frame Processing Time: {:.1} ms.",
+                    upd_result.update_time
+                ));
                 if upd_result.dropping {
-                    ui.colored_label(Color32::from_rgb(255,0,0),"frame drop");
-                }
-                else
-                {
+                    ui.colored_label(Color32::from_rgb(255, 0, 0), "frame drop");
+                } else {
                     ui.label("running ok");
                 }
 
@@ -217,7 +234,11 @@ impl EvolutionApp {
                     .selected_text(&self.selected_option)
                     .show_ui(ui, |ui| {
                         self.options.iter().for_each(|option| {
-                            ui.selectable_value(&mut self.selected_option, option.to_string(), option.to_string());
+                            ui.selectable_value(
+                                &mut self.selected_option,
+                                option.to_string(),
+                                option.to_string(),
+                            );
                         });
                     });
                 ui.label(format!("Selected: {}", self.selected_option));
@@ -225,7 +246,10 @@ impl EvolutionApp {
                 // Structure Spawning
                 ui.separator();
                 ui.heading("Structure Spawning");
-                ui.add(egui::Slider::new(&mut self.number_of_structures_to_add, 0..=10000).text("Number of structures to add"));
+                ui.add(
+                    egui::Slider::new(&mut self.number_of_structures_to_add, 0..=10000)
+                        .text("Number of structures to add"),
+                );
                 ui.label("Click to add");
 
                 if ui.button("Wooden platforms").clicked() {
@@ -240,8 +264,10 @@ impl EvolutionApp {
             });
     }
 
-    pub fn compile_script(&mut self, state: &mut State) {
-        let result = state.rhai.compile_with_scope(&mut state.rhai_scope, self.script.as_str());
+    pub fn compile_script(&mut self, rhai: &mut RhaiResourceStorage) {
+        let result = rhai
+            .engine
+            .compile_with_scope(&mut rhai.scope, self.script.as_str());
         match result {
             Ok(value) => {
                 self.ast = Some(value);
@@ -259,10 +285,8 @@ impl EvolutionApp {
             let mut buf = [0u8; 4];
             _ = getrandom::getrandom(&mut buf);
 
-            let nx =
-                (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny =
-                (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..20 {
                 for y in 0..20 {
@@ -281,10 +305,8 @@ impl EvolutionApp {
             let mut buf = [0u8; 4];
             _ = getrandom::getrandom(&mut buf);
 
-            let nx =
-                (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny =
-                (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..50 {
                 state.diffuse_rgba.put_pixel(

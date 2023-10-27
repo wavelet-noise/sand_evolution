@@ -78,7 +78,9 @@ impl CellTrait for Salt {
     fn id(&self) -> CellType {
         13
     }
-    fn name(&self) -> &str { "salt" }
+    fn name(&self) -> &str {
+        "salt"
+    }
 }
 
 pub struct Base;

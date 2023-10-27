@@ -1,7 +1,4 @@
-use super::{
-    helper::{fluid_flying_helper},
-    *,
-};
+use super::{helper::fluid_flying_helper, *};
 use crate::cs::PointType;
 
 pub struct Gas;

@@ -1,10 +1,7 @@
 use crate::cells::crushed_ice::CrushedIce;
-use crate::cs::{PointType, self};
+use crate::cs::{self, PointType};
 
-use super::{
-    water::Water,
-    CellRegistry, CellTrait, CellType, Prng, void::Void,
-};
+use super::{void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng};
 
 pub struct Ice;
 impl Ice {

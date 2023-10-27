@@ -1,9 +1,7 @@
-use crate::cs::{PointType, self};
+use crate::cs::{self, PointType};
 
 use super::{
-    helper::sand_faling_helper,
-    water::Water,
-    CellRegistry, CellTrait, CellType, Prng, void::Void,
+    helper::sand_faling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng,
 };
 
 pub struct CrushedIce;
