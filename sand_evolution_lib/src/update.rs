@@ -4,7 +4,7 @@ use crate::{cs, State};
 use crate::evolution_app::EvolutionApp;
 use crate::shared_state::SharedState;
 
-pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32), evolution_app: &mut EvolutionApp, event_loop_shared_state: Rc<RefCell<SharedState>>) {
+pub fn update_dim(state: &mut State, sim_steps: i32, _dimensions: (u32, u32), evolution_app: &mut EvolutionApp, event_loop_shared_state: Rc<RefCell<SharedState>>, update_start_time: f64) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
     let mut b_index = 0;
@@ -13,9 +13,10 @@ pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32), evo
     let mut buf = [0u8; BUF_SIZE];
     _ = getrandom::getrandom(&mut buf);
 
+    let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
     for _sim_update in 0..sim_steps {
-
         if state.toggled {
+            state.rhai_scope.set_value("time", update_start_time + _sim_update as f64 * one_tick_delta);
             if let Some(ast) = &evolution_app.ast {
                 let result = state.rhai.eval_ast_with_scope::<()>(&mut state.rhai_scope, ast);
                 if let Err(err) = &result {
@@ -31,15 +32,15 @@ pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32), evo
         }
         event_loop_shared_state.borrow_mut().points.clear();
 
-        state.a ^= 1;
-        if state.a == 0 {
-            state.b ^= 1;
+        state.flip ^= 1;
+        if state.flip == 0 {
+            state.flop ^= 1;
         }
 
         state.prng.gen();
 
-        for i in (1..(cs::SECTOR_SIZE.x - 2 - state.a)).rev().step_by(2) {
-            for j in (1..(cs::SECTOR_SIZE.y - 2 - state.b)).rev().step_by(2) {
+        for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
+            for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
                 b_index += 1;
                 if b_index >= BUF_SIZE {
                     b_index = 0;

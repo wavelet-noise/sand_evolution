@@ -201,6 +201,13 @@ impl EvolutionApp {
                 };
                 ui.label(sim_step_avg_time_str);
                 ui.label(format!("Frame Processing Time: {:.1} ms.", upd_result.update_time));
+                if upd_result.dropping {
+                    ui.colored_label(Color32::from_rgb(255,0,0),"frame drop");
+                }
+                else
+                {
+                    ui.label("running ok");
+                }
 
                 // Particle Spawning
                 ui.separator();

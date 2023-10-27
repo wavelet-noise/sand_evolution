@@ -28,6 +28,7 @@ pub struct WorldSettings {
 pub struct UpdateResult {
     pub simulation_step_average_time: f64,
     pub update_time: f64,
+    pub dropping: bool,
 }
 
 pub struct State {
@@ -50,8 +51,8 @@ pub struct State {
     pub diffuse_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
     pub loaded_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
     diffuse_texture: wgpu::Texture,
-    pub a: cs::PointType,
-    pub b: cs::PointType,
+    pub flip: cs::PointType,
+    pub flop: cs::PointType,
     last_spawn: f32,
     pub pal_container: CellRegistry,
     pub prng: Prng,
@@ -746,8 +747,8 @@ impl State {
             diffuse_texture: cell_type_texture,
             float_texture_plus_sampler_bgl,
             float_texture_plus_sampler_plus_texture_bgl,
-            a,
-            b,
+            flip: a,
+            flop: b,
             last_spawn,
             pal_container,
             prng,
@@ -822,14 +823,13 @@ impl State {
     pub fn update(
         &mut self,
         queue: &wgpu::Queue,
-        sim_steps: u8,
+        mut sim_steps: i32,
         evolution_app: &mut EvolutionApp,
         window: &Window,
         event_loop_shared_state: Rc<RefCell<SharedState>>,
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
-        self.rhai_scope.push("time", self.world_settings.time as f64);
 
         queue.write_buffer(
             &self.settings_buffer,
@@ -845,7 +845,9 @@ impl State {
             self.spawn(evolution_app, window);
         }
 
-        update::update_dim(self, sim_steps, dimensions, evolution_app, event_loop_shared_state);
+        let mut dropping = false;
+        if sim_steps > 10 { sim_steps = 1; dropping = true; }
+        update::update_dim(self, sim_steps, dimensions, evolution_app, event_loop_shared_state, update_start_time);
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 
@@ -878,6 +880,7 @@ impl State {
         return UpdateResult {
             simulation_step_average_time,
             update_time: instant::now() - update_start_time,
+            dropping,
         };
     }
 
