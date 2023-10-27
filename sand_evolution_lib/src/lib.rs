@@ -300,8 +300,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let steps_per_this_frame = ((delta_t + collected_delta) * evolution_app.simulation_steps_per_second as f64).floor();
-
+                let mut steps_per_this_frame = ((delta_t + collected_delta) * evolution_app.simulation_steps_per_second as f64).floor();
                 if evolution_app.simulation_steps_per_second != 0 {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
@@ -310,11 +309,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     }
                     upd_result = state.update(
                         &queue,
-                        steps_per_this_frame as u8,
+                        steps_per_this_frame as i32,
                         &mut evolution_app,
                         &window,
                         event_loop_shared_state.clone()
                     );
+                    if upd_result.dropping {
+                        evolution_app.simulation_steps_per_second -= 10;
+                    }
                 }
 
                 _ = state.render(&device, &queue, &output_view);
