@@ -1,15 +1,16 @@
 pub mod cells;
 pub mod cs;
+pub mod ecs;
 pub mod evolution_app;
 pub mod export_file;
 pub mod fps_meter;
 pub mod gbuffer;
-pub mod state;
 pub mod shared_state;
+pub mod state;
 pub mod update;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+pub mod resources;
+
 use ::egui::FontDefinitions;
 use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
@@ -17,6 +18,8 @@ use egui_winit_platform::{Platform, PlatformDescriptor};
 use evolution_app::EvolutionApp;
 use fps_meter::FpsMeter;
 use state::State;
+use std::cell::RefCell;
+use std::rc::Rc;
 use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 
@@ -83,10 +86,10 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     Ok("".to_owned())
 }
 
+use crate::shared_state::SharedState;
 #[cfg(not(target_arch = "wasm32"))]
 use clipboard::ClipboardProvider;
 use image::Luma;
-use crate::shared_state::SharedState;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -113,15 +116,18 @@ pub fn my_rand() -> i64 {
     (random() * 10000.0) as i64
 }
 
+use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
+use crate::export_file::code_to_file;
+use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
+use crate::state::UpdateResult;
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
-use crate::export_file::code_to_file;
-use crate::state::UpdateResult;
+use specs::{RunNow, WorldExt};
 
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
     let mut rng = rand::thread_rng();
-    rng.gen_range(0..10000)  // Generating a random number between 0 and 9999
+    rng.gen_range(0..10000) // Generating a random number between 0 and 9999
 }
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
@@ -226,25 +232,15 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     // Display the demo application that ships with egui.
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
-    let mut state= State::new(&device, &queue, &surface_config, &surface, surface_format).await;
+    let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
 
     let mut shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
 
     let set_cell_shared_state = shared_state_rc.clone();
-    state.rhai.register_fn("set_cell",  move |x: i64, y: i64, t: i64| {
-        let mut state = set_cell_shared_state.borrow_mut();
-        state.set_pixel(x as i32, y as i32, t as u8);
-    });
-    state.rhai.register_fn("rand", move || -> i64 {
-        my_rand()
-    });
 
-    if data.is_empty() || data.len() == 0
-    {
+    if data.is_empty() || data.len() == 0 {
         state.generate_simple();
-    }
-    else
-    {
+    } else {
         let res = image::load_from_memory(data).expect("Load from memory failed");
         state.loaded_rgba = res.to_luma8();
         state.diffuse_rgba = res.to_luma8();
@@ -263,6 +259,33 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
             evolution_app.options.push(a.name().to_owned());
         }
     }
+
+    let mut world = specs::World::new();
+
+    let mut rhai = rhai::Engine::new();
+    let mut rhai_scope = rhai::Scope::new();
+    //rhai_scope.push_constant("RES_X", dimensions.0);
+    //rhai_scope.push_constant("RES_Y", dimensions.1);
+    rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
+        let mut state = set_cell_shared_state.borrow_mut();
+        state.set_pixel(x as i32, y as i32, t as u8);
+    });
+    rhai.register_fn("rand", move || -> i64 { my_rand() });
+    rhai_scope.push("time", 0 as f64);
+    world.insert(RhaiResource {
+        storage: Some(RhaiResourceStorage {
+            engine: rhai,
+            scope: rhai_scope,
+        }),
+    });
+
+    let mut dispatcher = specs::DispatcherBuilder::new()
+        .with(EntityScriptSystem, "entity_script__system", &[])
+        .with(GravitySystem, "gravity_system", &[])
+        .with(MoveSystem, "move_system", &[])
+        .build();
+
+    dispatcher.setup(&mut world);
 
     let event_loop_proxy = event_loop.create_proxy();
 
@@ -300,23 +323,37 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let mut steps_per_this_frame = ((delta_t + collected_delta) * evolution_app.simulation_steps_per_second as f64).floor();
+                let mut steps_per_this_frame = ((delta_t + collected_delta)
+                    * evolution_app.simulation_steps_per_second as f64)
+                    .floor();
                 if evolution_app.simulation_steps_per_second != 0 {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
                     if evolution_app.need_to_recompile {
-                        evolution_app.compile_script(&mut state);
+                        if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
+                            if let Some(storage) = &mut rhai_resource.storage {
+                                evolution_app.compile_script(storage);
+                            } else {
+                                println!("Warning: RhaiResource.storage is None");
+                            }
+                        } else {
+                            println!("Warning: RhaiResource not found in the world");
+                        }
                     }
                     upd_result = state.update(
                         &queue,
                         steps_per_this_frame as i32,
                         &mut evolution_app,
                         &window,
-                        event_loop_shared_state.clone()
+                        event_loop_shared_state.clone(),
+                        &mut world,
+                        &mut dispatcher,
                     );
                     if upd_result.dropping {
                         evolution_app.simulation_steps_per_second -= 10;
-                        if evolution_app.simulation_steps_per_second < 0 { evolution_app.simulation_steps_per_second = 0 }
+                        if evolution_app.simulation_steps_per_second < 0 {
+                            evolution_app.simulation_steps_per_second = 0
+                        }
                     }
                 }
 
@@ -339,7 +376,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     &mut fps_meter,
                     &upd_result,
                     &event_loop_proxy,
-                    &mut any_win_hovered
+                    &mut any_win_hovered,
                 );
 
                 evolution_app.hovered = any_win_hovered;
@@ -415,26 +452,27 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 winit::event::WindowEvent::KeyboardInput {
                     device_id,
                     input,
-                    is_synthetic
+                    is_synthetic,
                 } => {
                     if let winit::event::ElementState::Pressed = input.state {
-                        if input.modifiers.logo() || input.modifiers.ctrl() { // logo key is Command on macOS
+                        if input.modifiers.logo() || input.modifiers.ctrl() {
+                            // logo key is Command on macOS
                             if let Some(virtual_keycode) = input.virtual_keycode {
                                 match virtual_keycode {
                                     winit::event::VirtualKeyCode::C => {
                                         _ = copy_text_to_clipboard(evolution_app.get_script());
-                                    },
+                                    }
                                     winit::event::VirtualKeyCode::V => {
                                         if let Ok(result) = copy_text_from_clipboard() {
                                             evolution_app.set_script(result.as_str());
                                         }
-                                    },
+                                    }
                                     _ => {}
                                 }
                             }
                         }
                     }
-                },
+                }
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if button == winit::event::MouseButton::Left {
                         if state == winit::event::ElementState::Pressed {
@@ -465,12 +503,13 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     };
                 }
                 UserEventInfo::TextImport(text) => {
-                    match String::from_utf8(text) {  // Assuming `image` is a Vec<u8>
+                    match String::from_utf8(text) {
+                        // Assuming `image` is a Vec<u8>
                         Ok(text) => {
                             evolution_app.set_script(text.as_str());
-                        },
+                        }
                         Err(_) => {
-                            panic!("Invalid UTF-8 data");  // Or handle this error more gracefully
+                            panic!("Invalid UTF-8 data"); // Or handle this error more gracefully
                         }
                     }
                 }

@@ -1,36 +1,42 @@
 pub mod acid;
 pub mod burning_coal;
+pub mod burning_gas;
 pub mod burning_wood;
 pub mod coal;
+pub mod crushed_ice;
+pub mod electricity;
 pub mod fire;
 pub mod gas;
 mod helper;
+pub mod ice;
 pub mod sand;
+pub mod snow;
 pub mod steam;
 pub mod stone;
 pub mod void;
 pub mod water;
 pub mod wood;
-pub mod ice;
-pub mod crushed_ice;
-pub mod snow;
-pub mod burning_gas;
-pub mod electricity;
 
-use std::collections::HashMap;
 use crate::cells::electricity::Electricity;
+use std::collections::HashMap;
 
 use crate::cs::{self, PointType};
 
 use self::{
     acid::{Acid, DeluteAcid},
+    burning_coal::BurningCoal,
+    burning_gas::BurningGas,
     coal::Coal,
+    crushed_ice::CrushedIce,
     gas::Gas,
     helper::sand_faling_helper,
+    ice::Ice,
     sand::{Base, Salt, Sand},
+    snow::Snow,
+    steam::Steam,
     void::Void,
     water::{BaseWater, SaltyWater, Water},
-    wood::Wood, steam::Steam, burning_coal::BurningCoal, ice::Ice, crushed_ice::CrushedIce, snow::Snow, burning_gas::BurningGas
+    wood::Wood,
 };
 pub type CellType = u8;
 

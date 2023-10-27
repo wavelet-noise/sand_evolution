@@ -1,6 +1,8 @@
-use crate::cs::{PointType, self};
+use crate::cs::{self, PointType};
 
-use super::{CellType, CellTrait, CellRegistry, Prng, fire, void::Void, helper::fluid_flying_helper};
+use super::{
+    fire, helper::fluid_flying_helper, void::Void, CellRegistry, CellTrait, CellType, Prng,
+};
 
 pub struct BurningGas;
 impl BurningGas {

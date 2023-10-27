@@ -1,5 +1,5 @@
-use std::error::Error;
 use image::ImageEncoder;
+use std::error::Error;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
@@ -11,17 +11,13 @@ use std::fs;
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
-pub fn code_to_file(
-    data: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     fs::write("exported.txt", data)?;
     Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn code_to_file(
-    data: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     let mut buffer = Vec::new();
     buffer.extend_from_slice(data.as_bytes());
 

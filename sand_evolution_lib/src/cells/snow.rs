@@ -1,6 +1,8 @@
-use crate::cs::{PointType, self};
+use crate::cs::{self, PointType};
 
-use super::{helper::{fluid_falling_helper}, water::{Water}, CellRegistry, CellTrait, CellType, Prng, void::Void};
+use super::{
+    helper::fluid_falling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng,
+};
 
 pub struct Snow;
 impl Snow {
@@ -24,7 +26,9 @@ impl CellTrait for Snow {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        if prng.next() > 128 && fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 10) {
+        if prng.next() > 128
+            && fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 10)
+        {
             return;
         }
 

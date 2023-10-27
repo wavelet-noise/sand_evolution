@@ -14,7 +14,12 @@ pub struct GBuffer {
 }
 
 impl GBuffer {
-    pub fn new(device: &wgpu::Device, width: u32, height: u32, surface_format: wgpu::TextureFormat) -> GBuffer {
+    pub fn new(
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+        surface_format: wgpu::TextureFormat,
+    ) -> GBuffer {
         let albedo = create_texture(
             device,
             width,

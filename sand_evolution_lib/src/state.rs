@@ -1,12 +1,14 @@
+use cgmath::num_traits::clamp;
 use std::cell::RefCell;
 use std::rc::Rc;
-use cgmath::num_traits::clamp;
 use wgpu::{util::DeviceExt, TextureFormat, TextureView};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
     window::Window,
 };
 
+use crate::resources::rhai_resource::RhaiResource;
+use crate::shared_state::SharedState;
 use crate::{
     cells::{stone::Stone, wood::Wood, CellRegistry, Prng},
     cs,
@@ -14,7 +16,6 @@ use crate::{
     gbuffer::GBuffer,
     update, Vertex, INDICES, VERTICES,
 };
-use crate::shared_state::SharedState;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -60,8 +61,6 @@ pub struct State {
     glow_texture: wgpu::Texture,
     gbuffer: GBuffer,
     surface_format: TextureFormat,
-    pub(crate) rhai: rhai::Engine,
-    pub(crate) rhai_scope: rhai::Scope<'static>,
     pub toggled: bool,
 }
 
@@ -83,13 +82,11 @@ impl State {
                     && y < cs::SECTOR_SIZE.y as u32 - 2
                 {
                     _ = getrandom::getrandom(&mut buf);
-                    return image::Luma([
-                        if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
-                            buf[1] % 4
-                        } else {
-                            0
-                        },
-                    ]);
+                    return image::Luma([if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
+                        buf[1] % 4
+                    } else {
+                        0
+                    }]);
                 } else {
                     return image::Luma([Stone::id()]);
                 }
@@ -154,7 +151,7 @@ impl State {
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
         _surface: &wgpu::Surface,
-        surface_format: wgpu::TextureFormat
+        surface_format: wgpu::TextureFormat,
     ) -> Self {
         let diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
@@ -217,11 +214,7 @@ impl State {
             depth_or_array_layers: 1,
         };
 
-        let base_texture = create_render_target(
-            &device,
-            viewport_extent,
-            surface_format,
-        );
+        let base_texture = create_render_target(&device, viewport_extent, surface_format);
         let glow_texture =
             create_render_target(&device, viewport_extent, wgpu::TextureFormat::Rgba16Float);
 
@@ -477,7 +470,10 @@ impl State {
         let settings_plus_texture_sampler_plus_texture_pl =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Gbuffer Render Pipeline Layout"),
-                bind_group_layouts: &[&settings_bind_group_layout, &float_texture_plus_sampler_plus_texture_bgl],
+                bind_group_layouts: &[
+                    &settings_bind_group_layout,
+                    &float_texture_plus_sampler_plus_texture_bgl,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -660,22 +656,24 @@ impl State {
             fragment: Some(wgpu::FragmentState {
                 module: &type_render_and_fullscreen_vertex,
                 entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::OVER,
-                        alpha: wgpu::BlendComponent::OVER,
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::OVER,
+                            alpha: wgpu::BlendComponent::OVER,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }),
-                Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::OVER,
-                        alpha: wgpu::BlendComponent::OVER,
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::OVER,
+                            alpha: wgpu::BlendComponent::OVER,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                ],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -720,13 +718,6 @@ impl State {
         let last_spawn = -5.0;
         let prng = Prng::new();
 
-        let mut rhai = rhai::Engine::new();
-        let mut rhai_scope = rhai::Scope::new();
-        rhai_scope.push_constant("RES_X", dimensions.0);
-        rhai_scope.push_constant("RES_Y", dimensions.1);
-        rhai_scope.push("time", 0 as f64);
-        //rhai.register_fn("set_cell", State::set_cell);
-
         Self {
             render_pipeline: type_render_pipeline,
             bloom_render_pipeline,
@@ -756,9 +747,7 @@ impl State {
             glow_texture,
             gbuffer,
             surface_format,
-            rhai,
-            rhai_scope,
-            toggled: true
+            toggled: true,
         }
     }
 
@@ -777,11 +766,8 @@ impl State {
     // }
 
     fn set_cell(&mut self, x: i32, y: i32, t: u8) {
-        self.diffuse_rgba.put_pixel(
-            x as u32,
-            y as u32,
-            image::Luma([t]),
-        );
+        self.diffuse_rgba
+            .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
     fn spawn(&mut self, evolution_app: &mut EvolutionApp, window: &Window) {
@@ -827,6 +813,8 @@ impl State {
         evolution_app: &mut EvolutionApp,
         window: &Window,
         event_loop_shared_state: Rc<RefCell<SharedState>>,
+        world: &mut specs::World,
+        dispatcher: &mut specs::Dispatcher,
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
@@ -841,13 +829,26 @@ impl State {
 
         let dimensions = self.diffuse_rgba.dimensions();
 
-        if evolution_app.pressed && ! evolution_app.hovered {
+        if evolution_app.pressed && !evolution_app.hovered {
             self.spawn(evolution_app, window);
         }
 
         let mut dropping = false;
-        if sim_steps > 10 { sim_steps = 1; dropping = true; }
-        update::update_dim(self, sim_steps, dimensions, evolution_app, event_loop_shared_state, update_start_time);
+        if sim_steps > 10 {
+            sim_steps = 1;
+            dropping = true;
+        }
+
+        update::update_tick(
+            self,
+            sim_steps,
+            dimensions,
+            evolution_app,
+            event_loop_shared_state,
+            update_start_time,
+            world,
+            dispatcher,
+        );
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 
@@ -899,22 +900,24 @@ impl State {
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &self.gbuffer.albedo_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: true,
-                        },
-                    }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &self.gbuffer.blur_2_texture_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: true,
-                        },
-                    })],
+                    color_attachments: &[
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: &self.gbuffer.albedo_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: true,
+                            },
+                        }),
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: &self.gbuffer.blur_2_texture_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: true,
+                            },
+                        }),
+                    ],
                     depth_stencil_attachment: None,
                 });
 
@@ -931,7 +934,6 @@ impl State {
 
             // Render pass for the bloom texture
             {
-
                 let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
                 color_texture_view.format = Some(self.surface_format);
 
@@ -950,7 +952,9 @@ impl State {
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&self.gbuffer.blur_2_texture_view),
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.gbuffer.blur_2_texture_view,
+                            ),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
@@ -978,7 +982,8 @@ impl State {
                 render_pass.set_bind_group(1, &to_hor_blur_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass
+                    .set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
                 render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
             }
@@ -1002,7 +1007,9 @@ impl State {
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&self.gbuffer.blur_1_texture_view),
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.gbuffer.blur_1_texture_view,
+                            ),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
@@ -1030,7 +1037,8 @@ impl State {
                 render_pass.set_bind_group(1, &to_vert_blur_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass
+                    .set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
                 render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
             }
@@ -1062,7 +1070,9 @@ impl State {
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,
-                            resource: wgpu::BindingResource::TextureView(&self.gbuffer.blur_2_texture_view),
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.gbuffer.blur_2_texture_view,
+                            ),
                         },
                     ],
                     label: Some("combine_bg"),
@@ -1086,7 +1096,8 @@ impl State {
                 render_pass.set_bind_group(1, &combine_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass
+                    .set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
                 render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
             }

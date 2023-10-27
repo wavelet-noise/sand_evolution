@@ -105,7 +105,7 @@ pub fn fluid_falling_helper(
     pal_container: &CellRegistry,
     cur: usize,
     rpng: &mut Prng,
-    thickness: u8
+    thickness: u8,
 ) -> bool {
     const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
     let selected_order = [0, 1]; //ORDER[(rpng.next() % 2) as usize];

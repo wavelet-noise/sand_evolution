@@ -1,8 +1,6 @@
-use crate::cs::{PointType, self};
+use crate::cs::{self, PointType};
 
-use super::{
-    CellRegistry, CellTrait, CellType, Prng, void::Void,
-};
+use super::{void::Void, CellRegistry, CellTrait, CellType, Prng};
 
 pub struct Electricity;
 impl Electricity {
@@ -39,8 +37,7 @@ impl CellTrait for Electricity {
             if rand_v == Void::id() {
                 container[cc] = Electricity::id();
             }
-        }
-        else {
+        } else {
             container[cur] = Void::id();
         }
     }

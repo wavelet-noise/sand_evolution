@@ -33,6 +33,7 @@ cgmath = "0.18"
 instant = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 rhai = "1.16.2"
+specs = { version = "0.20", default-features = false }
 
 clipboard = { version = "0.5", optional = true }
 rand = { version = "0.8.5", features = [] }
