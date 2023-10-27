@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use cgmath::num_traits::clamp;
 use wgpu::{util::DeviceExt, TextureFormat, TextureView};
 use winit::{
@@ -12,6 +14,7 @@ use crate::{
     gbuffer::GBuffer,
     update, Vertex, INDICES, VERTICES,
 };
+use crate::shared_state::SharedState;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -21,7 +24,7 @@ pub struct WorldSettings {
     res_y: f32,
     _wasm_padding2: f32,
 }
-
+#[derive(Default)]
 pub struct UpdateResult {
     pub simulation_step_average_time: f64,
     pub update_time: f64,
@@ -822,6 +825,7 @@ impl State {
         sim_steps: u8,
         evolution_app: &mut EvolutionApp,
         window: &Window,
+        event_loop_shared_state: Rc<RefCell<SharedState>>,
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
@@ -841,7 +845,7 @@ impl State {
             self.spawn(evolution_app, window);
         }
 
-        update::update_dim(self, sim_steps, dimensions);
+        update::update_dim(self, sim_steps, dimensions, evolution_app, event_loop_shared_state);
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
 

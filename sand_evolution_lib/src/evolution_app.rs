@@ -33,7 +33,7 @@ impl Executor {
 pub struct EvolutionApp {
     pub number_of_cells_to_add: i32,
     pub number_of_structures_to_add: i32,
-    pub simulation_steps_per_frame: i32,
+    pub simulation_steps_per_second: i32,
     pub selected_option: String,
     pub options: Vec<String>,
     pub cursor_position: Option<PhysicalPosition<f64>>,
@@ -184,14 +184,14 @@ impl EvolutionApp {
             .show(context, |ui| {
                 // Simulation Configuration
                 ui.heading("Pause or simulation speed");
-                ui.add(egui::Slider::new(&mut self.simulation_steps_per_frame, 0..=20).text("Simulation steps per frame"));
+                ui.add(egui::Slider::new(&mut self.simulation_steps_per_second, 0..=240).text("Simulation steps per second"));
 
                 ui.separator();
                 ui.label(format!(
                     "fps: {}",
                     compact_number_string(fps_meter.next() as f32)
                 ));
-                let sim_step_avg_time_str = if self.simulation_steps_per_frame == 0 {
+                let sim_step_avg_time_str = if self.simulation_steps_per_second == 0 {
                     "Simulation Step Avg Time: ON PAUSE".to_string()
                 } else {
                     format!(
@@ -310,14 +310,13 @@ impl EvolutionApp {
     pub fn new() -> Self {
         let number_of_cells_to_add = 500;
         let number_of_structures_to_add = 100;
-        let simulation_steps_per_frame = 5;
         let selected_option: String = "water".to_owned();
         let options: Vec<String> = Vec::new();
         let executor = Executor::new();
         Self {
             number_of_cells_to_add,
             number_of_structures_to_add,
-            simulation_steps_per_frame,
+            simulation_steps_per_second: 120,
             selected_option,
             options,
             cursor_position: None,

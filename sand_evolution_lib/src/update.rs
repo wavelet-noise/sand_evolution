@@ -1,6 +1,10 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::{cs, State};
+use crate::evolution_app::EvolutionApp;
+use crate::shared_state::SharedState;
 
-pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32)) {
+pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32), evolution_app: &mut EvolutionApp, event_loop_shared_state: Rc<RefCell<SharedState>>) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
 
     let mut b_index = 0;
@@ -10,6 +14,23 @@ pub fn update_dim(state: &mut State, sim_steps: u8, _dimensions: (u32, u32)) {
     _ = getrandom::getrandom(&mut buf);
 
     for _sim_update in 0..sim_steps {
+
+        if state.toggled {
+            if let Some(ast) = &evolution_app.ast {
+                let result = state.rhai.eval_ast_with_scope::<()>(&mut state.rhai_scope, ast);
+                if let Err(err) = &result {
+                    evolution_app.script_error = err.to_string();
+                }
+            }
+        }
+        for (p, c) in event_loop_shared_state.borrow_mut().points.iter() {
+            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
+                (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
+                state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
+            }
+        }
+        event_loop_shared_state.borrow_mut().points.clear();
+
         state.a ^= 1;
         if state.a == 0 {
             state.b ^= 1;
