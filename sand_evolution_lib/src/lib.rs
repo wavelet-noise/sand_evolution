@@ -125,6 +125,7 @@ use crate::state::UpdateResult;
 use rand::Rng;
 use specs::{Dispatcher, RunNow, WorldExt};
 use wgpu::Queue;
+use winit::dpi::PhysicalSize;
 
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
@@ -164,16 +165,18 @@ impl GameContext {
         queue: &Queue,
         steps_per_this_frame: i32,
         evolution_app: &mut EvolutionApp,
-        window: &winit::window::Window,
-        shared_state: &Rc<RefCell<SharedState>>
+        shared_state: &Rc<RefCell<SharedState>>,
+        size: PhysicalSize<u32>,
+        scale_factor: f64,
     ) -> UpdateResult {
         self.state.update(
             &queue,
             steps_per_this_frame as i32,
             evolution_app,
-            window,
             &mut self.world,
-            shared_state
+            shared_state,
+            size,
+            scale_factor
         )
     }
 }
@@ -396,8 +399,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         &queue,
                         sim_steps,
                         &mut evolution_app,
-                        &window,
-                        &event_loop_shared_state
+                        &event_loop_shared_state,
+                        window.inner_size(),
+                        window.scale_factor()
                     );
                     event_loop_game_context.borrow_mut().dispatch();
                     if upd_result.dropping {

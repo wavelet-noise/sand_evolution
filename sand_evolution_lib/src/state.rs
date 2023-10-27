@@ -785,12 +785,12 @@ impl State {
             .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
-    fn spawn(&mut self, evolution_app: &mut EvolutionApp, window: &Window) {
+    fn spawn(&mut self, evolution_app: &mut EvolutionApp, size: PhysicalSize<u32>, scale_factor: f64) {
         if let Some(position) = evolution_app.cursor_position {
-            let scale_factor = window.scale_factor();
+            let scale_factor = scale_factor;
             let logical_position: LogicalPosition<f64> =
                 LogicalPosition::from_physical(position, scale_factor);
-            let window_size = window.inner_size();
+            let window_size = size;
             let scaled_window_size = PhysicalSize::new(
                 window_size.width as f64 / scale_factor,
                 window_size.height as f64 / scale_factor,
@@ -826,9 +826,10 @@ impl State {
         queue: &wgpu::Queue,
         mut sim_steps: i32,
         evolution_app: &mut EvolutionApp,
-        window: &Window,
         world: &mut specs::World,
         shared_state: &Rc<RefCell<SharedState>>,
+        size: PhysicalSize<u32>,
+        scale_factor: f64,
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
@@ -844,7 +845,7 @@ impl State {
         let dimensions = self.diffuse_rgba.dimensions();
 
         if evolution_app.pressed && !evolution_app.hovered {
-            self.spawn(evolution_app, window);
+            self.spawn(evolution_app, size, scale_factor);
         }
 
         let mut dropping = false;
