@@ -14,7 +14,7 @@ use crate::{
     cs,
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
-    update, Vertex, INDICES, VERTICES,
+    update, GameContext, Vertex, INDICES, VERTICES,
 };
 
 #[repr(C)]
@@ -62,6 +62,21 @@ pub struct State {
     gbuffer: GBuffer,
     surface_format: TextureFormat,
     pub toggled: bool,
+}
+
+impl State {
+    pub(crate) fn update_with_data(&mut self, p0: &[u8]) -> &mut Self {
+        if p0.is_empty() || p0.len() == 0 {
+            self.generate_simple();
+        } else {
+            let res = image::load_from_memory(p0).expect("Load from memory failed");
+            self.loaded_rgba = res.to_luma8();
+            self.diffuse_rgba = res.to_luma8();
+            println!("Some image loaded");
+        }
+
+        self
+    }
 }
 
 struct MyState {
@@ -146,7 +161,7 @@ impl State {
             }
         }
     }
-    pub async fn new(
+    pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
@@ -812,9 +827,8 @@ impl State {
         mut sim_steps: i32,
         evolution_app: &mut EvolutionApp,
         window: &Window,
-        event_loop_shared_state: Rc<RefCell<SharedState>>,
         world: &mut specs::World,
-        dispatcher: &mut specs::Dispatcher,
+        shared_state: &Rc<RefCell<SharedState>>,
     ) -> UpdateResult {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
@@ -844,10 +858,9 @@ impl State {
             sim_steps,
             dimensions,
             evolution_app,
-            event_loop_shared_state,
-            update_start_time,
             world,
-            dispatcher,
+            shared_state,
+            update_start_time
         );
 
         let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;

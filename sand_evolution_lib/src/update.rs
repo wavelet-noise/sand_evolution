@@ -1,20 +1,19 @@
 use crate::evolution_app::EvolutionApp;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::shared_state::SharedState;
-use crate::{cs, State};
+use crate::{cs, GameContext, State};
+use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
-use log::error;
 
 pub fn update_tick(
     state: &mut State,
     sim_steps: i32,
     _dimensions: (u32, u32),
     evolution_app: &mut EvolutionApp,
-    event_loop_shared_state: Rc<RefCell<SharedState>>,
-    update_start_time: f64,
     world: &mut specs::World,
-    dispatcher: &mut specs::Dispatcher,
+    shared_state: &Rc<RefCell<SharedState>>,
+    update_start_time: f64
 ) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
@@ -30,7 +29,7 @@ pub fn update_tick(
                 if let Some(storage) = &mut rhai_resource.storage {
                     storage.scope.set_value(
                         "time",
-                        update_start_time + _sim_update as f64 * one_tick_delta,
+                        f64::fract(update_start_time), /*TODO*/
                     );
                     if let Some(ast) = &evolution_app.ast {
                         let result = storage
@@ -47,9 +46,9 @@ pub fn update_tick(
                 error!("Warning: RhaiResource not found in the world");
             }
 
-            dispatcher.dispatch(world);
+            //dispatcher.dispatch(world);
         }
-        for (p, c) in event_loop_shared_state.borrow_mut().points.iter() {
+        for (p, c) in shared_state.borrow_mut().points.iter() {
             if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
                 && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
             {
@@ -58,7 +57,7 @@ pub fn update_tick(
                     .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
             }
         }
-        event_loop_shared_state.borrow_mut().points.clear();
+        shared_state.borrow_mut().points.clear();
 
         state.flip ^= 1;
         if state.flip == 0 {
