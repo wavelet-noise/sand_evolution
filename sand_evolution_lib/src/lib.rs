@@ -316,6 +316,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     );
                     if upd_result.dropping {
                         evolution_app.simulation_steps_per_second -= 10;
+                        if evolution_app.simulation_steps_per_second < 0 { evolution_app.simulation_steps_per_second = 0 }
                     }
                 }
 
