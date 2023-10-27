@@ -116,6 +116,7 @@ pub fn my_rand() -> i64 {
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
 use crate::export_file::code_to_file;
+use crate::state::UpdateResult;
 
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
@@ -266,33 +267,20 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
+    let mut last_frame_time = start_time;
+    let mut collected_delta = 0.0;
     let mut event_loop_shared_state = shared_state_rc.clone();
+    let mut upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
 
         match event {
             RedrawRequested(..) => {
-                platform.update_time((instant::now() - start_time) / 1000.0);
-
-                if (state.toggled) {
-                    if (evolution_app.need_to_recompile) {
-                        evolution_app.compile_script(&mut state);
-                    }
-                    if let Some(ast) = &evolution_app.ast {
-                        let result = state.rhai.eval_ast_with_scope::<()>(&mut state.rhai_scope, ast);
-                        if let Err(err) = &result {
-                            evolution_app.script_error = err.to_string();
-                        }
-                    }
-                }
-                for (p, c) in event_loop_shared_state.borrow_mut().points.iter() {
-                    if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x) &&
-                        (0..cs::SECTOR_SIZE.y as i32).contains(&p.y) {
-                        state.diffuse_rgba.put_pixel(p.x as u32, p.y as u32, Luma([*c]));
-                    }
-                }
-                event_loop_shared_state.borrow_mut().points.clear();
+                let frame_start_time = (instant::now() - start_time) / 1000.0;
+                let delta_t = frame_start_time - last_frame_time;
+                last_frame_time = frame_start_time;
+                platform.update_time(frame_start_time);
 
                 let output_frame = match surface.get_current_texture() {
                     Ok(frame) => frame,
@@ -312,12 +300,23 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let upd_result = state.update(
-                    &queue,
-                    evolution_app.simulation_steps_per_frame as u8,
-                    &mut evolution_app,
-                    &window,
-                );
+                let steps_per_this_frame = ((delta_t + collected_delta) * evolution_app.simulation_steps_per_second as f64).floor();
+
+                if evolution_app.simulation_steps_per_second != 0 {
+                    let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
+                    collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
+                    if evolution_app.need_to_recompile {
+                        evolution_app.compile_script(&mut state);
+                    }
+                    upd_result = state.update(
+                        &queue,
+                        steps_per_this_frame as u8,
+                        &mut evolution_app,
+                        &window,
+                        event_loop_shared_state.clone()
+                    );
+                }
+
                 _ = state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
