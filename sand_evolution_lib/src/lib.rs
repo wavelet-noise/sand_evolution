@@ -89,6 +89,7 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
 use crate::shared_state::SharedState;
 #[cfg(not(target_arch = "wasm32"))]
 use clipboard::ClipboardProvider;
+use futures::TryFutureExt;
 use image::Luma;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -122,12 +123,60 @@ use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::state::UpdateResult;
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
-use specs::{RunNow, WorldExt};
+use specs::{Dispatcher, RunNow, WorldExt};
+use wgpu::Queue;
+use winit::window::Window;
 
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
     let mut rng = rand::thread_rng();
     rng.gen_range(0..10000) // Generating a random number between 0 and 9999
+}
+
+pub struct GameContext {
+    pub world: specs::World,
+    pub dispatcher: specs::Dispatcher<'static, 'static>,
+    pub state: State,
+}
+
+impl GameContext {
+    pub fn new(state: State) -> Self {
+        let mut world = specs::World::new();
+        let mut dispatcher = specs::DispatcherBuilder::new()
+            .with(EntityScriptSystem, "entity_script__system", &[])
+            .with(GravitySystem, "gravity_system", &[])
+            .with(MoveSystem, "move_system", &[])
+            .build();
+        dispatcher.setup(&mut world);
+
+        GameContext {
+            world,
+            dispatcher,
+            state,
+        }
+    }
+
+    pub fn dispatch(&mut self) {
+        self.dispatcher.dispatch(&self.world);
+    }
+
+    pub fn update(
+        &mut self,
+        queue: &Queue,
+        steps_per_this_frame: i32,
+        evolution_app: &mut EvolutionApp,
+        window: &Window,
+        shared_state: &Rc<RefCell<SharedState>>
+    ) -> UpdateResult {
+        self.state.update(
+            &queue,
+            steps_per_this_frame as i32,
+            evolution_app,
+            &window,
+            &mut self.world,
+            shared_state
+        )
+    }
 }
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
@@ -211,8 +260,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let mut surface_config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: surface_format,
-        width: size.width as u32,
-        height: size.height as u32,
+        width: size.width,
+        height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
     };
     surface.configure(&device, &surface_config);
@@ -232,20 +281,16 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     // Display the demo application that ships with egui.
     //let mut demo_app = egui_demo_lib::DemoWindows::default();
 
-    let mut state = State::new(&device, &queue, &surface_config, &surface, surface_format).await;
-
-    let mut shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
-
-    let set_cell_shared_state = shared_state_rc.clone();
-
-    if data.is_empty() || data.len() == 0 {
-        state.generate_simple();
-    } else {
-        let res = image::load_from_memory(data).expect("Load from memory failed");
-        state.loaded_rgba = res.to_luma8();
-        state.diffuse_rgba = res.to_luma8();
-        println!("Some image loaded");
-    }
+    let shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
+    let game_context_rc = Rc::new(RefCell::new(GameContext::new(State::new(
+        &device,
+        &queue,
+        &surface_config,
+        &surface,
+        surface_format,
+    ))));
+    game_context_rc.borrow_mut().state.update_with_data(data);
+    let mut game_context = game_context_rc.clone();
 
     let mut evolution_app = EvolutionApp::new();
     if let Ok(decoded) = base64::decode(script) {
@@ -254,44 +299,42 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         }
     }
 
-    for a in state.pal_container.pal.iter() {
+    for a in game_context.borrow_mut().state.pal_container.pal.iter() {
         if a.id() != 0 {
             evolution_app.options.push(a.name().to_owned());
         }
     }
 
-    let mut world = specs::World::new();
+    {
+        let mut rhai = rhai::Engine::new();
+        let mut rhai_scope = rhai::Scope::new();
+        //rhai_scope.push_constant("RES_X", dimensions.0);
+        //rhai_scope.push_constant("RES_Y", dimensions.1);
 
-    let mut rhai = rhai::Engine::new();
-    let mut rhai_scope = rhai::Scope::new();
-    //rhai_scope.push_constant("RES_X", dimensions.0);
-    //rhai_scope.push_constant("RES_Y", dimensions.1);
-    rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
-        let mut state = set_cell_shared_state.borrow_mut();
-        state.set_pixel(x as i32, y as i32, t as u8);
-    });
-    rhai.register_fn("rand", move || -> i64 { my_rand() });
-    rhai_scope.push("time", 0 as f64);
-    world.insert(RhaiResource {
-        storage: Some(RhaiResourceStorage {
-            engine: rhai,
-            scope: rhai_scope,
-        }),
-    });
-
-    let mut dispatcher = specs::DispatcherBuilder::new()
-        .with(EntityScriptSystem, "entity_script__system", &[])
-        .with(GravitySystem, "gravity_system", &[])
-        .with(MoveSystem, "move_system", &[])
-        .build();
-
-    dispatcher.setup(&mut world);
+        {
+            let moved_clone = shared_state_rc.clone();
+            rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(x as i32, y as i32, t as u8);
+            });
+        }
+        rhai.register_fn("rand", move || -> i64 { my_rand() });
+        rhai_scope.push("time", 0f64);
+        game_context.borrow_mut().world.insert(RhaiResource {
+            storage: Some(RhaiResourceStorage {
+                engine: rhai,
+                scope: rhai_scope,
+            }),
+        });
+    }
 
     let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
     let mut last_frame_time = start_time;
     let mut collected_delta = 0.0;
+    let mut event_loop_game_context = game_context_rc.clone();
     let mut event_loop_shared_state = shared_state_rc.clone();
     let mut upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
@@ -330,7 +373,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
                     if evolution_app.need_to_recompile {
-                        if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
+                        if let Some(mut rhai_resource) = event_loop_game_context
+                            .borrow_mut()
+                            .world
+                            .get_mut::<RhaiResource>()
+                        {
                             if let Some(storage) = &mut rhai_resource.storage {
                                 evolution_app.compile_script(storage);
                             } else {
@@ -340,15 +387,20 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                             println!("Warning: RhaiResource not found in the world");
                         }
                     }
-                    upd_result = state.update(
+                    let sim_steps = steps_per_this_frame as i32;
+                    let event_loop_clone = event_loop_game_context.clone();
+
+                    ///
+                    /// UPDATE
+                    ///
+                    let upd_result = event_loop_game_context.borrow_mut().update(
                         &queue,
-                        steps_per_this_frame as i32,
+                        sim_steps,
                         &mut evolution_app,
                         &window,
-                        event_loop_shared_state.clone(),
-                        &mut world,
-                        &mut dispatcher,
+                        &event_loop_shared_state
                     );
+                    event_loop_game_context.borrow_mut().dispatch();
                     if upd_result.dropping {
                         evolution_app.simulation_steps_per_second -= 10;
                         if evolution_app.simulation_steps_per_second < 0 {
@@ -357,7 +409,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     }
                 }
 
-                _ = state.render(&device, &queue, &output_view);
+                _ = event_loop_game_context.borrow_mut().state.render(
+                    &device,
+                    &queue,
+                    &output_view,
+                );
 
                 // Begin to draw the UI frame.
                 //
@@ -372,7 +428,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
                 evolution_app.ui(
                     &platform.context(),
-                    &mut state,
+                    &mut event_loop_game_context.borrow_mut().state,
                     &mut fps_meter,
                     &upd_result,
                     &event_loop_proxy,
@@ -490,7 +546,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     if dimensions.0 == cs::SECTOR_SIZE.x as u32
                         && dimensions.1 == cs::SECTOR_SIZE.y as u32
                     {
-                        state.diffuse_rgba = img;
+                        event_loop_game_context.borrow_mut().state.diffuse_rgba = img;
                     }
                 }
                 _ => {}
@@ -498,7 +554,10 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
             UserEvent(event) => match event {
                 UserEventInfo::ImageImport(image) => {
                     match image::load_from_memory(&image) {
-                        Ok(img) => state.diffuse_rgba = img.into_luma8(),
+                        Ok(img) => {
+                            event_loop_game_context.borrow_mut().state.diffuse_rgba =
+                                img.into_luma8()
+                        }
                         _ => panic!("Invalid image format"),
                     };
                 }
