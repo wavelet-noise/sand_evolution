@@ -125,7 +125,6 @@ use crate::state::UpdateResult;
 use rand::Rng;
 use specs::{Dispatcher, RunNow, WorldExt};
 use wgpu::Queue;
-use winit::window::Window;
 
 #[cfg(not(feature = "wasm"))]
 pub fn my_rand() -> i64 {
@@ -165,14 +164,14 @@ impl GameContext {
         queue: &Queue,
         steps_per_this_frame: i32,
         evolution_app: &mut EvolutionApp,
-        window: &Window,
+        window: &winit::window::Window,
         shared_state: &Rc<RefCell<SharedState>>
     ) -> UpdateResult {
         self.state.update(
             &queue,
             steps_per_this_frame as i32,
             evolution_app,
-            &window,
+            window,
             &mut self.world,
             shared_state
         )
