@@ -198,7 +198,7 @@ impl EvolutionApp {
                 // Simulation Configuration
                 ui.heading("Pause or simulation speed");
                 ui.add(
-                    egui::Slider::new(&mut self.simulation_steps_per_second, 0..=240)
+                    egui::Slider::new(&mut self.simulation_steps_per_second, 0..=480)
                         .text("Simulation steps per second"),
                 );
 
@@ -345,7 +345,7 @@ impl EvolutionApp {
         Self {
             number_of_cells_to_add,
             number_of_structures_to_add,
-            simulation_steps_per_second: 120,
+            simulation_steps_per_second: 240,
             selected_option,
             options,
             cursor_position: None,
