@@ -382,6 +382,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     else if t == 57u // snow
     {
       col = mix(vec4<f32>(0.8, 0.9, 1.0, 2.0) * 0.8, vec4<f32>(0.8, 0.9, 2.0, 1.0), tdnoise);
+      col.r = min(col.r, col.b);
+      col.g = min(col.g, col.b);
       if (col.b > 1.0) {
         col = mix(vec4<f32>(0.8, 0.8, 1.1,1.0),vec4<f32>(0.3, 0.3, 0.8,1.0),noise_pixel);
       }
