@@ -19,12 +19,17 @@ pub mod wood;
 mod base_water;
 mod salty_water;
 mod delute_acid;
+mod grass;
+
+mod dry_grass;
 
 use crate::cells::electricity::Electricity;
 use std::collections::HashMap;
 use base_water::BaseWater;
 use delute_acid::DeluteAcid;
 use salty_water::SaltyWater;
+use crate::cells::dry_grass::DryGrass;
+use crate::cells::grass::Grass;
 
 use crate::cs::{self, PointType};
 
@@ -177,6 +182,8 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[56] = CrushedIce::boxed();
     cell_registry.pal[57] = Snow::boxed();
     cell_registry.pal[60] = Electricity::boxed();
+    cell_registry.pal[70] = Grass::boxed();
+    cell_registry.pal[71] = DryGrass::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;
