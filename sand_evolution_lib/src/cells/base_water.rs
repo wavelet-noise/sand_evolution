@@ -1,7 +1,14 @@
-use super::{*, helper::fluid_falling_helper};
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng};
+use crate::cells::helper::fluid_falling_helper;
+use crate::cells::salty_water::SaltyWater;
+use crate::cells::void::Void;
+use crate::cells::water::Water;
+use crate::cs;
 use crate::cs::PointType;
-pub struct Water;
-impl Water {
+
+pub struct BaseWater;
+
+impl BaseWater {
     pub const fn new() -> Self {
         Self
     }
@@ -9,10 +16,11 @@ impl Water {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        2
+        16
     }
 }
-impl CellTrait for Water {
+
+impl CellTrait for BaseWater {
     fn update(
         &self,
         i: PointType,
@@ -34,11 +42,18 @@ impl CellTrait for Water {
             if dim.next() > 50 {
                 let cc_v = container[cc] as usize;
                 let cc_c = &pal_container.pal[cc_v];
-                let cc_pt = cc_c.dissolve();
 
-                if cc_pt != Void::id() {
-                    container[cc] = Void::id();
-                    container[cur] = cc_pt;
+                // let cc_dis = cc_c.dissolve();
+                // if cc_dis != Void::id() {
+                //     container[cc] = Void::id();
+                //     container[cur] = cc_dis;
+                //     return;
+                // }
+
+                let cc_pt = cc_c.proton_transfer();
+                if cc_pt != Void::id() && cc_v != BaseWater::id() as usize {
+                    container[cc] = cc_pt;
+                    container[cur] = Water::id();
                     return;
                 }
             }
@@ -46,14 +61,16 @@ impl CellTrait for Water {
     }
 
     fn den(&self) -> i8 {
-        1
+        2
     }
-
+    fn proton_transfer(&self) -> CellType {
+        SaltyWater::id()
+    }
     fn name(&self) -> &str {
-        "water"
+        "base water"
     }
 
     fn id(&self) -> CellType {
-        2
+        15
     }
 }

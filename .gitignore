@@ -6,3 +6,4 @@ Cargo.lock
 .idea/
 exported.txt
 sand_evolution_lib/.DS_Store
+.DS_Store
