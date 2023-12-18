@@ -65,6 +65,6 @@ impl CellTrait for DryIce {
         Self::id()
     }
     fn name(&self) -> &str {
-        "crushed_ice"
+        "dry ice"
     }
 }

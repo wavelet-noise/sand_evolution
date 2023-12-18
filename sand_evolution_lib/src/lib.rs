@@ -22,10 +22,25 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
+
+#[derive(Debug)]
+struct CellTypeNotFound {
+    name: String
+}
+
+impl Display for CellTypeNotFound {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cell type not found: {0}", self.name)
+    }
+}
+
+impl std::error::Error for CellTypeNotFound {}
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -91,6 +106,7 @@ use crate::shared_state::SharedState;
 use clipboard::ClipboardProvider;
 use futures::TryFutureExt;
 use image::Luma;
+use log::Level::Error;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -123,6 +139,7 @@ use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::state::UpdateResult;
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
+use rhai::EvalAltResult;
 use specs::{Dispatcher, RunNow, WorldExt};
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
@@ -300,15 +317,19 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         }
     }
 
+    let mut id_dict: HashMap<String, u8> = HashMap::new();
+
     for a in game_context.state.pal_container.pal.iter() {
         if a.id() != 0 {
             evolution_app.options.push(a.name().to_owned());
+            id_dict.insert(a.name().to_owned(), a.id());
         }
     }
 
     {
         let mut rhai = rhai::Engine::new();
         let mut rhai_scope = rhai::Scope::new();
+
         //rhai_scope.push_constant("RES_X", dimensions.0);
         //rhai_scope.push_constant("RES_Y", dimensions.1);
 
@@ -318,6 +339,18 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 moved_clone
                     .borrow_mut()
                     .set_pixel(x as i32, y as i32, t as u8);
+            });
+        }
+        {
+            rhai.register_fn("type_id", move |name: &str| -> Result<i64, Box<EvalAltResult>> {
+                if id_dict.contains_key(name) {
+                    Ok(id_dict[name] as i64)
+                } else {
+                    Err(EvalAltResult::ErrorSystem(
+                        "SystemError".into(),
+                        Box::new(CellTypeNotFound{name: name.to_string()})
+                    ).into())
+                }
             });
         }
         rhai.register_fn("rand", move || -> i64 { my_rand() });

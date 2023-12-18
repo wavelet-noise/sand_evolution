@@ -438,6 +438,14 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(1.0,0.5,1.0,1.0);
     }
+    else if t == 70u // grass
+    {
+      col = vec4<f32>(0.4,1.0,0.4,1.0)*((noise_pixel+1.0)/2.0)*0.5;
+    }
+    else if t == 71u // dry grass
+    {
+      col = vec4<f32>(1.0,0.7,0.6,1.0)*((noise_pixel+1.0)/2.0)*0.15;
+    }
     else
     {
       col = vec4<f32>(0.0,1.0,0.0,1.0);

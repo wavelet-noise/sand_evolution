@@ -71,6 +71,6 @@ impl CellTrait for CrushedIce {
         Self::id()
     }
     fn name(&self) -> &str {
-        "crushed_ice"
+        "crushed ice"
     }
 }
