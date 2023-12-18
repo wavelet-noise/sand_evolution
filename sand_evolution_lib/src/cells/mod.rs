@@ -16,14 +16,20 @@ pub mod stone;
 pub mod void;
 pub mod water;
 pub mod wood;
+mod base_water;
+mod salty_water;
+mod delute_acid;
 
 use crate::cells::electricity::Electricity;
 use std::collections::HashMap;
+use base_water::BaseWater;
+use delute_acid::DeluteAcid;
+use salty_water::SaltyWater;
 
 use crate::cs::{self, PointType};
 
 use self::{
-    acid::{Acid, DeluteAcid},
+    acid::Acid,
     burning_coal::BurningCoal,
     burning_gas::BurningGas,
     coal::Coal,
@@ -35,7 +41,7 @@ use self::{
     snow::Snow,
     steam::Steam,
     void::Void,
-    water::{BaseWater, SaltyWater, Water},
+    water::Water,
     wood::Wood,
 };
 pub type CellType = u8;

@@ -1,10 +1,12 @@
+use crate::cells::base_water::BaseWater;
+use crate::cells::salty_water::SaltyWater;
 use crate::cs::PointType;
 
 use super::{
-    gas::Gas,
-    helper::sand_faling_helper,
-    water::{BaseWater, SaltyWater},
-    CellRegistry, CellTrait, CellType, Prng,
+    CellRegistry,
+    CellTrait,
+    CellType,
+    gas::Gas, helper::sand_faling_helper, Prng,
 };
 
 pub struct Sand;

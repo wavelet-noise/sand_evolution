@@ -1,7 +1,13 @@
-use super::{*, helper::fluid_falling_helper};
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng};
+use crate::cells::helper::fluid_falling_helper;
+use crate::cells::void::Void;
+use crate::cells::water::Water;
+use crate::cs;
 use crate::cs::PointType;
-pub struct Water;
-impl Water {
+
+pub struct DeluteAcid;
+
+impl DeluteAcid {
     pub const fn new() -> Self {
         Self
     }
@@ -9,10 +15,11 @@ impl Water {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        2
+        12
     }
 }
-impl CellTrait for Water {
+
+impl CellTrait for DeluteAcid {
     fn update(
         &self,
         i: PointType,
@@ -42,18 +49,35 @@ impl CellTrait for Water {
                     return;
                 }
             }
+
+            if dim.next() > 240 {
+                let cc_v = container[cc] as usize;
+                let cc_c = &pal_container.pal[cc_v];
+                let cc_pt = cc_c.proton_transfer();
+
+                if cc_pt != Void::id() {
+                    container[cc] = cc_pt;
+
+                    if dim.next() > 120 {
+                        container[cur] = Water::id();
+                    } else {
+                        container[cur] = Void::id();
+                    }
+                    return;
+                }
+            }
         }
     }
 
     fn den(&self) -> i8 {
-        1
+        2
     }
 
     fn name(&self) -> &str {
-        "water"
+        "delute acid"
     }
 
     fn id(&self) -> CellType {
-        2
+        12
     }
 }
