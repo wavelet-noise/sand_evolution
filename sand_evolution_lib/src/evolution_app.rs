@@ -153,6 +153,7 @@ impl EvolutionApp {
         egui::Window::new("Level script")
             .default_pos(egui::pos2(560.0, 5.0))
             .default_size(egui::vec2(500., 500.))
+            .max_size(egui::vec2(500., 1000.))
             .show(context, |ui| {
                 // Add a vertical scroll area around the text editor
                 egui::ScrollArea::vertical()
