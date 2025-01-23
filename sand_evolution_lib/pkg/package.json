@@ -1,5 +1,6 @@
 {
   "name": "sand_evolution_lib",
+  "type": "module",
   "collaborators": [
     "wn"
   ],
@@ -9,7 +10,7 @@
     "sand_evolution_lib.js",
     "sand_evolution_lib.d.ts"
   ],
-  "module": "sand_evolution_lib.js",
+  "main": "sand_evolution_lib.js",
   "types": "sand_evolution_lib.d.ts",
   "sideEffects": [
     "./snippets/*"
