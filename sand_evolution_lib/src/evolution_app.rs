@@ -154,8 +154,13 @@ impl EvolutionApp {
             .default_pos(egui::pos2(560.0, 5.0))
             .default_size(egui::vec2(500., 500.))
             .show(context, |ui| {
-                ui.text_edit_multiline(&mut self.script);
-
+                // Add a vertical scroll area around the text editor
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, true]) // Prevent horizontal auto-shrinking if necessary
+                    .show(ui, |ui| {
+                        ui.text_edit_multiline(&mut self.script);
+                    });
+        
                 if ui
                     .button(if state.toggled {
                         "Disable script"
@@ -166,17 +171,17 @@ impl EvolutionApp {
                 {
                     state.toggled = !state.toggled;
                 }
-                ui.colored_label(Color32::from_rgb(255, 0, 0), &self.script_error);
-
+                ui.colored_label(egui::Color32::from_rgb(255, 0, 0), &self.script_error);
+        
                 if ui.button("Export code").clicked() {
                     code_to_file(self.script.as_str());
                 }
-
+        
                 if ui.button("Import code").clicked() {
                     let dialog = rfd::AsyncFileDialog::new()
                         .add_filter("Text", &["txt"])
                         .pick_file();
-
+        
                     let event_loop_proxy = event_loop_proxy.clone();
                     self.executor.execute(async move {
                         if let Some(file) = dialog.await {
@@ -187,7 +192,7 @@ impl EvolutionApp {
                         }
                     });
                 }
-
+        
                 *any_win_hovered |= context.is_pointer_over_area()
             });
 
