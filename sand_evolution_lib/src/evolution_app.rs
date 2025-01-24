@@ -101,7 +101,7 @@ impl EvolutionApp {
     ) {
         egui::Window::new("Configuration")
             .default_pos(egui::pos2(340.0, 5.0))
-            .fixed_size(egui::vec2(200.0, 100.0))
+            .default_size(egui::vec2(200.0, 100.0))
             .show(context, |ui| {
                 let url = "https://github.com/wavelet-noise/sand_evolution";
                 if ui.hyperlink(url).clicked() {
