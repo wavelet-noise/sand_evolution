@@ -100,6 +100,7 @@ impl EvolutionApp {
         any_win_hovered: &mut bool,
     ) {
         egui::Window::new("Configuration")
+            .collapsed(true)
             .default_pos(egui::pos2(340.0, 5.0))
             .default_size(egui::vec2(200.0, 100.0))
             .show(context, |ui| {
@@ -151,6 +152,7 @@ impl EvolutionApp {
             });
 
         egui::Window::new("Level script")
+            .collapsed(true)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(1000., 1000.))
             .show(context, |ui| {
@@ -197,6 +199,7 @@ impl EvolutionApp {
             });
 
         egui::Window::new("Simulation")
+            .collapsed(true)
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
