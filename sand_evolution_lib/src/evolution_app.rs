@@ -107,7 +107,7 @@ impl EvolutionApp {
         let mut w2: bool = self.w2;
         let mut w3: bool = self.w3;
 
-        egui::Window::new("Level script")
+        egui::Window::new("Swithes")
         .default_pos(egui::pos2(10.0,10.0))
         .show(context, |ui| {
             if ui.button("Config").clicked() {
