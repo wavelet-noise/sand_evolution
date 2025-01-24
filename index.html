@@ -67,6 +67,7 @@
                 const response = await fetch(scriptFile);
                 console.log(response);
                 scriptContent = await response.text();
+                console.log(scriptContent);
             }
         
             run(vw, vh, uint8Array, scriptString, scriptContent);
