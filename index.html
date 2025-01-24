@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sand Evolution v0.1</title>
+    <title>Sand Evolution v0.2</title>
 </head>
 
 <body id="wasm-example">
@@ -46,18 +46,30 @@
 
             console.log(scriptString);
 
-            let uint8Array = new Uint8Array(0);
+            var scriptFile = new URLSearchParams(location.search).get("script_file") || "";
+            scriptFile = decodeURIComponent(scriptFile);
+            scriptFile = scriptFile.replace(/^"|"$/g, '');
+        
+            console.log(scriptFile);
 
+            let uint8Array = new Uint8Array(0);
+            let scriptContent = scriptString;
+        
             if (saveString !== "") {
                 const response = await fetch(saveString);
                 console.log(response);
                 const blob = await response.blob();
-
-                // Convert blob to Uint8Array
+        
                 uint8Array = await blobToArrayBuffer(blob);
             }
-
-            run(vw, vh, uint8Array, scriptString)
+        
+            if (scriptFile !== "") {
+                const response = await fetch(scriptFile);
+                console.log(response);
+                scriptContent = await response.text();
+            }
+        
+            run(vw, vh, uint8Array, scriptString, scriptContent);
         }
 
         gameloop();
