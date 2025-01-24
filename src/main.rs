@@ -3,7 +3,6 @@ fn main() {
         2000.0,
         1000.0,
         Default::default(),
-        "".to_owned(),
-        false
+        "".to_owned()
     ));
 }
