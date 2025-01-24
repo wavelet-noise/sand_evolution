@@ -52,6 +52,10 @@ impl CellTrait for CrushedIce {
         }
     }
 
+    fn den(&self) -> i8 {
+        5
+    }
+
     fn stat(&self) -> bool {
         true
     }
@@ -63,14 +67,10 @@ impl CellTrait for CrushedIce {
     fn heat_proof(&self) -> u8 {
         200
     }
-
-    fn den(&self) -> i8 {
-        5
+    fn name(&self) -> &str {
+        "crushed ice"
     }
     fn id(&self) -> CellType {
         Self::id()
-    }
-    fn name(&self) -> &str {
-        "crushed ice"
     }
 }

@@ -34,16 +34,16 @@ impl CellTrait for Coal {
     fn den(&self) -> i8 {
         10
     }
-    fn proton_transfer(&self) -> CellType {
-        BurningGas::id()
-    }
     fn burnable(&self) -> u8 {
         BurningCoal::id()
     }
-    fn id(&self) -> CellType {
-        8
+    fn proton_transfer(&self) -> CellType {
+        BurningGas::id()
     }
     fn name(&self) -> &str {
         "coal"
+    }
+    fn id(&self) -> CellType {
+        8
     }
 }

@@ -50,11 +50,11 @@ impl CellTrait for Cell {
         true
     }
 
-    fn name(&self) -> &str {
-        "burning wood"
-    }
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
+    }
+    fn name(&self) -> &str {
+        "burning wood"
     }
     fn id(&self) -> CellType {
         6

@@ -20,6 +20,6 @@ impl FpsMeter {
             self.last_value = self.count;
             self.count = 0;
         }
-        return self.last_value;
+        self.last_value
     }
 }
