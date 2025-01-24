@@ -103,8 +103,9 @@ impl EvolutionApp {
         event_loop_proxy: &EventLoopProxy<UserEventInfo>,
         any_win_hovered: &mut bool,
     ) {
+        let mut w1: bool = self.w1;
         egui::Window::new("Configuration")
-            .open(&mut self.w1)
+            .open(&mut w1)
             .default_pos(egui::pos2(340.0, 5.0))
             .default_size(egui::vec2(200.0, 100.0))
             .show(context, |ui| {
@@ -154,9 +155,11 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
+        self.w1 = w1;
 
+        let mut w2: bool = self.w2;
         egui::Window::new("Level script")
-            .open(&mut self.w2)
+            .open(&mut w2)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(1000., 1000.))
             .show(context, |ui| {
@@ -201,9 +204,11 @@ impl EvolutionApp {
         
                 *any_win_hovered |= context.is_pointer_over_area()
             });
+        self.w2 = w2;
 
+        let mut w3: bool = self.w3;
         egui::Window::new("Simulation")
-            .open(&mut self.w3)
+            .open(&mut w3)
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
@@ -274,6 +279,7 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
+        self.w3 = w3;
     }
 
     pub fn compile_script(&mut self, rhai: &mut RhaiResourceStorage) {
