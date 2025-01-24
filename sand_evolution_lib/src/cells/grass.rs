@@ -31,20 +31,20 @@ impl CellTrait for Grass {
     fn stat(&self) -> bool {
         true
     }
-    fn heatable(&self) -> u8 {
-        DryGrass::id()
-    }
-
     fn burnable(&self) -> u8 {
         DryGrass::id()
     }
+
     fn proton_transfer(&self) -> CellType {
         burning_wood::id()
     }
-    fn id(&self) -> CellType {
-        Grass::id()
+    fn heatable(&self) -> u8 {
+        DryGrass::id()
     }
     fn name(&self) -> &str {
         "grass"
+    }
+    fn id(&self) -> CellType {
+        Grass::id()
     }
 }

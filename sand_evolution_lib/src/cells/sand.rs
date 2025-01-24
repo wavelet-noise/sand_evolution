@@ -6,7 +6,7 @@ use super::{
     CellRegistry,
     CellTrait,
     CellType,
-    gas::Gas, helper::sand_faling_helper, Prng,
+    gas::Gas, helper::sand_falling_helper, Prng,
 };
 
 pub struct Sand;
@@ -31,7 +31,7 @@ impl CellTrait for Sand {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng);
+        sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
     fn den(&self) -> i8 {
         10
@@ -69,7 +69,7 @@ impl CellTrait for Salt {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng);
+        sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
     fn den(&self) -> i8 {
         10
@@ -107,7 +107,7 @@ impl CellTrait for Base {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng);
+        sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
     fn den(&self) -> i8 {
         10

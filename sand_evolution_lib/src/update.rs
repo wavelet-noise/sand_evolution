@@ -18,6 +18,8 @@ pub fn update_tick(
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
 
+    let frame_start_time = (instant::now() - state.start_time) / 1000.0;
+
     const BUF_SIZE: usize = 50;
     let mut buf = [0u8; BUF_SIZE];
     _ = getrandom::getrandom(&mut buf);
@@ -29,7 +31,7 @@ pub fn update_tick(
                 if let Some(storage) = &mut rhai_resource.storage {
                     storage
                         .scope
-                        .set_value("time", f64::fract(update_start_time) /*TODO*/);
+                        .set_value("time", frame_start_time);
                     if let Some(ast) = &evolution_app.ast {
                         let result = storage
                             .engine

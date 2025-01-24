@@ -40,7 +40,7 @@ use self::{
     coal::Coal,
     crushed_ice::CrushedIce,
     gas::Gas,
-    helper::sand_faling_helper,
+    helper::sand_falling_helper,
     ice::Ice,
     sand::{Base, Salt, Sand},
     snow::Snow,
