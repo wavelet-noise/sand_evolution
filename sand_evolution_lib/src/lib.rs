@@ -200,7 +200,7 @@ impl GameContext {
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
+pub async fn run(w: f32, h: f32, data: &[u8], script: String, base64: bool) {
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -311,9 +311,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     game_context.state.update_with_data(data);
 
     let mut evolution_app = EvolutionApp::new();
-    if let Ok(decoded) = base64::decode(script) {
-        if let Ok(decoded_str) = String::from_utf8(decoded) {
-            evolution_app.set_script(decoded_str.as_str());
+
+    if base64 == true {
+        evolution_app.set_script(script);
+    } else {
+        if let Ok(decoded) = base64::decode(script) {
+            if let Ok(decoded_str) = String::from_utf8(decoded) {
+                evolution_app.set_script(decoded_str.as_str());
+            }
         }
     }
 
