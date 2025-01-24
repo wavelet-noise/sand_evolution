@@ -53,8 +53,8 @@
             console.log(scriptFile);
 
             let uint8Array = new Uint8Array(0);
-            let scriptContent = scriptString;
-            let base64 = true;
+            var scriptContent = scriptString;
+            var base64 = true;
         
             if (saveString !== "") {
                 const response = await fetch(saveString);
