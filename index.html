@@ -40,12 +40,6 @@
 
             console.log(saveString);
 
-            var scriptString = new URLSearchParams(location.search).get("script") || "";
-            scriptString = decodeURIComponent(scriptString);
-            scriptString = scriptString.replace(/^"|"$/g, '');
-
-            console.log(scriptString);
-
             var scriptFile = new URLSearchParams(location.search).get("script_file") || "";
             scriptFile = decodeURIComponent(scriptFile);
             scriptFile = scriptFile.replace(/^"|"$/g, '');
@@ -53,8 +47,7 @@
             console.log(scriptFile);
 
             let uint8Array = new Uint8Array(0);
-            var scriptContent = scriptString;
-            var base64 = true;
+            var scriptContent = "";
         
             if (saveString !== "") {
                 const response = await fetch(saveString);
@@ -72,7 +65,7 @@
                 base64 = false;
             }
         
-            run(vw, vh, uint8Array, scriptContent, base64);
+            run(vw, vh, uint8Array, scriptContent);
         }
 
         gameloop();
