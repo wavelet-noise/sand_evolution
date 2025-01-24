@@ -54,6 +54,7 @@
 
             let uint8Array = new Uint8Array(0);
             let scriptContent = scriptString;
+            let base64 = false;
         
             if (saveString !== "") {
                 const response = await fetch(saveString);
@@ -68,9 +69,10 @@
                 console.log(response);
                 scriptContent = await response.text();
                 console.log(scriptContent);
+                base64 = true;
             }
         
-            run(vw, vh, uint8Array, scriptContent);
+            run(vw, vh, uint8Array, scriptContent, base64);
         }
 
         gameloop();
