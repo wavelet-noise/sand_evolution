@@ -19,10 +19,9 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
 #[cfg(target_arch = "wasm32")]
 pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     let mut buffer = Vec::new();
-    buffer.extend_from_slice(data.as_bytes());
 
     // Create a Uint8Array object from the binary buffer
-    let data_url = format!("data:text/plain;base64,{}", base64::encode(&buffer));
+    let data_url = format!("data:text/plain;{}", str);
 
     let window = web_sys::window().expect("window not found");
     let document = window.document().expect("document not found");
