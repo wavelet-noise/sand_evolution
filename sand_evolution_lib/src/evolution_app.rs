@@ -51,6 +51,10 @@ pub struct EvolutionApp {
     pub script_error: String,
     executor: Executor,
     pub ast: Option<rhai::AST>,
+
+    pub w1: bool,
+    pub w2: bool,
+    pub w3: bool
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -100,7 +104,7 @@ impl EvolutionApp {
         any_win_hovered: &mut bool,
     ) {
         egui::Window::new("Configuration")
-            .default_open(false)
+            .open(&mut self.w1)
             .default_pos(egui::pos2(340.0, 5.0))
             .default_size(egui::vec2(200.0, 100.0))
             .show(context, |ui| {
@@ -152,7 +156,7 @@ impl EvolutionApp {
             });
 
         egui::Window::new("Level script")
-            .default_open(false)
+            .open(&mut self.w2)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(1000., 1000.))
             .show(context, |ui| {
@@ -199,7 +203,7 @@ impl EvolutionApp {
             });
 
         egui::Window::new("Simulation")
-            .default_open(false)
+            .open(&mut self.w3)
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
@@ -365,6 +369,10 @@ impl EvolutionApp {
             script_error: "".to_owned(),
             ast: None,
             need_to_recompile: true,
+
+            w1: false,
+            w2: false,
+            w3: false
         }
     }
 }
