@@ -2,7 +2,7 @@ use crate::cs;
 
 use super::{CellRegistry, Prng};
 
-pub fn sand_faling_helper(
+pub fn sand_falling_helper(
     my_den: i8,
     i: u16,
     j: u16,
@@ -46,10 +46,10 @@ pub fn sand_faling_helper(
         }
     }
 
-    return false;
+    false
 }
 
-pub fn snow_faling_helper(
+pub fn snow_falling_helper(
     my_den: i8,
     i: u16,
     j: u16,
@@ -93,7 +93,7 @@ pub fn snow_faling_helper(
         }
     }
 
-    return false;
+    false
 }
 
 #[inline(always)]
@@ -168,7 +168,7 @@ pub fn fluid_falling_helper(
         }
     }
 
-    return false;
+    false
 }
 
 #[inline(always)]
@@ -232,5 +232,5 @@ pub fn fluid_flying_helper(
         }
     }
 
-    return false;
+    false
 }

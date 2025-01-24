@@ -30,10 +30,10 @@ impl CellTrait for Stone {
         true
     }
 
-    fn id(&self) -> CellType {
-        255
-    }
     fn name(&self) -> &str {
         "stone"
+    }
+    fn id(&self) -> CellType {
+        255
     }
 }

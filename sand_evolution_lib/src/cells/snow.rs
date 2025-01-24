@@ -54,6 +54,10 @@ impl CellTrait for Snow {
         }
     }
 
+    fn den(&self) -> i8 {
+        5
+    }
+
     fn stat(&self) -> bool {
         true
     }
@@ -61,14 +65,10 @@ impl CellTrait for Snow {
     fn heatable(&self) -> CellType {
         Water::id()
     }
-
-    fn den(&self) -> i8 {
-        5
+    fn name(&self) -> &str {
+        "snow"
     }
     fn id(&self) -> CellType {
         Self::id()
-    }
-    fn name(&self) -> &str {
-        "snow"
     }
 }

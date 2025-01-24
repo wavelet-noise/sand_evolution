@@ -25,7 +25,7 @@ impl CellTrait for BurningCoal {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        if !sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
+        if !sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             let bot = cs::xy_to_index(i, j - 1);
             let bot_v = container[bot] as usize;
 

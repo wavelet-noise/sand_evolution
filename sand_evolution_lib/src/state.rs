@@ -46,7 +46,7 @@ pub struct State {
     settings_bind_group: wgpu::BindGroup,
     float_texture_plus_sampler_bgl: wgpu::BindGroupLayout,
     float_texture_plus_sampler_plus_texture_bgl: wgpu::BindGroupLayout,
-    start_time: f64,
+    pub start_time: f64,
     type_bind_group: wgpu::BindGroup,
     gbuffer_combine_bind_group: wgpu::BindGroup,
     pub diffuse_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,

@@ -35,10 +35,10 @@ impl CellTrait for Wood {
     fn proton_transfer(&self) -> CellType {
         Gas::id()
     }
-    fn id(&self) -> CellType {
-        50
-    }
     fn name(&self) -> &str {
         "wood"
+    }
+    fn id(&self) -> CellType {
+        50
     }
 }

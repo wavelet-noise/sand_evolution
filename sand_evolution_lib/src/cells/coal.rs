@@ -1,7 +1,7 @@
 use crate::cs::PointType;
 
 use super::{
-    burning_coal::BurningCoal, burning_gas::BurningGas, helper::sand_faling_helper, CellRegistry,
+    burning_coal::BurningCoal, burning_gas::BurningGas, helper::sand_falling_helper, CellRegistry,
     CellTrait, CellType, Prng,
 };
 
@@ -28,7 +28,7 @@ impl CellTrait for Coal {
         pal_container: &CellRegistry,
         dim: &mut Prng,
     ) {
-        sand_faling_helper(self.den(), i, j, container, pal_container, cur, dim);
+        sand_falling_helper(self.den(), i, j, container, pal_container, cur, dim);
     }
 
     fn den(&self) -> i8 {

@@ -1,7 +1,7 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    helper::sand_faling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng,
+    helper::sand_falling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng,
 };
 
 pub struct CrushedIce;
@@ -26,7 +26,7 @@ impl CellTrait for CrushedIce {
         pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        if sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
+        if sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             return;
         }
 
