@@ -54,7 +54,7 @@
 
             let uint8Array = new Uint8Array(0);
             let scriptContent = scriptString;
-            let base64 = false;
+            let base64 = true;
         
             if (saveString !== "") {
                 const response = await fetch(saveString);
@@ -69,7 +69,7 @@
                 console.log(response);
                 scriptContent = await response.text();
                 console.log(scriptContent);
-                base64 = true;
+                base64 = false;
             }
         
             run(vw, vh, uint8Array, scriptContent, base64);
