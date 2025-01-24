@@ -200,7 +200,7 @@ impl GameContext {
 
 const INDICES: &[u16] = &[0, 1, 3, 0, 3, 2];
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub async fn run(w: f32, h: f32, data: &[u8], script: String, base64: bool) {
+pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let mut fps_meter = FpsMeter::new();
 
     cfg_if::cfg_if! {
@@ -312,15 +312,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String, base64: bool) {
 
     let mut evolution_app = EvolutionApp::new();
 
-    if base64 == true {
-        evolution_app.set_script(script.as_str());
-    } else {
-        if let Ok(decoded) = base64::decode(script) {
-            if let Ok(decoded_str) = String::from_utf8(decoded) {
-                evolution_app.set_script(decoded_str.as_str());
-            }
-        }
-    }
+    evolution_app.set_script(script.as_str());
 
     let mut id_dict: HashMap<String, u8> = HashMap::new();
 
