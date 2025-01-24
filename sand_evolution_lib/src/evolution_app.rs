@@ -104,6 +104,24 @@ impl EvolutionApp {
         any_win_hovered: &mut bool,
     ) {
         let mut w1: bool = self.w1;
+        let mut w2: bool = self.w2;
+        let mut w3: bool = self.w3;
+
+        egui::Window::new("Level script")
+        .default_pos(egui::pos2(10.0,10.0))
+        .show(context, |ui| {
+            if ui.button("Config").clicked() {
+                w1 = !w1;
+            }
+            if ui.button("Script").clicked() {
+                w2 = !w2;
+            }
+            if ui.button("Sim").clicked() {
+                w3 = !w3;
+            }
+        });
+
+        
         egui::Window::new("Configuration")
             .open(&mut w1)
             .default_pos(egui::pos2(340.0, 5.0))
@@ -156,8 +174,7 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         self.w1 = w1;
-
-        let mut w2: bool = self.w2;
+        
         egui::Window::new("Level script")
             .open(&mut w2)
             .default_pos(egui::pos2(560.0, 5.0))
@@ -205,8 +222,6 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         self.w2 = w2;
-
-        let mut w3: bool = self.w3;
         egui::Window::new("Simulation")
             .open(&mut w3)
             .default_pos(egui::pos2(5.0, 5.0))
