@@ -84,7 +84,7 @@ impl Prng {
             self.rnd_next
         };
 
-        return self.rnd[self.rnd_next];
+        self.rnd[self.rnd_next]
     }
 
     pub fn add_carb(&mut self) {
@@ -113,7 +113,7 @@ impl CellRegistry {
             dict: HashMap::new(),
         };
         setup_palette(&mut me);
-        return me;
+        me
     }
 }
 

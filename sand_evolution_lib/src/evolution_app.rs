@@ -65,18 +65,18 @@ pub fn compact_number_string(n: f32) -> String {
     }
 
     if abs < 999999.0 {
-        return format!("{:.2}k", abs as f32 / 1000.0);
+        return format!("{:.2}k", abs / 1000.0);
     }
 
     if abs < 999999999.0 {
-        return format!("{:.2}M", abs as f32 / 1000000.0);
+        return format!("{:.2}M", abs / 1000000.0);
     }
 
     if abs < 999999999999.0 {
-        return format!("{:.2}G", abs as f32 / 1000000000.0);
+        return format!("{:.2}G", abs / 1000000000.0);
     }
 
-    return format!("{:.2}T", abs as f32 / 1000000000000.0);
+    format!("{:.2}T", abs / 1000000000000.0)
 }
 
 pub enum UserEventInfo {

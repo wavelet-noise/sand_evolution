@@ -45,10 +45,10 @@ impl CellTrait for Electricity {
     fn den(&self) -> i8 {
         0
     }
-    fn id(&self) -> CellType {
-        Self::id()
-    }
     fn name(&self) -> &str {
         "electricity"
+    }
+    fn id(&self) -> CellType {
+        Self::id()
     }
 }

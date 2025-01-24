@@ -896,11 +896,11 @@ impl State {
             },
             texture_size,
         );
-        return UpdateResult {
+        UpdateResult {
             simulation_step_average_time,
             update_time: instant::now() - update_start_time,
             dropping,
-        };
+        }
     }
 
     pub fn render(
