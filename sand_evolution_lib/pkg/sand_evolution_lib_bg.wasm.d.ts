@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export const run: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
+export const run: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => any;
 export const wgpu_render_pass_set_pipeline: (a: number, b: bigint) => void;
 export const wgpu_render_pass_set_bind_group: (a: number, b: number, c: bigint, d: number, e: number) => void;
 export const wgpu_render_pass_set_vertex_buffer: (a: number, b: number, c: bigint, d: bigint, e: bigint) => void;
@@ -56,7 +56,7 @@ export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_export_6: WebAssembly.Table;
-export const closure381_externref_shim: (a: number, b: number, c: any) => void;
+export const closure183_externref_shim: (a: number, b: number, c: any) => void;
 export const _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h35fda42e0c36ae41: (a: number, b: number) => void;
 export const _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h76300c65999abc77: (a: number, b: number) => void;
 export const closure503_externref_shim: (a: number, b: number, c: any) => void;

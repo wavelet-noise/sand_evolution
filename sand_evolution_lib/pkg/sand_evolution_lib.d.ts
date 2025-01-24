@@ -1,12 +1,12 @@
 /* tslint:disable */
 /* eslint-disable */
-export function run(w: number, h: number, data: Uint8Array, script: string): Promise<void>;
+export function run(w: number, h: number, data: Uint8Array, script: string, base64: boolean): Promise<void>;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly run: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
+  readonly run: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => any;
   readonly wgpu_render_pass_set_pipeline: (a: number, b: bigint) => void;
   readonly wgpu_render_pass_set_bind_group: (a: number, b: number, c: bigint, d: number, e: number) => void;
   readonly wgpu_render_pass_set_vertex_buffer: (a: number, b: number, c: bigint, d: bigint, e: bigint) => void;
@@ -61,7 +61,7 @@ export interface InitOutput {
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_6: WebAssembly.Table;
-  readonly closure381_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure183_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h35fda42e0c36ae41: (a: number, b: number) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h76300c65999abc77: (a: number, b: number) => void;
   readonly closure503_externref_shim: (a: number, b: number, c: any) => void;
