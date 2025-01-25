@@ -18,6 +18,7 @@ pub fn update_tick(
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
 
+    state.tick += 1;
     let frame_start_time = (instant::now() - state.start_time) / 1000.0;
 
     const BUF_SIZE: usize = 50;
@@ -32,6 +33,7 @@ pub fn update_tick(
                     storage
                         .scope
                         .set_value("time", frame_start_time);
+                    storage.scope.set_value("tick", state.tick);
                     if let Some(ast) = &evolution_app.ast {
                         let result = storage
                             .engine

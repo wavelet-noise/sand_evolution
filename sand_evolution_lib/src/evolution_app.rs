@@ -178,11 +178,13 @@ impl EvolutionApp {
         egui::Window::new("Level script")
             .open(&mut w2)
             .default_pos(egui::pos2(560.0, 5.0))
-            .fixed_size(egui::vec2(1000., 1000.))
             .show(context, |ui| {
                 // Add a vertical scroll area around the text editor
                 egui::ScrollArea::vertical()
-                    .auto_shrink([false, true]) // Prevent horizontal auto-shrinking if necessary
+                    .auto_shrink([true, true]) // Prevent horizontal auto-shrinking if necessary
+                    .enable_scrolling(true)
+                    .always_show_scroll(true)
+                    .max_height(500.0)
                     .show(ui, |ui| {
                         ui.text_edit_multiline(&mut self.script);
                     });
