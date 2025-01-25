@@ -25,6 +25,32 @@ impl CellTrait for Laser {
         _pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
+        let top = cs::xy_to_index(i, j + 1);
+        let down = cs::xy_to_index(i, j - 1);
+        let r = cs::xy_to_index(i + 1, j);
+        let l = cs::xy_to_index(i - 1, j);
+
+        let arr = [top, down, l, r];
+        let cc = arr[(prng.next() % 4) as usize];
+
+        if prng.next() > 50 {
+            let cc_v = container[cc] as usize;
+            let cc_c = &_pal_container.pal[cc_v];
+            let cc_b = cc_c.burnable();
+
+            if cc_b != Void::id() {
+                container[cc] = cc_b;
+                return;
+            }
+
+            let cc_h = cc_c.heatable();
+
+            if cc_h != Void::id() && prng.next() > cc_c.heat_proof() {
+                container[cc] = cc_h;
+                return;
+            }
+        }
+
         if prng.next() < 200 {
             return
         } else {
