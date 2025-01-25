@@ -62,7 +62,8 @@ pub struct State {
     gbuffer: GBuffer,
     surface_format: TextureFormat,
     pub toggled: bool,
-    pub tick: i64
+    pub tick: i64,
+    pub frame: i64
 }
 
 impl State {
@@ -762,7 +763,8 @@ impl State {
             gbuffer,
             surface_format,
             toggled: true,
-            tick: 0
+            tick: 0,
+            frame: 0
         }
     }
 

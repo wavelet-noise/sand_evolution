@@ -17,82 +17,81 @@ pub fn update_tick(
 ) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
-
-    state.tick += 1;
     let frame_start_time = (instant::now() - state.start_time) / 1000.0;
+    state.frame += 1;
 
     const BUF_SIZE: usize = 50;
     let mut buf = [0u8; BUF_SIZE];
     _ = getrandom::getrandom(&mut buf);
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-    for _sim_update in 0..sim_steps {
-        if state.toggled {
-            if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
-                if let Some(storage) = &mut rhai_resource.storage {
-                    storage
-                        .scope
-                        .set_value("time", frame_start_time);
-                    storage.scope.set_value("tick", state.tick);
-                    if let Some(ast) = &evolution_app.ast {
-                        let result = storage
-                            .engine
-                            .eval_ast_with_scope::<()>(&mut storage.scope, ast);
-                        if let Err(err) = &result {
-                            evolution_app.script_error = err.to_string();
-                        }
+    if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
+        if let Some(storage) = &mut rhai_resource.storage {
+            storage.scope.set_value("time", frame_start_time);
+            storage.scope.set_value("frame", state.frame);
+            for _sim_update in 0..sim_steps {
+                state.tick += 1;
+                if state.toggled {
+                            storage.scope.set_value("tick", state.tick);
+                            if let Some(ast) = &evolution_app.ast {
+                                let result = storage
+                                    .engine
+                                    .eval_ast_with_scope::<()>(&mut storage.scope, ast);
+                                if let Err(err) = &result {
+                                    evolution_app.script_error = err.to_string();
+                                }
+                            }
+
+                    //dispatcher.dispatch(world);
+                }
+                for (p, c) in shared_state.borrow_mut().points.iter() {
+                    if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
+                        && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
+                    {
+                        state
+                            .diffuse_rgba
+                            .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
                     }
-                } else {
-                    error!("Warning: RhaiResource.storage is None");
                 }
-            } else {
-                error!("Warning: RhaiResource not found in the world");
-            }
+                shared_state.borrow_mut().points.clear();
 
-            //dispatcher.dispatch(world);
-        }
-        for (p, c) in shared_state.borrow_mut().points.iter() {
-            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
-                && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
-            {
-                state
-                    .diffuse_rgba
-                    .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
-            }
-        }
-        shared_state.borrow_mut().points.clear();
-
-        state.flip ^= 1;
-        if state.flip == 0 {
-            state.flop ^= 1;
-        }
-
-        state.prng.gen();
-
-        for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
-            for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
-                b_index += 1;
-                if b_index >= BUF_SIZE {
-                    b_index = 0;
+                state.flip ^= 1;
+                if state.flip == 0 {
+                    state.flop ^= 1;
                 }
 
-                // 21.5 % to skip each cell
-                if buf[b_index] > 200 {
-                    continue;
+                state.prng.gen();
+
+                for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
+                    for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
+                        b_index += 1;
+                        if b_index >= BUF_SIZE {
+                            b_index = 0;
+                        }
+
+                        // 21.5 % to skip each cell
+                        if buf[b_index] > 200 {
+                            continue;
+                        }
+
+                        let cur = cs::xy_to_index(i, j);
+                        let cur_v = *state.diffuse_rgba.get(cur).unwrap();
+
+                        state.pal_container.pal[cur_v as usize].update(
+                            i,
+                            j,
+                            cur,
+                            state.diffuse_rgba.as_mut(),
+                            &state.pal_container,
+                            &mut state.prng,
+                        );
+                    }
                 }
-
-                let cur = cs::xy_to_index(i, j);
-                let cur_v = *state.diffuse_rgba.get(cur).unwrap();
-
-                state.pal_container.pal[cur_v as usize].update(
-                    i,
-                    j,
-                    cur,
-                    state.diffuse_rgba.as_mut(),
-                    &state.pal_container,
-                    &mut state.prng,
-                );
             }
+        } else {
+            error!("Warning: RhaiResource.storage is None");
         }
+    } else {
+        error!("Warning: RhaiResource not found in the world");
     }
 }
