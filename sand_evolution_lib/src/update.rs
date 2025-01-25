@@ -27,8 +27,10 @@ pub fn update_tick(
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
     if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
         if let Some(storage) = &mut rhai_resource.storage {
-            storage.scope.set_value("time", frame_start_time);
-            storage.scope.set_value("frame", state.frame);
+            if state.toggled {
+                storage.scope.set_value("time", frame_start_time);
+                storage.scope.set_value("frame", state.frame);
+            }
             for _sim_update in 0..sim_steps {
                 state.tick += 1;
                 if state.toggled {
@@ -41,7 +43,9 @@ pub fn update_tick(
                                     evolution_app.script_error = err.to_string();
                                 }
                             }
-
+                    if state.tick % 500 == 0 {
+                        storage.scope.clear();
+                    }
                     //dispatcher.dispatch(world);
                 }
                 for (p, c) in shared_state.borrow_mut().points.iter() {
