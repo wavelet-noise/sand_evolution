@@ -6,6 +6,13 @@ use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
+    let frame_start_time = (instant::now() - state.start_time) / 1000.0;
+
+    storage.scope.set_value("time", frame_start_time);
+    storage.scope.set_value("frame", state.frame);
+}
+
 pub fn update_tick(
     state: &mut State,
     sim_steps: i32,
@@ -17,7 +24,6 @@ pub fn update_tick(
 ) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
-    let frame_start_time = (instant::now() - state.start_time) / 1000.0;
     state.frame += 1;
 
     const BUF_SIZE: usize = 50;
@@ -28,8 +34,7 @@ pub fn update_tick(
     if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
         if let Some(storage) = &mut rhai_resource.storage {
             if state.toggled {
-                storage.scope.set_value("time", frame_start_time);
-                storage.scope.set_value("frame", state.frame);
+                set_frame_vars(state, storage);
             }
             for _sim_update in 0..sim_steps {
                 state.tick += 1;
@@ -45,6 +50,7 @@ pub fn update_tick(
                             }
                     if state.tick % 500 == 0 {
                         storage.scope.clear();
+                        set_frame_vars(state, storage);
                     }
                     //dispatcher.dispatch(world);
                 }
