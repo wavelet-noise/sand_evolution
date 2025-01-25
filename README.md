@@ -9,8 +9,8 @@ You can initialize the simulation with a custom starting image. Use the save que
 Example png save:
 https://wavelet-noise.github.io/sand_evolution/?save=https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/main/exported_example.png
 
-And also with level script in base64:
-https://wavelet-noise.github.io/sand_evolution/?save=https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/main/empty_box.png&script=Zm9yIGsgaW4gMC4udG9faW50KDEwMCphYnMoc2luKHRpbWUvMikpKSB7DQogc2V0X2NlbGwocmFuZCgpJTEwMjQsIHJhbmQoKSU1MTIsIDYwKTsNCn0NCg==
+And also with level script in txt file:
+https://wavelet-noise.github.io/sand_evolution/?save=https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/main/empty_box.png&script_file=https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/refs/heads/main/zeus2.rhai
 
 Compilation for browsers: 
 ```wasm-pack build --release --target web sand_evolution_lib```
