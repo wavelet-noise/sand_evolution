@@ -10,6 +10,8 @@ pub mod state;
 pub mod update;
 
 pub mod resources;
+mod rhai_lib;
+mod random;
 
 use ::egui::FontDefinitions;
 use chrono::Timelike;
@@ -24,7 +26,7 @@ use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-
+use cgmath::{InnerSpace, Vector2, Vector3};
 use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
@@ -121,18 +123,6 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     ctx.get_contents()
 }
 
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-#[cfg(feature = "wasm")]
-extern "C" {
-    #[wasm_bindgen(js_namespace = Math)]
-    fn random() -> f64;
-}
-#[cfg(feature = "wasm")]
-pub fn my_rand() -> i64 {
-    (random() * 10000.0) as i64
-}
-
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::export_file::code_to_file;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
@@ -143,12 +133,6 @@ use rhai::EvalAltResult;
 use specs::{Dispatcher, RunNow, WorldExt};
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
-
-#[cfg(not(feature = "wasm"))]
-pub fn my_rand() -> i64 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0..10000) // Generating a random number between 0 and 9999
-}
 
 pub struct GameContext {
     pub world: specs::World,
@@ -327,31 +311,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         let mut rhai = rhai::Engine::new();
         let mut rhai_scope = rhai::Scope::new();
 
-        //rhai_scope.push_constant("RES_X", dimensions.0);
-        //rhai_scope.push_constant("RES_Y", dimensions.1);
+        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict);
 
-        {
-            let moved_clone = shared_state_rc.clone();
-            rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
-                moved_clone
-                    .borrow_mut()
-                    .set_pixel(x as i32, y as i32, t as u8);
-            });
-        }
-        {
-            rhai.register_fn("type_id", move |name: &str| -> Result<i64, Box<EvalAltResult>> {
-                if id_dict.contains_key(name) {
-                    Ok(id_dict[name] as i64)
-                } else {
-                    Err(EvalAltResult::ErrorSystem(
-                        "SystemError".into(),
-                        Box::new(CellTypeNotFound{name: name.to_string()})
-                    ).into())
-                }
-            });
-        }
-        rhai.register_fn("rand", move || -> i64 { my_rand() });
-        rhai_scope.push("time", 0f64);
         game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
                 engine: rhai,
