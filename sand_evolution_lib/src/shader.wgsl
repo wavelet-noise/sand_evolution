@@ -396,6 +396,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(0.6, 0.3, 1.0*noise_pixel*noise_pixel, 1.0)*noise_pixel*noise_pixel*1.8;
     }
+    else if t == 62u // laser
+    {
+      col = vec4<f32>(2.0, 0.1, 0.0, 1.0)*noise_pixel*noise_pixel*1.8;
+    }
     else if t == 6u // burning_wood
     {
       col = vec4<f32>(0.8, 1.0, 0.5, 1.0)*1.1;
