@@ -63,6 +63,7 @@ pub struct EvolutionApp {
     pub selected_project: Option<usize>,
     pub project_loading: bool,
     pub project_error: String,
+    pub projects_fetched: bool, // Track if we've attempted to fetch from GitHub
 
     // Last generated share URL for templates
     pub last_load_url: String,
@@ -388,6 +389,7 @@ impl EvolutionApp {
             });
         self.w3 = w3;
         // Separate window for GitHub templates / projects
+        let was_closed = !w4;
         egui::Window::new("Templates")
             .open(&mut w4)
             .default_pos(egui::pos2(780.0, 5.0))
@@ -397,34 +399,16 @@ impl EvolutionApp {
 
                 ui.separator();
 
-                ui.horizontal(|ui| {
-                    // Load / refresh list button
-                    if ui
-                        .add_enabled(
-                            !self.project_loading,
-                            egui::Button::new("Load / refresh list"),
-                        )
-                        .clicked()
-                    {
-                        self.start_fetch_github_projects(event_loop_proxy);
-                    }
-
-                    // Visual feedback while loading
-                    if self.project_loading {
+                // Visual feedback while loading
+                if self.project_loading {
+                    ui.horizontal(|ui| {
                         ui.add(egui::Spinner::new());
-                        ui.label("Loading…");
-                    }
-                });
+                        ui.label("Loading projects from GitHub…");
+                    });
+                }
 
                 if !self.project_error.is_empty() {
                     ui.colored_label(Color32::from_rgb(255, 0, 0), &self.project_error);
-                }
-
-                if self.projects.is_empty()
-                    && !self.project_loading
-                    && self.project_error.is_empty()
-                {
-                    ui.label("No templates loaded yet. Press the button above.");
                 }
 
                 ui.separator();
@@ -572,6 +556,13 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
+        
+        // Auto-fetch projects when window is first opened (was closed, now open)
+        if w4 && was_closed && !self.projects_fetched && !self.project_loading {
+            self.projects_fetched = true;
+            self.start_fetch_github_projects(event_loop_proxy);
+        }
+        
         self.w4 = w4;
     }
 
@@ -678,6 +669,7 @@ impl EvolutionApp {
             selected_project: None,
             project_loading: false,
             project_error: String::new(),
+            projects_fetched: false,
 
             last_load_url: String::new(),
         }
