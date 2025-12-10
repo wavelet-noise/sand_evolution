@@ -116,9 +116,12 @@ pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::err
     
     let window = web_sys::window().ok_or("No window")?;
     let navigator = window.navigator();
-    let clipboard = Clipboard::new(&navigator)?;
+    let clipboard_js = js_sys::Reflect::get(&navigator, &"clipboard".into())
+        .map_err(|e| format!("Failed to get clipboard: {:?}", e))?;
+    let clipboard: Clipboard = clipboard_js.dyn_into()
+        .map_err(|e| format!("Failed to cast to Clipboard: {:?}", e))?;
     
-    let promise = clipboard.read_text()?;
+    let promise = clipboard.read_text();
     let js_value = JsFuture::from(promise)
         .await
         .map_err(|e| format!("Clipboard read error: {:?}", e))?;
