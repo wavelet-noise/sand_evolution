@@ -102,24 +102,14 @@ mod github {
     pub async fn fetch_github_projects() -> Result<Vec<ProjectDescription>, JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
 
-        let resp_value = JsFuture::from(window.fetch_with_str(PROJECTS_TOML_URL)).await
-            .map_err(|e| JsValue::from_str(&format!("Failed to fetch projects.toml: {:?}", e)))?;
-        
-        let toml_resp: web_sys::Response = resp_value.dyn_into()
-            .map_err(|_| JsValue::from_str("Failed to convert response"))?;
+        let resp_value = JsFuture::from(window.fetch_with_str(PROJECTS_TOML_URL)).await?;
+        let toml_resp: web_sys::Response = resp_value.dyn_into()?;
 
         if !toml_resp.ok() {
-            let status = toml_resp.status();
-            let status_text = toml_resp.status_text();
-            return Err(JsValue::from_str(&format!(
-                "Failed to load projects.toml: {} {}",
-                status, status_text
-            )));
+            return Err(JsValue::from_str("Failed to load projects.toml"));
         }
 
-        let text_js = JsFuture::from(toml_resp.text()?)
-            .map_err(|e| JsValue::from_str(&format!("Failed to read projects.toml text: {:?}", e)))?;
-        
+        let text_js = JsFuture::from(toml_resp.text()?).await?;
         let toml_text = text_js.as_string()
             .ok_or_else(|| JsValue::from_str("projects.toml is not a valid string"))?;
 
