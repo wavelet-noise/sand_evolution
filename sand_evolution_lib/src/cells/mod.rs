@@ -59,32 +59,23 @@ pub struct Prng {
     rnd: [u8; 256],
     rnd_next: usize,
     carb: i32,
-    seed: u64,
 }
 
 impl Prng {
     pub fn new() -> Self {
-        let mut prng = Self {
-            rnd: [0u8; 256],
+        let mut buf = [0u8; 256];
+        // High‑quality randomness from OS / WebCrypto via getrandom.
+        let _ = getrandom::fill(&mut buf);
+        Self {
+            rnd: buf,
             rnd_next: 0,
             carb: 100,
-            seed: 0x1234_5678_9ABC_DEF0,
-        };
-        prng.gen();
-        prng
+        }
     }
 
     pub fn gen(&mut self) {
-        // Simple xorshift-based PRNG to (re)fill the buffer.
-        for byte in self.rnd.iter_mut() {
-            // xorshift64*
-            let mut x = self.seed;
-            x ^= x >> 12;
-            x ^= x << 25;
-            x ^= x >> 27;
-            self.seed = x;
-            *byte = (x.wrapping_mul(0x2545F4914F6CDD1D) >> 56) as u8;
-        }
+        // Refill the buffer with fresh random bytes each time.
+        let _ = getrandom::fill(&mut self.rnd);
         self.rnd_next = 0;
     }
 
