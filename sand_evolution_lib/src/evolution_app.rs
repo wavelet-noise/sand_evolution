@@ -388,10 +388,9 @@ impl EvolutionApp {
         egui::Window::new("Templates")
             .open(&mut w4)
             .default_pos(egui::pos2(780.0, 5.0))
-            .default_size(egui::vec2(260.0, 320.0))
+            .default_size(egui::vec2(420.0, 360.0))
             .show(context, |ui| {
                 ui.heading("GitHub templates");
-                ui.label("Community-made presets from the GitHub repository.");
 
                 ui.separator();
 
@@ -427,121 +426,164 @@ impl EvolutionApp {
 
                 ui.separator();
 
-                // Scrollable list of templates
-                egui::ScrollArea::vertical()
-                    .max_height(200.0)
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        for idx in 0..self.projects.len() {
-                            let is_selected = self.selected_project == Some(idx);
-                            let display_name = self.projects[idx].display_name.clone();
-                            let id = self.projects[idx].id.clone();
-                            let has_image = self.projects[idx].image_url.is_some();
+                // Two-column layout: list on the left, details on the right
+                ui.columns(2, |columns| {
+                    // LEFT: scrollable list of templates
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, true])
+                        .show(&mut columns[0], |ui| {
+                            for (idx, project) in self.projects.iter().enumerate() {
+                                let is_selected = self.selected_project == Some(idx);
+                                let has_image = project.image_url.is_some();
 
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    // Select template by click
-                                    if ui
-                                        .selectable_label(is_selected, &display_name)
-                                        .clicked()
-                                    {
-                                        self.selected_project = Some(idx);
-                                    }
+                                ui.group(|ui| {
+                                    ui.horizontal(|ui| {
+                                        // Select template by click
+                                        if ui
+                                            .selectable_label(is_selected, &project.display_name)
+                                            .clicked()
+                                        {
+                                            self.selected_project = Some(idx);
+                                        }
 
-                                    if has_image {
-                                        ui.label(
-                                            egui::RichText::new("img")
-                                                .small()
-                                                .color(Color32::from_rgb(180, 220, 255)),
-                                        );
-                                    }
+                                        if has_image {
+                                            ui.label(
+                                                egui::RichText::new("BG")
+                                                    .small()
+                                                    .color(Color32::from_rgb(180, 220, 255)),
+                                            );
+                                        }
+                                    });
+
+                                    ui.label(
+                                        egui::RichText::new(&project.id)
+                                            .small()
+                                            .monospace()
+                                            .color(Color32::from_gray(150)),
+                                    );
                                 });
+                            }
+                        });
 
-                                ui.label(
-                                    egui::RichText::new(format!("id: {}", id))
-                                        .small()
-                                        .monospace()
-                                        .color(Color32::from_gray(150)),
-                                );
+                    let right = &mut columns[1];
+
+                    // RIGHT: details + actions for currently selected template
+                    if let Some(idx) = self.selected_project {
+                        if idx < self.projects.len() {
+                            // Clone to avoid holding an immutable borrow of `self`
+                            // while we might mutably borrow it for loading.
+                            let project = self.projects[idx].clone();
+
+                            right.heading("Selected template");
+                            right.label(
+                                egui::RichText::new(&project.display_name)
+                                    .strong(),
+                            );
+
+                            right.add_space(4.0);
+                            right.label(
+                                egui::RichText::new("Assets")
+                                    .small()
+                                    .strong(),
+                            );
+
+                            // Script actions
+                            right.horizontal(|ui| {
+                                if ui
+                                    .button("Open script")
+                                    .on_hover_text(&project.script_url)
+                                    .clicked()
+                                {
+                                    let _ = webbrowser::open(&project.script_url);
+                                }
+
+                                if ui
+                                    .button("Copy script URL")
+                                    .on_hover_text("Copy raw script URL to clipboard")
+                                    .clicked()
+                                {
+                                    let _ = copy_text_to_clipboard(&project.script_url);
+                                }
                             });
-                        }
-                    });
 
-                // Details + actions for currently selected template
-                if let Some(idx) = self.selected_project {
-                    if idx < self.projects.len() {
-                        let display_name = self.projects[idx].display_name.clone();
-                        let script_url = self.projects[idx].script_url.clone();
-                        let image_url = self.projects[idx].image_url.clone();
+                            // Background actions
+                            match &project.image_url {
+                                Some(url) => {
+                                    right.horizontal(|ui| {
+                                        if ui
+                                            .button("Open background")
+                                            .on_hover_text(url)
+                                            .clicked()
+                                        {
+                                            let _ = webbrowser::open(url);
+                                        }
 
-                        ui.separator();
-                        ui.label("Selected template:");
-                        ui.label(
-                            egui::RichText::new(display_name)
-                                .strong()
-                        );
-                        ui.label(
-                            egui::RichText::new(format!("Script: {}", script_url))
-                                .small()
-                                .monospace(),
-                        );
-
-                        match image_url {
-                            Some(url) => {
-                                ui.label(
-                                    egui::RichText::new(format!("Background image: {}", url))
-                                        .small()
-                                        .monospace(),
-                                );
+                                        if ui
+                                            .button("Copy background URL")
+                                            .on_hover_text(
+                                                "Copy raw background image URL to clipboard",
+                                            )
+                                            .clicked()
+                                        {
+                                            let _ = copy_text_to_clipboard(url);
+                                        }
+                                    });
+                                }
+                                None => {
+                                    right.label(
+                                        egui::RichText::new("Background: none")
+                                            .small()
+                                            .italics(),
+                                    );
+                                }
                             }
-                            None => {
-                                ui.label(
-                                    egui::RichText::new("Background image: none")
-                                        .small()
-                                        .italics(),
-                                );
-                            }
-                        }
 
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            // Common "load selected" button
-                            if ui
-                                .add_enabled(
-                                    !self.project_loading,
+                            right.separator();
+
+                            // Primary actions
+                            if right
+                                .add_sized(
+                                    egui::vec2(right.available_width(), 24.0),
                                     egui::Button::new("Load selected template"),
                                 )
                                 .clicked()
                             {
-                                self.start_load_project_from_github(idx, event_loop_proxy);
+                                if !self.project_loading {
+                                    self.start_load_project_from_github(idx, event_loop_proxy);
+                                }
                             }
 
-                            // Button to copy URL that loads this template in browser
-                            if ui
-                                .button("Copy load URL")
+                            if right
+                                .add_sized(
+                                    egui::vec2(right.available_width(), 24.0),
+                                    egui::Button::new("Copy load URL (current BG + script)"),
+                                )
                                 .clicked()
                             {
+                                // Build URL like in README, using the template's background + script.
+                                // For the web build clipboard this will be exported to a text file.
                                 let mut full_url =
                                     "https://wavelet-noise.github.io/sand_evolution/".to_owned();
 
-                                // Match README style: ?save=...&script_file=...
-                                if let Some(bg_url) =
-                                    self.projects[idx].image_url.as_ref()
-                                {
+                                if let Some(bg_url) = project.image_url.as_ref() {
                                     full_url.push_str("?save=");
                                     full_url.push_str(bg_url);
                                     full_url.push_str("&script_file=");
-                                    full_url.push_str(&script_url);
+                                    full_url.push_str(&project.script_url);
                                 } else {
                                     full_url.push_str("?script_file=");
-                                    full_url.push_str(&script_url);
+                                    full_url.push_str(&project.script_url);
                                 }
 
                                 let _ = copy_text_to_clipboard(&full_url);
                             }
-                        });
+                        } else {
+                            right.label("No template selected.");
+                        }
+                    } else {
+                        right.label("Click a template on the left to see details.");
                     }
-                }
+                });
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
