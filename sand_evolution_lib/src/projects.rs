@@ -188,6 +188,8 @@ mod github {
                 array.copy_to(&mut bytes[..]);
                 image_bytes = Some(bytes);
             }
+            // Note: If image fetch fails (non-ok response), we silently continue
+            // since background images are optional. The script will still load.
         }
 
         let resp_value = JsFuture::from(window.fetch_with_str(&project.script_url)).await?;
