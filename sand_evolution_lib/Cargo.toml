@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["wn"]
 edition = "2021"
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
@@ -14,7 +17,6 @@ egui_wgpu_backend = "0.19"
 chrono = "0.4"
 pollster = "0.3"
 egui = "0.19"
-epi = "0.17"
 egui_winit_platform = "0.16"
 wgpu = "0.13"
 winit = { version="0.27.3", features = ["x11"]}
@@ -22,7 +24,6 @@ base64 = "0.21.0"
 rfd = "0.12.1"
 futures = {version="0.3.10",features=["thread-pool"]}
 serde-wasm-bindgen = "0.6"
-js-sys = "0.3.61"
 webbrowser = "0.8.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -75,4 +76,4 @@ web-sys = { version = "0.3.61", features = [
     "Response",
     "Headers"
 ]}
-js-sys = "0.3.45"
+js-sys = "0.3.61"
