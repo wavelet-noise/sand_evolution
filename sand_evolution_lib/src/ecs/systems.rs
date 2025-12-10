@@ -1,6 +1,6 @@
-use crate::ecs::components::{Position, Script, ScriptType, Velocity};
+use crate::ecs::components::{Position, Script, Velocity};
 use crate::resources::rhai_resource::RhaiResource;
-use specs::{Entities, Join, Read, ReadStorage, System, Write, WriteStorage};
+use specs::{Entities, Join, ReadStorage, System, Write, WriteStorage};
 
 pub struct MoveSystem;
 
@@ -87,7 +87,7 @@ impl EntityScriptSystem {
         
         for (entity, script_text) in entities_to_compile {
             // Теперь можем получить mutable доступ
-            if let Some(mut script) = scripts.get_mut(entity) {
+            if let Some(script) = scripts.get_mut(entity) {
                 script.ast = Self::compile_script(engine, scope, &script_text);
                 script.raw = false;
             }

@@ -1,10 +1,12 @@
 use crate::evolution_app::EvolutionApp;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::shared_state::SharedState;
-use crate::{cs, GameContext, State};
+use crate::{cs, State};
+use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
+use specs::RunNow;
 
 fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
     let frame_start_time = (instant::now() - state.start_time) / 1000.0;
@@ -31,70 +33,93 @@ pub fn update_tick(
     _ = getrandom::getrandom(&mut buf);
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-    if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
-        if let Some(storage) = &mut rhai_resource.storage {
-            if state.toggled {
+    
+    // Устанавливаем переменные фрейма один раз перед циклом
+    if state.toggled {
+        if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
+            if let Some(storage) = &mut rhai_resource.storage {
                 set_frame_vars(state, storage);
             }
-            for _sim_update in 0..sim_steps {
-                state.tick += 1;
-                if state.toggled {
-                    storage.scope.set_value("tick", state.tick);
-                    if state.tick % 500 == 0 {
-                        storage.scope.clear();
-                        set_frame_vars(state, storage);
-                    }
-                    // Мировой скрипт теперь выполняется через EntityScriptSystem
-                    //dispatcher.dispatch(world);
-                }
-                for (p, c) in shared_state.borrow_mut().points.iter() {
-                    if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
-                        && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
-                    {
-                        state
-                            .diffuse_rgba
-                            .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
-                    }
-                }
-                shared_state.borrow_mut().points.clear();
-
-                state.flip ^= 1;
-                if state.flip == 0 {
-                    state.flop ^= 1;
-                }
-
-                state.prng.gen();
-
-                for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
-                    for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
-                        b_index += 1;
-                        if b_index >= BUF_SIZE {
-                            b_index = 0;
+        }
+    }
+    
+    for _sim_update in 0..sim_steps {
+        state.tick += 1;
+        if state.toggled {
+            // Устанавливаем переменную tick в scope
+            {
+                if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
+                    if let Some(storage) = &mut rhai_resource.storage {
+                        storage.scope.set_value("tick", state.tick);
+                        if state.tick % 500 == 0 {
+                            storage.scope.clear();
+                            set_frame_vars(state, storage);
                         }
-
-                        // 21.5 % to skip each cell
-                        if buf[b_index] > 200 {
-                            continue;
-                        }
-
-                        let cur = cs::xy_to_index(i, j);
-                        let cur_v = *state.diffuse_rgba.get(cur).unwrap();
-
-                        state.pal_container.pal[cur_v as usize].update(
-                            i,
-                            j,
-                            cur,
-                            state.diffuse_rgba.as_mut(),
-                            &state.pal_container,
-                            &mut state.prng,
-                        );
                     }
                 }
             }
-        } else {
-            error!("Warning: RhaiResource.storage is None");
+            
+            // Выполняем системы ECS на каждом тике симуляции
+            // Это включает EntityScriptSystem, который выполняет скрипты объектов
+            // Вызываем системы после освобождения borrow rhai_resource
+            {
+                use specs::WorldExt;
+                let mut script_system = EntityScriptSystem;
+                script_system.run_now(world);
+                world.maintain();
+                
+                let mut gravity_system = GravitySystem;
+                gravity_system.run_now(world);
+                world.maintain();
+                
+                let mut move_system = MoveSystem;
+                move_system.run_now(world);
+                world.maintain();
+            }
         }
-    } else {
-        error!("Warning: RhaiResource not found in the world");
+        
+        for (p, c) in shared_state.borrow_mut().points.iter() {
+            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
+                && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
+            {
+                state
+                    .diffuse_rgba
+                    .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
+            }
+        }
+        shared_state.borrow_mut().points.clear();
+
+        state.flip ^= 1;
+        if state.flip == 0 {
+            state.flop ^= 1;
+        }
+
+        state.prng.gen();
+
+        for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
+            for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
+                b_index += 1;
+                if b_index >= BUF_SIZE {
+                    b_index = 0;
+                }
+
+                // 21.5 % to skip each cell
+                if buf[b_index] > 200 {
+                    continue;
+                }
+
+                let cur = cs::xy_to_index(i, j);
+                let cur_v = *state.diffuse_rgba.get(cur).unwrap();
+
+                state.pal_container.pal[cur_v as usize].update(
+                    i,
+                    j,
+                    cur,
+                    state.diffuse_rgba.as_mut(),
+                    &state.pal_container,
+                    &mut state.prng,
+                );
+            }
+        }
     }
 }
