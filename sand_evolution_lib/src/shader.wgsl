@@ -456,6 +456,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(1.0,0.7,0.6,1.0)*((noise_pixel+1.0)/2.0)*0.15;
     }
+    else if t == 80u // black hole
+    {
+      col = vec4<f32>(0.35, 0.0, 0.35, 1.0);
+    }
     else
     {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
