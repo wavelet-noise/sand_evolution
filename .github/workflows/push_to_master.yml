@@ -1,0 +1,46 @@
+name: deploy
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: wasm-pack-action
+      uses: jetli/wasm-pack-action@v0.3.0
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y liblua5.3-dev pkg-config build-essential libc6-dev
+    - name: Build 🛠
+      run: wasm-pack build --release --target web sand_evolution_lib
+    - name: Archive 💼
+      run: |
+        echo "- builed files -"
+        ls -f sand_evolution_lib/pkg
+        echo "----------------"
+        mkdir dest
+        mkdir dest/sand_evolution_lib
+        cp -r sand_evolution_lib/pkg dest/sand_evolution_lib
+        echo "-  clone main  -"
+        git clone https://github.com/wavelet-noise/sand_evolution.git repo
+        ls -f repo
+        echo "----------------"
+        cp repo/index.html dest/index.html
+        cp repo/favicon.ico dest/favicon.ico
+        rm -f dest/sand_evolution_lib/pkg/.gitignore
+        echo "---  result  ---"
+        ls -fR dest
+    - name: Deploy 🚀
+      uses: s0/git-publish-subdir-action@develop
+      env:
+        REPO: self
+        BRANCH: gh-pages
+        FOLDER: dest
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
