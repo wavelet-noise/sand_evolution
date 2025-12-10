@@ -59,34 +59,78 @@ pub struct Prng {
     rnd: [u8; 256],
     rnd_next: usize,
     carb: i32,
+    state: [u64; 4],
 }
 
 impl Prng {
     pub fn new() -> Self {
-        let mut buf = [0u8; 256];
-        // High‑quality randomness from OS / WebCrypto via getrandom.
-        let _ = getrandom::fill(&mut buf);
-        Self {
-            rnd: buf,
+        // Инициализация хорошего PRNG (xoshiro256**) из системного источника энтропии
+        // через getrandom 0.2 (один раз на создание).
+        let mut seed_bytes = [0u8; 32];
+        let _ = getrandom::getrandom(&mut seed_bytes);
+
+        let mut state = [0u64; 4];
+        for i in 0..4 {
+            let mut chunk = [0u8; 8];
+            chunk.copy_from_slice(&seed_bytes[i * 8..(i + 1) * 8]);
+            state[i] = u64::from_le_bytes(chunk);
+        }
+        // Запретить нулевое состояние (xoshiro требует ненулевой стейт).
+        if state.iter().all(|&x| x == 0) {
+            state = [
+                0x0123_4567_89AB_CDEF,
+                0x89AB_CDEF_0123_4567,
+                0xF00D_F00D_DEAD_BEEF,
+                0xC0DE_CAFE_1337_0001,
+            ];
+        }
+
+        let mut prng = Self {
+            rnd: [0u8; 256],
             rnd_next: 0,
             carb: 100,
-        }
+            state,
+        };
+        prng.gen();
+        prng
+    }
+
+    #[inline]
+    fn next_u64(&mut self) -> u64 {
+        // xoshiro256** (см. http://prng.di.unimi.it/)
+        let result = self.state[1].wrapping_mul(5).rotate_left(7).wrapping_mul(9);
+        let t = self.state[1] << 17;
+
+        self.state[2] ^= self.state[0];
+        self.state[3] ^= self.state[1];
+        self.state[1] ^= self.state[2];
+        self.state[0] ^= self.state[3];
+
+        self.state[2] ^= t;
+        self.state[3] = self.state[3].rotate_left(45);
+
+        result
     }
 
     pub fn gen(&mut self) {
-        // Refill the buffer with fresh random bytes each time.
-        let _ = getrandom::fill(&mut self.rnd);
+        let mut idx = 0;
+        let total_len = self.rnd.len();
+        while idx < total_len {
+            let x = self.next_u64().to_le_bytes();
+            let remaining = total_len - idx;
+            let copy_len = if remaining < 8 { remaining } else { 8 };
+            self.rnd[idx..idx + copy_len].copy_from_slice(&x[..copy_len]);
+            idx += copy_len;
+        }
         self.rnd_next = 0;
     }
 
     pub fn next(&mut self) -> u8 {
         self.rnd_next += 1;
-        self.rnd_next = if self.rnd_next >= 256 {
-            0
-        } else {
-            self.rnd_next
-        };
-
+        if self.rnd_next >= self.rnd.len() {
+            // Если вышли за буфер — генерируем новый блок.
+            self.gen();
+        }
         self.rnd[self.rnd_next]
     }
 
