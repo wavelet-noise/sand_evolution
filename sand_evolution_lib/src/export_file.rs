@@ -15,16 +15,27 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
 
 #[cfg(target_arch = "wasm32")]
 pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
-    let mut buffer = Vec::new();
-    buffer.extend_from_slice(data.as_bytes());
+    use js_sys::Uint8Array;
 
-    // Create a Uint8Array object from the binary buffer
-    let data_url = format!("data:text/plain;base64,{}", base64::encode(&buffer));
+    let buffer = Uint8Array::from(data.as_bytes());
 
     let window = web_sys::window().expect("window not found");
     let document = window.document().expect("document not found");
     let body = document.body().expect("body not found");
-    let link = data_url.clone();
+
+    // Create a Blob from the data
+    let blob_parts = js_sys::Array::new();
+    blob_parts.push(&buffer);
+    let mut blob_options = BlobPropertyBag::new();
+    blob_options.set_type("text/plain");
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
+        &blob_parts,
+        &blob_options,
+    ).map_err(|e| format!("Failed to create blob: {:?}", e))?;
+
+    // Create object URL from blob
+    let url = Url::create_object_url_with_blob(&blob)
+        .map_err(|e| format!("Failed to create object URL: {:?}", e))?;
 
     let link_element = document
         .create_element("a")
@@ -32,7 +43,7 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     body.append_child(&link_element)
         .expect("link element appending failed");
     link_element
-        .set_attribute("href", &link)
+        .set_attribute("href", &url)
         .expect("failed to set an attribute");
     link_element
         .set_attribute("download", "exported.txt")
@@ -41,6 +52,18 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
         .dyn_into::<web_sys::HtmlElement>()
         .expect("html link element casting failed");
     html_link_element.click();
+
+    // Clean up the object URL after a short delay
+    let url_clone = url.clone();
+    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+        let _ = Url::revoke_object_url(&url_clone);
+    }) as Box<dyn FnMut()>);
+    window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        100,
+    ).map_err(|e| format!("Failed to set timeout: {:?}", e))?;
+    closure.forget();
+
     Ok(())
 }
 
@@ -57,6 +80,8 @@ pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
 ) -> Result<(), Box<dyn Error>> {
     use std::io::Cursor;
+    use js_sys::Uint8Array;
+
     let mut buffer = Vec::new();
     let mut cursor = Cursor::new(&mut buffer);
     
@@ -65,12 +90,25 @@ pub fn write_to_file(
     dynamic_image.write_to(&mut cursor, image::ImageOutputFormat::Png)?;
 
     // Create a Uint8Array object from the binary buffer
-    let data_url = format!("data:image/png;base64,{}", base64::encode(&buffer));
+    let uint8_array = Uint8Array::from(buffer.as_slice());
 
     let window = web_sys::window().expect("window not found");
     let document = window.document().expect("document not found");
     let body = document.body().expect("body not found");
-    let link = data_url.clone();
+
+    // Create a Blob from the PNG data
+    let blob_parts = js_sys::Array::new();
+    blob_parts.push(&uint8_array);
+    let mut blob_options = BlobPropertyBag::new();
+    blob_options.set_type("image/png");
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
+        &blob_parts,
+        &blob_options,
+    ).map_err(|e| format!("Failed to create blob: {:?}", e))?;
+
+    // Create object URL from blob
+    let url = Url::create_object_url_with_blob(&blob)
+        .map_err(|e| format!("Failed to create object URL: {:?}", e))?;
 
     let link_element = document
         .create_element("a")
@@ -78,7 +116,7 @@ pub fn write_to_file(
     body.append_child(&link_element)
         .expect("link element appending failed");
     link_element
-        .set_attribute("href", &link)
+        .set_attribute("href", &url)
         .expect("failed to set an attribute");
     link_element
         .set_attribute("download", "exported.png")
@@ -87,5 +125,17 @@ pub fn write_to_file(
         .dyn_into::<web_sys::HtmlElement>()
         .expect("html link element casting failed");
     html_link_element.click();
+
+    // Clean up the object URL after a short delay
+    let url_clone = url.clone();
+    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+        let _ = Url::revoke_object_url(&url_clone);
+    }) as Box<dyn FnMut()>);
+    window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        100,
+    ).map_err(|e| format!("Failed to set timeout: {:?}", e))?;
+    closure.forget();
+
     Ok(())
 }

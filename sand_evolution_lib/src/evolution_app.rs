@@ -470,17 +470,22 @@ impl EvolutionApp {
                 }
                 object_names.sort();
                 
-                // Переменная для сохранения скрипта
-                let mut should_save_script = false;
+                // Верхняя панель с выбором объекта
+                ui.horizontal(|ui| {
+                    ui.label("Object:");
+                    egui::ComboBox::from_id_source("object_selector")
+                        .width(200.0)
+                        .selected_text(&self.selected_object_name)
+                        .show_ui(ui, |ui| {
+                            for name in &object_names {
+                                ui.selectable_value(&mut self.selected_object_name, name.clone(), name);
+                            }
+                        });
+                });
                 
                 // Проверяем изменение выбранного объекта и загружаем скрипт только при изменении
+                // Важно: проверка должна быть ПОСЛЕ рендера ComboBox, чтобы изменения обнаруживались в том же кадре
                 if self.selected_object_name != self.last_loaded_object {
-                    // Если есть несохраненные изменения, предупреждаем пользователя
-                    if self.script_modified && !self.last_loaded_object.is_empty() {
-                        // Можно добавить диалог подтверждения, но пока просто сбрасываем флаг
-                        // В будущем можно добавить модальное окно с подтверждением
-                    }
-                    
                     if let Some(script_text) = self.get_object_script(world, &self.selected_object_name) {
                         self.script = script_text;
                     } else {
@@ -492,41 +497,10 @@ impl EvolutionApp {
                     self.script_error.clear();
                 }
                 
-                // Верхняя панель с выбором объекта и статусом
-                ui.horizontal(|ui| {
-                    ui.label("Object:");
-                    egui::ComboBox::from_id_source("object_selector")
-                        .width(200.0)
-                        .selected_text(&self.selected_object_name)
-                        .show_ui(ui, |ui| {
-                            for name in &object_names {
-                                ui.selectable_value(&mut self.selected_object_name, name.clone(), name);
-                            }
-                        });
-                    
-                    // Отслеживаем изменения в тексте скрипта
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if self.script_modified {
-                            ui.colored_label(egui::Color32::from_rgb(255, 200, 0), "● Modified");
-                        } else {
-                            ui.colored_label(egui::Color32::from_rgb(100, 200, 100), "✓ Saved");
-                        }
-                    });
-                });
-                
                 ui.separator();
                 
                 // Панель инструментов
                 ui.horizontal(|ui| {
-                    // Кнопка сохранения с индикацией горячей клавиши
-                    let save_enabled = self.script_modified;
-                    let save_button = ui.add_enabled(save_enabled, egui::Button::new("💾 Save"));
-                    if save_button.clicked() && save_enabled {
-                        should_save_script = true;
-                    }
-                    
-                    ui.separator();
-                    
                     // Кнопка включения/выключения скрипта
                     if ui
                         .button(if state.toggled {
@@ -672,20 +646,6 @@ impl EvolutionApp {
                     });
                 });
                 
-                // Сохраняем изменения скрипта после освобождения borrow
-                if should_save_script {
-                    let script_text = self.script.clone();
-                    let object_name = self.selected_object_name.clone();
-                    self.set_object_script(world, &object_name, &script_text);
-                    self.script_modified = false;
-                    // Очищаем ошибки при успешном сохранении
-                    self.script_error.clear();
-                    // Показываем уведомление об успешном сохранении
-                    self.editor_state.add_toast(
-                        format!("Script saved: {}", object_name),
-                        crate::editor::state::ToastLevel::Info
-                    );
-                }
         
                 *any_win_hovered |= context.is_pointer_over_area()
             });
