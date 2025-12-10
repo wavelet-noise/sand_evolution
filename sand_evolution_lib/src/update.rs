@@ -28,7 +28,9 @@ pub fn update_tick(
 
     const BUF_SIZE: usize = 50;
     let mut buf = [0u8; BUF_SIZE];
-    _ = getrandom::getrandom(&mut buf);
+    for b in buf.iter_mut() {
+        *b = state.prng.next();
+    }
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
     if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {

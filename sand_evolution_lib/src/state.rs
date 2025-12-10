@@ -86,7 +86,6 @@ struct MyState {
 
 impl State {
     pub fn generate_simple(&mut self) {
-        let mut buf = [0u8; 4];
         self.diffuse_rgba = image::GrayImage::from_fn(
             cs::SECTOR_SIZE.x as u32,
             cs::SECTOR_SIZE.y as u32,
@@ -96,9 +95,10 @@ impl State {
                     && x < cs::SECTOR_SIZE.x as u32 - 2
                     && y < cs::SECTOR_SIZE.y as u32 - 2
                 {
-                    _ = getrandom::getrandom(&mut buf);
-                    return image::Luma([if buf[0] % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
-                        buf[1] % 4
+                    let v0 = self.prng.next();
+                    let v1 = self.prng.next();
+                    return image::Luma([if v0 % 7 == 0 && y < cs::SECTOR_SIZE.y as u32 / 2 {
+                        v1 % 4
                     } else {
                         0
                     }]);
@@ -109,10 +109,12 @@ impl State {
         );
 
         for _ in 0..150 {
-            _ = getrandom::getrandom(&mut buf);
-
-            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+            let nx = (
+                ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+            ) % cs::SECTOR_SIZE.x as u32;
+            let ny = (
+                ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+            ) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..50 {
                 self.diffuse_rgba.put_pixel(
@@ -124,10 +126,12 @@ impl State {
         }
 
         for _ in 0..100 {
-            _ = getrandom::getrandom(&mut buf);
-
-            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+            let nx = (
+                ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+            ) % cs::SECTOR_SIZE.x as u32;
+            let ny = (
+                ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+            ) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..20 {
                 for y in 0..20 {
@@ -143,10 +147,12 @@ impl State {
         for _ in 0..3 {
             for cell in self.pal_container.pal.iter() {
                 if cell.id() != 0 {
-                    _ = getrandom::getrandom(&mut buf);
-
-                    let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
-                    let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
+                    let nx = (
+                        ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+                    ) % cs::SECTOR_SIZE.x as u32;
+                    let ny = (
+                        ((self.prng.next() as u32) << 8) | self.prng.next() as u32
+                    ) % cs::SECTOR_SIZE.y as u32;
 
                     for x in 0..35 {
                         for y in 0..20 {
@@ -806,9 +812,6 @@ impl State {
                 logical_position.x / scaled_window_size.width as f64,
                 1.0 - logical_position.y / scaled_window_size.height as f64,
             );
-
-            let mut buf = [0u8; 10000 + 1];
-            _ = getrandom::getrandom(&mut buf);
 
             for _i in 0..evolution_app.number_of_cells_to_add as usize {
                 let mut px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
