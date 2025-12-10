@@ -566,7 +566,6 @@ impl EvolutionApp {
         
         // Auto-fetch projects when window is first opened (was closed, now open)
         if w4 && was_closed && !self.projects_fetched && !self.project_loading {
-            self.projects_fetched = true;
             self.start_fetch_github_projects(event_loop_proxy);
         }
         
