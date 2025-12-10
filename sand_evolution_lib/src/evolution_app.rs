@@ -4,6 +4,7 @@ use std::io::ErrorKind;
 use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
 use crate::export_file::code_to_file;
+use crate::projects::{ProjectDescription};
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::{
     cells::{stone::Stone, void::Void, wood::Wood},
@@ -54,7 +55,13 @@ pub struct EvolutionApp {
 
     pub w1: bool,
     pub w2: bool,
-    pub w3: bool
+    pub w3: bool,
+
+    // GitHub project support
+    pub projects: Vec<ProjectDescription>,
+    pub selected_project: Option<usize>,
+    pub project_loading: bool,
+    pub project_error: String,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -82,6 +89,8 @@ pub fn compact_number_string(n: f32) -> String {
 pub enum UserEventInfo {
     ImageImport(Vec<u8>),
     TextImport(Vec<u8>),
+    ProjectsLoaded(Vec<ProjectDescription>),
+    ProjectLoadError(String),
 }
 
 impl EvolutionApp {
@@ -94,6 +103,79 @@ impl EvolutionApp {
         self.need_to_recompile = true;
         true
     }
+
+    #[cfg(target_arch = "wasm32")]
+    fn start_fetch_github_projects(&mut self, event_loop_proxy: &EventLoopProxy<UserEventInfo>) {
+        if self.project_loading {
+            return;
+        }
+        self.project_loading = true;
+        self.project_error.clear();
+
+        let proxy = event_loop_proxy.clone();
+        self.executor.execute(async move {
+            match crate::projects::fetch_github_projects().await {
+                Ok(projects) => {
+                    let _ = proxy.send_event(UserEventInfo::ProjectsLoaded(projects));
+                }
+                Err(e) => {
+                    let _ = proxy.send_event(UserEventInfo::ProjectLoadError(format!(
+                        "GitHub projects error: {:?}",
+                        e
+                    )));
+                }
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_fetch_github_projects(&mut self, _event_loop_proxy: &EventLoopProxy<UserEventInfo>) {
+        self.project_error =
+            "Loading projects from GitHub is only supported in the Web build.".to_owned();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn start_load_project_from_github(
+        &mut self,
+        index: usize,
+        event_loop_proxy: &EventLoopProxy<UserEventInfo>,
+    ) {
+        if index >= self.projects.len() {
+            return;
+        }
+        self.project_loading = true;
+        self.project_error.clear();
+
+        let proj = self.projects[index].clone();
+        let proxy = event_loop_proxy.clone();
+        self.executor.execute(async move {
+            match crate::projects::fetch_project_assets(&proj).await {
+                Ok((maybe_image, script_text)) => {
+                    if let Some(img) = maybe_image {
+                        let _ = proxy.send_event(UserEventInfo::ImageImport(img));
+                    }
+                    let _ = proxy.send_event(UserEventInfo::TextImport(script_text.into_bytes()));
+                }
+                Err(e) => {
+                    let _ = proxy.send_event(UserEventInfo::ProjectLoadError(format!(
+                        "Project load error: {:?}",
+                        e
+                    )));
+                }
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_load_project_from_github(
+        &mut self,
+        _index: usize,
+        _event_loop_proxy: &EventLoopProxy<UserEventInfo>,
+    ) {
+        self.project_error =
+            "Loading project from GitHub is only supported in the Web build.".to_owned();
+    }
+
     pub(crate) fn ui(
         &mut self,
         context: &Context,
@@ -167,6 +249,40 @@ impl EvolutionApp {
                             event_loop_proxy
                                 .send_event(create_event_with_data(bytes))
                                 .ok();
+                        }
+                    });
+                }
+
+                // GitHub projects section
+                ui.separator();
+                ui.heading("GitHub projects");
+
+                if ui.button("Load project list from GitHub").clicked() {
+                    self.start_fetch_github_projects(event_loop_proxy);
+                }
+
+                if self.project_loading {
+                    ui.label("Loading...");
+                }
+
+                if !self.project_error.is_empty() {
+                    ui.colored_label(Color32::from_rgb(255, 0, 0), &self.project_error);
+                }
+
+                for idx in 0..self.projects.len() {
+                    let is_selected = self.selected_project == Some(idx);
+                    let display_name = self.projects[idx].display_name.clone();
+                    ui.horizontal(|ui| {
+                        if ui
+                            .selectable_label(is_selected, &display_name)
+                            .clicked()
+                        {
+                            self.selected_project = Some(idx);
+                        }
+
+                        if ui.button("Load").clicked() {
+                            self.selected_project = Some(idx);
+                            self.start_load_project_from_github(idx, event_loop_proxy);
                         }
                     });
                 }
@@ -395,7 +511,12 @@ impl EvolutionApp {
 
             w1: false,
             w2: false,
-            w3: false
+            w3: false,
+
+            projects: Vec::new(),
+            selected_project: None,
+            project_loading: false,
+            project_error: String::new(),
         }
     }
 }

@@ -10,6 +10,7 @@ pub mod state;
 pub mod update;
 
 pub mod resources;
+pub mod projects;
 mod rhai_lib;
 mod random;
 
@@ -18,6 +19,7 @@ use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use evolution_app::EvolutionApp;
+use projects::ProjectDescription;
 use fps_meter::FpsMeter;
 use state::State;
 use std::cell::RefCell;
@@ -545,22 +547,30 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 UserEventInfo::ImageImport(image) => {
                     match image::load_from_memory(&image) {
                         Ok(img) => {
-                            game_context.state.diffuse_rgba =
-                                img.into_luma8()
+                            game_context.state.diffuse_rgba = img.into_luma8()
                         }
                         _ => panic!("Invalid image format"),
                     };
+                    evolution_app.project_loading = false;
                 }
                 UserEventInfo::TextImport(text) => {
                     match String::from_utf8(text) {
-                        // Assuming `image` is a Vec<u8>
                         Ok(text) => {
                             evolution_app.set_script(text.as_str());
                         }
                         Err(_) => {
-                            panic!("Invalid UTF-8 data"); // Or handle this error more gracefully
+                            panic!("Invalid UTF-8 data");
                         }
                     }
+                    evolution_app.project_loading = false;
+                }
+                UserEventInfo::ProjectsLoaded(projects) => {
+                    evolution_app.projects = projects;
+                    evolution_app.project_loading = false;
+                }
+                UserEventInfo::ProjectLoadError(err) => {
+                    evolution_app.project_error = err;
+                    evolution_app.project_loading = false;
                 }
             },
             _ => (),
@@ -573,3 +583,4 @@ pub fn seconds_since_midnight() -> f64 {
     let time = chrono::Local::now().time();
     time.num_seconds_from_midnight() as f64 + 1e-9 * (time.nanosecond() as f64)
 }
+
