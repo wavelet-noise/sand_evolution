@@ -545,12 +545,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
             },
             UserEvent(event) => match event {
                 UserEventInfo::ImageImport(image) => {
-                    match image::load_from_memory(&image) {
-                        Ok(img) => {
-                            game_context.state.diffuse_rgba = img.into_luma8()
-                        }
-                        _ => panic!("Invalid image format"),
-                    };
+                    game_context.state.update_with_data(&image);
                     evolution_app.project_loading = false;
                 }
                 UserEventInfo::TextImport(text) => {
