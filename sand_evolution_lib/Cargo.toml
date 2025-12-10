@@ -20,7 +20,6 @@ egui = "0.19"
 egui_winit_platform = "0.16"
 wgpu = "0.13"
 winit = { version="0.27.3", features = ["x11"]}
-base64 = "0.21.0"
 rfd = "0.12.1"
 futures = {version="0.3.10",features=["thread-pool"]}
 serde-wasm-bindgen = "0.6"
