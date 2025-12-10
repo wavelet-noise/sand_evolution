@@ -57,3 +57,34 @@ pub struct Name {
 impl Component for Name {
     type Storage = specs::HashMapStorage<Self>;
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct Rotation {
+    pub angle: f32, // в радианах
+}
+
+impl Default for Rotation {
+    fn default() -> Self {
+        Self { angle: 0.0 }
+    }
+}
+
+impl Component for Rotation {
+    type Storage = specs::VecStorage<Self>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Scale {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Default for Scale {
+    fn default() -> Self {
+        Self { x: 1.0, y: 1.0 }
+    }
+}
+
+impl Component for Scale {
+    type Storage = specs::VecStorage<Self>;
+}

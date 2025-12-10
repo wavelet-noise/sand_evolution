@@ -1,6 +1,7 @@
 pub mod cells;
 pub mod cs;
 pub mod ecs;
+pub mod editor;
 pub mod evolution_app;
 pub mod export_file;
 pub mod fps_meter;
@@ -102,7 +103,26 @@ pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Erro
 }
 #[cfg(target_arch = "wasm32")]
 pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> {
+    // В браузере буфер обмена доступен только через асинхронный API
+    // Эта функция будет вызываться из асинхронного контекста
     Ok("".to_owned())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::error::Error>> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::Clipboard;
+    
+    let window = web_sys::window().ok_or("No window")?;
+    let navigator = window.navigator();
+    let clipboard = Clipboard::new(&navigator)?;
+    
+    let promise = clipboard.read_text()?;
+    let js_value = JsFuture::from(promise).await?;
+    let text = js_value.as_string().ok_or("Failed to get text")?;
+    
+    Ok(text)
 }
 
 use crate::shared_state::SharedState;
@@ -125,7 +145,7 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     ctx.get_contents()
 }
 
-use crate::ecs::components::{Name, Position, Script, ScriptType, Velocity};
+use crate::ecs::components::{Name, Position, Script, ScriptType, Velocity, Rotation, Scale};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::export_file::code_to_file;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
@@ -152,6 +172,8 @@ impl GameContext {
         world.register::<Script>();
         world.register::<Position>();
         world.register::<Velocity>();
+        world.register::<Rotation>();
+        world.register::<Scale>();
         
         let mut dispatcher = specs::DispatcherBuilder::new()
             .with(EntityScriptSystem, "entity_script__system", &[])
@@ -356,7 +378,12 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     ));
     game_context.state.update_with_data(data);
 
-    let mut evolution_app = EvolutionApp::new();
+    // Создаем shared log storage для скриптов перед созданием EvolutionApp
+    // Используем VecDeque как кольцевой буфер с ограничением в 30 записей
+    use std::collections::VecDeque;
+    let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
+    
+    let mut evolution_app = EvolutionApp::new_with_log(script_log_rc.clone());
 
     evolution_app.set_script(script.as_str());
     
@@ -378,7 +405,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
         // Пока что передаем None, так как доступ к world из скриптов требует дополнительной архитектуры
         // Функции для работы с объектами можно добавить позже через специальный механизм
-        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None);
+        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone());
 
         game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
@@ -587,28 +614,13 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     *control_flow = ControlFlow::Exit;
                 }
                 winit::event::WindowEvent::KeyboardInput {
-                    device_id,
-                    input,
-                    is_synthetic,
+                    device_id: _,
+                    input: _,
+                    is_synthetic: _,
                 } => {
-                    if let winit::event::ElementState::Pressed = input.state {
-                        if input.modifiers.logo() || input.modifiers.ctrl() {
-                            // logo key is Command on macOS
-                            if let Some(virtual_keycode) = input.virtual_keycode {
-                                match virtual_keycode {
-                                    winit::event::VirtualKeyCode::C => {
-                                        _ = copy_text_to_clipboard(evolution_app.get_script());
-                                    }
-                                    winit::event::VirtualKeyCode::V => {
-                                        if let Ok(result) = copy_text_from_clipboard() {
-                                            evolution_app.set_script(result.as_str());
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
+                    // Не обрабатываем события клавиатуры здесь - egui TextEdit сам обрабатывает
+                    // вставку из буфера обмена через стандартные сочетания клавиш (Cmd+V/Ctrl+V)
+                    // Обработка через winit вызывает конфликты и паники на macOS
                 }
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if button == winit::event::MouseButton::Left {
