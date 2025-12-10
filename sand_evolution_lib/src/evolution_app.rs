@@ -56,6 +56,7 @@ pub struct EvolutionApp {
     pub w1: bool,
     pub w2: bool,
     pub w3: bool,
+    pub w4: bool, // templates / projects window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -188,6 +189,7 @@ impl EvolutionApp {
         let mut w1: bool = self.w1;
         let mut w2: bool = self.w2;
         let mut w3: bool = self.w3;
+        let mut w4: bool = self.w4;
 
         egui::Window::new("Swithes")
         .default_pos(egui::pos2(10.0,10.0))
@@ -200,6 +202,9 @@ impl EvolutionApp {
             }
             if ui.button("Sim").clicked() {
                 w3 = !w3;
+            }
+            if ui.button("Templates").clicked() {
+                w4 = !w4;
             }
         });
 
@@ -251,156 +256,6 @@ impl EvolutionApp {
                                 .ok();
                         }
                     });
-                }
-
-                // GitHub projects section
-                ui.separator();
-                ui.heading("GitHub projects");
-
-                ui.horizontal(|ui| {
-                    // Load / refresh list button
-                    if ui
-                        .add_enabled(
-                            !self.project_loading,
-                            egui::Button::new("Load / refresh project list from GitHub"),
-                        )
-                        .clicked()
-                    {
-                        self.start_fetch_github_projects(event_loop_proxy);
-                    }
-
-                    // Visual feedback while loading
-                    if self.project_loading {
-                        ui.add(egui::Spinner::new());
-                        ui.label("Loading projects…");
-                    }
-                });
-
-                if !self.project_error.is_empty() {
-                    ui.colored_label(Color32::from_rgb(255, 0, 0), &self.project_error);
-                }
-
-                if self.projects.is_empty()
-                    && !self.project_loading
-                    && self.project_error.is_empty()
-                {
-                    ui.label("No projects loaded yet. Press the button above.");
-                }
-
-                // Scrollable list of projects (templates)
-                egui::ScrollArea::vertical()
-                    .max_height(180.0)
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        for idx in 0..self.projects.len() {
-                            let is_selected = self.selected_project == Some(idx);
-                            let display_name = self.projects[idx].display_name.clone();
-                            let id = self.projects[idx].id.clone();
-                            let has_image = self.projects[idx].image_url.is_some();
-
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    // Select template by click
-                                    if ui
-                                        .selectable_label(is_selected, &display_name)
-                                        .clicked()
-                                    {
-                                        self.selected_project = Some(idx);
-                                    }
-
-                                    if has_image {
-                                        ui.label(
-                                            egui::RichText::new("img")
-                                                .small()
-                                                .color(Color32::from_rgb(180, 220, 255)),
-                                        );
-                                    }
-                                });
-
-                                ui.label(
-                                    egui::RichText::new(format!("id: {}", id))
-                                        .small()
-                                        .monospace()
-                                        .color(Color32::from_gray(150)),
-                                );
-                            });
-                        }
-                    });
-
-                // Details of currently selected project
-                if let Some(idx) = self.selected_project {
-                    if idx < self.projects.len() {
-                        let display_name = self.projects[idx].display_name.clone();
-                        let script_url = self.projects[idx].script_url.clone();
-                        let image_url = self.projects[idx].image_url.clone();
-
-                        ui.separator();
-                        ui.label("Selected project:");
-                        ui.label(
-                            egui::RichText::new(display_name)
-                                .strong()
-                        );
-                        ui.label(
-                            egui::RichText::new(format!("Script: {}", script_url))
-                                .small()
-                                .monospace(),
-                        );
-
-                        match image_url {
-                            Some(url) => {
-                                ui.label(
-                                    egui::RichText::new(format!("Background image: {}", url))
-                                        .small()
-                                        .monospace(),
-                                );
-                            }
-                            None => {
-                                ui.label(
-                                    egui::RichText::new("Background image: none")
-                                        .small()
-                                        .italics(),
-                                );
-                            }
-                        }
-
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            // Common "load selected" button
-                            if ui
-                                .add_enabled(
-                                    !self.project_loading,
-                                    egui::Button::new("Load selected project"),
-                                )
-                                .clicked()
-                            {
-                                self.start_load_project_from_github(idx, event_loop_proxy);
-                            }
-
-                            // Button to copy URL that loads this project in browser
-                            if ui
-                                .button("Copy load URL")
-                                .clicked()
-                            {
-                                let mut full_url =
-                                    "https://wavelet-noise.github.io/sand_evolution/".to_owned();
-
-                                // Match README style: ?save=...&script_file=...
-                                if let Some(bg_url) =
-                                    self.projects[idx].image_url.as_ref()
-                                {
-                                    full_url.push_str("?save=");
-                                    full_url.push_str(bg_url);
-                                    full_url.push_str("&script_file=");
-                                    full_url.push_str(&script_url);
-                                } else {
-                                    full_url.push_str("?script_file=");
-                                    full_url.push_str(&script_url);
-                                }
-
-                                let _ = copy_text_to_clipboard(&full_url);
-                            }
-                        });
-                    }
                 }
 
                 *any_win_hovered |= context.is_pointer_over_area()
@@ -529,6 +384,168 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         self.w3 = w3;
+        // Separate window for GitHub templates / projects
+        egui::Window::new("Templates")
+            .open(&mut w4)
+            .default_pos(egui::pos2(780.0, 5.0))
+            .default_size(egui::vec2(260.0, 320.0))
+            .show(context, |ui| {
+                ui.heading("GitHub templates");
+                ui.label("Community-made presets from the GitHub repository.");
+
+                ui.separator();
+
+                ui.horizontal(|ui| {
+                    // Load / refresh list button
+                    if ui
+                        .add_enabled(
+                            !self.project_loading,
+                            egui::Button::new("Load / refresh list"),
+                        )
+                        .clicked()
+                    {
+                        self.start_fetch_github_projects(event_loop_proxy);
+                    }
+
+                    // Visual feedback while loading
+                    if self.project_loading {
+                        ui.add(egui::Spinner::new());
+                        ui.label("Loading…");
+                    }
+                });
+
+                if !self.project_error.is_empty() {
+                    ui.colored_label(Color32::from_rgb(255, 0, 0), &self.project_error);
+                }
+
+                if self.projects.is_empty()
+                    && !self.project_loading
+                    && self.project_error.is_empty()
+                {
+                    ui.label("No templates loaded yet. Press the button above.");
+                }
+
+                ui.separator();
+
+                // Scrollable list of templates
+                egui::ScrollArea::vertical()
+                    .max_height(200.0)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        for idx in 0..self.projects.len() {
+                            let is_selected = self.selected_project == Some(idx);
+                            let display_name = self.projects[idx].display_name.clone();
+                            let id = self.projects[idx].id.clone();
+                            let has_image = self.projects[idx].image_url.is_some();
+
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    // Select template by click
+                                    if ui
+                                        .selectable_label(is_selected, &display_name)
+                                        .clicked()
+                                    {
+                                        self.selected_project = Some(idx);
+                                    }
+
+                                    if has_image {
+                                        ui.label(
+                                            egui::RichText::new("img")
+                                                .small()
+                                                .color(Color32::from_rgb(180, 220, 255)),
+                                        );
+                                    }
+                                });
+
+                                ui.label(
+                                    egui::RichText::new(format!("id: {}", id))
+                                        .small()
+                                        .monospace()
+                                        .color(Color32::from_gray(150)),
+                                );
+                            });
+                        }
+                    });
+
+                // Details + actions for currently selected template
+                if let Some(idx) = self.selected_project {
+                    if idx < self.projects.len() {
+                        let display_name = self.projects[idx].display_name.clone();
+                        let script_url = self.projects[idx].script_url.clone();
+                        let image_url = self.projects[idx].image_url.clone();
+
+                        ui.separator();
+                        ui.label("Selected template:");
+                        ui.label(
+                            egui::RichText::new(display_name)
+                                .strong()
+                        );
+                        ui.label(
+                            egui::RichText::new(format!("Script: {}", script_url))
+                                .small()
+                                .monospace(),
+                        );
+
+                        match image_url {
+                            Some(url) => {
+                                ui.label(
+                                    egui::RichText::new(format!("Background image: {}", url))
+                                        .small()
+                                        .monospace(),
+                                );
+                            }
+                            None => {
+                                ui.label(
+                                    egui::RichText::new("Background image: none")
+                                        .small()
+                                        .italics(),
+                                );
+                            }
+                        }
+
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            // Common "load selected" button
+                            if ui
+                                .add_enabled(
+                                    !self.project_loading,
+                                    egui::Button::new("Load selected template"),
+                                )
+                                .clicked()
+                            {
+                                self.start_load_project_from_github(idx, event_loop_proxy);
+                            }
+
+                            // Button to copy URL that loads this template in browser
+                            if ui
+                                .button("Copy load URL")
+                                .clicked()
+                            {
+                                let mut full_url =
+                                    "https://wavelet-noise.github.io/sand_evolution/".to_owned();
+
+                                // Match README style: ?save=...&script_file=...
+                                if let Some(bg_url) =
+                                    self.projects[idx].image_url.as_ref()
+                                {
+                                    full_url.push_str("?save=");
+                                    full_url.push_str(bg_url);
+                                    full_url.push_str("&script_file=");
+                                    full_url.push_str(&script_url);
+                                } else {
+                                    full_url.push_str("?script_file=");
+                                    full_url.push_str(&script_url);
+                                }
+
+                                let _ = copy_text_to_clipboard(&full_url);
+                            }
+                        });
+                    }
+                }
+
+                *any_win_hovered |= context.is_pointer_over_area()
+            });
+        self.w4 = w4;
     }
 
     pub fn compile_script(&mut self, rhai: &mut RhaiResourceStorage) {
@@ -628,6 +645,7 @@ impl EvolutionApp {
             w1: false,
             w2: false,
             w3: false,
+            w4: false,
 
             projects: Vec::new(),
             selected_project: None,

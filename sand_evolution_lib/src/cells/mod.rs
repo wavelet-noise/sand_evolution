@@ -16,6 +16,7 @@ pub mod stone;
 pub mod void;
 pub mod water;
 pub mod wood;
+pub mod black_hole;
 mod base_water;
 mod salty_water;
 mod delute_acid;
@@ -52,6 +53,7 @@ use self::{
     void::Void,
     water::Water,
     wood::Wood,
+    black_hole::BlackHole,
 };
 pub type CellType = u8;
 
@@ -183,6 +185,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[62] = Laser::boxed();
     cell_registry.pal[70] = Grass::boxed();
     cell_registry.pal[71] = DryGrass::boxed();
+    cell_registry.pal[80] = BlackHole::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;
