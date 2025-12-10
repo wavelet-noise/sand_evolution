@@ -59,13 +59,13 @@ pub fn write_to_file(
 pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
 ) -> Result<(), Box<dyn Error>> {
+    use std::io::Cursor;
     let mut buffer = Vec::new();
-    let result = image::codecs::png::PngEncoder::new(&mut buffer).write_image(
-        &data,
-        crate::cs::SECTOR_SIZE.x as u32,
-        crate::cs::SECTOR_SIZE.y as u32,
-        image::ColorType::L8,
-    )?;
+    let mut cursor = Cursor::new(&mut buffer);
+    
+    // Конвертируем ImageBuffer в DynamicImage и сохраняем в PNG
+    let dynamic_image = image::DynamicImage::ImageLuma8(data.clone());
+    dynamic_image.write_to(&mut cursor, image::ImageOutputFormat::Png)?;
 
     // Create a Uint8Array object from the binary buffer
     let data_url = format!("data:image/png;base64,{}", base64::encode(&buffer));

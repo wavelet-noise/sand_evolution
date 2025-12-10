@@ -97,8 +97,10 @@ const VERTICES: &[Vertex] = &[
 #[cfg(target_arch = "wasm32")]
 use web_sys::{Navigator, Window};
 #[cfg(target_arch = "wasm32")]
+use crate::export_file::code_to_file;
+#[cfg(target_arch = "wasm32")]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    code_to_file(&text.to_owned());
+    code_to_file(&text.to_owned())?;
     Ok(())
 }
 #[cfg(target_arch = "wasm32")]
