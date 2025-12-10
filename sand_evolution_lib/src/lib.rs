@@ -20,7 +20,6 @@ use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use evolution_app::EvolutionApp;
-use projects::ProjectDescription;
 use fps_meter::FpsMeter;
 use state::State;
 use std::cell::RefCell;
@@ -29,7 +28,6 @@ use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use cgmath::{InnerSpace, Vector2, Vector3};
 use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
@@ -133,9 +131,6 @@ pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::err
 use crate::shared_state::SharedState;
 #[cfg(not(target_arch = "wasm32"))]
 use clipboard::ClipboardProvider;
-use futures::TryFutureExt;
-use image::Luma;
-use log::Level::Error;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -152,13 +147,9 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
 
 use crate::ecs::components::{Name, Position, Script, ScriptType, Velocity, Rotation, Scale};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
-use crate::export_file::code_to_file;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::state::UpdateResult;
-#[cfg(not(feature = "wasm"))]
-use rand::Rng;
-use rhai::EvalAltResult;
-use specs::{Builder, Dispatcher, Entity, RunNow, WorldExt};
+use specs::{Builder, Entity, RunNow, WorldExt};
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
 
@@ -238,7 +229,7 @@ impl GameContext {
 
     /// Найти entity по имени
     pub fn find_entity_by_name(&self, name: &str) -> Option<Entity> {
-        use specs::{ReadStorage, Join};
+        use specs::Join;
         let names = self.world.read_storage::<Name>();
         let entities = self.world.entities();
         
@@ -425,8 +416,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let start_time = instant::now();
     let mut last_frame_time = start_time;
     let mut collected_delta = 0.0;
-    let mut event_loop_shared_state = shared_state_rc.clone();
-    let mut upd_result = UpdateResult::default();
+    let event_loop_shared_state = shared_state_rc.clone();
+    let upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
         // Pass the winit events to the platform integration.
         platform.handle_event(&event);
@@ -456,7 +447,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let mut steps_per_this_frame = ((delta_t + collected_delta)
+                let steps_per_this_frame = ((delta_t + collected_delta)
                     * evolution_app.simulation_steps_per_second as f64)
                     .floor();
                 if evolution_app.simulation_steps_per_second != 0 {
@@ -468,9 +459,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         
                         if let Some(script_entity) = script_entity {
                             // Получаем rhai_resource отдельно
-                            let mut rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
+                            let rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
                             
-                            if let Some(mut rhai_resource) = rhai_resource_opt {
+                            if let Some(rhai_resource) = rhai_resource_opt {
                                 if let Some(storage) = &mut rhai_resource.storage {
                                     // Компилируем скрипт выбранного объекта
                                     let script_text = evolution_app.get_script().to_owned();
@@ -481,7 +472,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                     match result {
                                         Ok(value) => {
                                             let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
-                                            if let Some(mut script) = scripts.get_mut(script_entity) {
+                                            if let Some(script) = scripts.get_mut(script_entity) {
                                                 script.ast = Some(value);
                                                 script.script = script_text;
                                                 script.raw = false;
@@ -490,7 +481,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                         }
                                         Err(err) => {
                                             let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
-                                            if let Some(mut script) = scripts.get_mut(script_entity) {
+                                            if let Some(script) = scripts.get_mut(script_entity) {
                                                 script.ast = None;
                                                 script.raw = true;
                                             }
@@ -518,7 +509,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         window.inner_size(),
                         window.scale_factor(),
                     );
-                    game_context.dispatch();
+                    // dispatch() теперь вызывается внутри update_tick на каждом тике симуляции
+                    // Оставляем один вызов для случаев, когда симуляция не запущена
+                    if evolution_app.simulation_steps_per_second == 0 {
+                        game_context.dispatch();
+                    }
                 }
 
                 _ = game_context.state.render(
