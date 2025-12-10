@@ -1,6 +1,6 @@
 use egui::{Painter, Pos2, Color32, Stroke};
 use crate::editor::state::{EditorState, EditorMode, GizmoHandle};
-use specs::{World, WorldExt, ReadStorage};
+use specs::{World, WorldExt};
 use crate::ecs::components::Position;
 
 pub struct GizmoSystem;

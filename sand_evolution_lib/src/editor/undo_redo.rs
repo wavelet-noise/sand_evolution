@@ -95,9 +95,9 @@ impl MoveCommand {
 impl Command for MoveCommand {
     fn execute(&mut self, world: &mut World, _editor_state: &mut EditorState) {
         use crate::ecs::components::Position;
-        use specs::{WorldExt, WriteStorage};
+        use specs::WorldExt;
         
-        if let Some(mut pos) = world.write_storage::<Position>().get_mut(self.entity) {
+        if let Some(pos) = world.write_storage::<Position>().get_mut(self.entity) {
             pos.x = self.new_x;
             pos.y = self.new_y;
         }
@@ -105,9 +105,9 @@ impl Command for MoveCommand {
     
     fn undo(&mut self, world: &mut World, _editor_state: &mut EditorState) {
         use crate::ecs::components::Position;
-        use specs::{WorldExt, WriteStorage};
+        use specs::WorldExt;
         
-        if let Some(mut pos) = world.write_storage::<Position>().get_mut(self.entity) {
+        if let Some(pos) = world.write_storage::<Position>().get_mut(self.entity) {
             pos.x = self.old_x;
             pos.y = self.old_y;
         }

@@ -1,8 +1,7 @@
-use crate::cells::coal::Coal;
 use crate::cells::dry_grass::DryGrass;
 use crate::cs::PointType;
 
-use super::{burning_wood, dry_grass, CellRegistry, CellTrait, CellType, Prng};
+use super::{burning_wood, CellRegistry, CellTrait, CellType, Prng};
 
 pub struct Grass;
 impl Grass {

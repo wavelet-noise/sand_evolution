@@ -5,7 +5,7 @@ use cgmath::{InnerSpace, Matrix, Matrix2, Matrix3, SquareMatrix, Vector2, Vector
 use rhai::EvalAltResult;
 use crate::CellTypeNotFound;
 use crate::shared_state::SharedState;
-use specs::{Builder, WorldExt, ReadStorage, WriteStorage, Join};
+use specs::{Builder, WorldExt, Join};
 
 pub fn register_rhai(
     rhai: &mut rhai::Engine, 
@@ -153,9 +153,9 @@ pub fn register_rhai(
 
         let world_clone = world_ref.clone();
         rhai.register_fn("set_object_script", move |name: &str, script: &str| -> bool {
-            use specs::{ReadStorage, WriteStorage, Join};
+            use specs::Join;
             use crate::ecs::components::{Name, Script};
-            let mut world = world_clone.borrow_mut();
+            let world = world_clone.borrow_mut();
             let names = world.read_storage::<Name>();
             let entities = world.entities();
             
@@ -171,7 +171,7 @@ pub fn register_rhai(
             // Затем обновляем скрипт
             if let Some(entity) = target_entity {
                 let mut scripts = world.write_storage::<Script>();
-                if let Some(mut script_comp) = scripts.get_mut(entity) {
+                if let Some(script_comp) = scripts.get_mut(entity) {
                     script_comp.script = script.to_owned();
                     script_comp.raw = true;
                     return true;
@@ -182,7 +182,7 @@ pub fn register_rhai(
 
         let world_clone = world_ref.clone();
         rhai.register_fn("get_object_script", move |name: &str| -> String {
-            use specs::{ReadStorage, Join};
+            use specs::Join;
             use crate::ecs::components::{Name, Script};
             let world = world_clone.borrow();
             let names = world.read_storage::<Name>();
@@ -201,7 +201,7 @@ pub fn register_rhai(
 
         let world_clone = world_ref.clone();
         rhai.register_fn("delete_object", move |name: &str| -> bool {
-            use specs::{ReadStorage, Join};
+            use specs::Join;
             use crate::ecs::components::Name;
             if name == "World Script" {
                 return false;

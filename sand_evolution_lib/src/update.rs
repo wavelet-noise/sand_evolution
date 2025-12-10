@@ -1,7 +1,7 @@
 use crate::evolution_app::EvolutionApp;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::shared_state::SharedState;
-use crate::{cs, GameContext, State};
+use crate::{cs, State};
 use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
