@@ -1,6 +1,6 @@
-use crate::ecs::components::{Position, Script, Velocity};
+use crate::ecs::components::{Position, Script, ScriptType, Velocity};
 use crate::resources::rhai_resource::RhaiResource;
-use specs::{Join, Read, ReadStorage, System, Write, WriteStorage};
+use specs::{Entities, Join, Read, ReadStorage, System, Write, WriteStorage};
 
 pub struct MoveSystem;
 
@@ -31,15 +31,16 @@ pub struct EntityScriptSystem;
 
 impl<'a> System<'a> for EntityScriptSystem {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Script>,
         ReadStorage<'a, Position>,
         Write<'a, RhaiResource>,
     );
 
-    fn run(&mut self, (mut scripts, positions, mut rhai_resource): Self::SystemData) {
+    fn run(&mut self, (entities, mut scripts, positions, mut rhai_resource): Self::SystemData) {
         if let Some(rhai) = &mut rhai_resource.storage {
-            Self::compile_and_run_scripts(&mut scripts, &positions, &rhai.engine, &mut rhai.scope);
-        } else {
+            // Унифицированная обработка всех скриптов
+            Self::compile_and_run_all_scripts(&entities, &mut scripts, &positions, &rhai.engine, &mut rhai.scope);
         }
     }
 }
@@ -64,20 +65,41 @@ impl EntityScriptSystem {
         }
     }
 
-    // Helper function to compile scripts
-    fn compile_and_run_scripts(
+    // Унифицированная функция для компиляции и выполнения всех скриптов
+    fn compile_and_run_all_scripts(
+        entities: &Entities,
         scripts: &mut WriteStorage<Script>,
         positions: &ReadStorage<Position>,
-        engine: &rhai::Engine,   // Assuming Engine is the type of your engine
-        scope: &mut rhai::Scope, // Assuming Scope is the type of your scope
+        engine: &rhai::Engine,
+        scope: &mut rhai::Scope,
     ) {
-        for (script, _position) in (scripts, positions).join() {
-            if script.raw {
-                script.ast = Self::compile_script(engine, scope, &script.script);
+        // Сначала компилируем все скрипты, которые нужно скомпилировать
+        let mut entities_to_compile: Vec<(specs::Entity, String)> = Vec::new();
+        {
+            // Используем временную ссылку для чтения
+            let scripts_read: &WriteStorage<Script> = scripts;
+            for (entity, script) in (entities, scripts_read).join() {
+                if script.raw {
+                    entities_to_compile.push((entity, script.script.clone()));
+                }
             }
+        }
+        
+        for (entity, script_text) in entities_to_compile {
+            // Теперь можем получить mutable доступ
+            if let Some(mut script) = scripts.get_mut(entity) {
+                script.ast = Self::compile_script(engine, scope, &script_text);
+                script.raw = false;
+            }
+        }
 
-            if let Some(ast) = &script.ast {
-                Self::run_script(engine, scope, ast);
+        // Затем выполняем все скомпилированные скрипты
+        {
+            let scripts_read: &WriteStorage<Script> = scripts;
+            for (_entity, script) in (entities, scripts_read).join() {
+                if let Some(ast) = &script.ast {
+                    Self::run_script(engine, scope, ast);
+                }
             }
         }
     }
