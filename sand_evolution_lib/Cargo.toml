@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-ahash = "0.8.5"
+ahash = { version = "0.8.5", default-features = false, features = ["runtime-rng", "std"] }
 egui_wgpu_backend = "0.19"
 chrono = "0.4"
 pollster = "0.3"
