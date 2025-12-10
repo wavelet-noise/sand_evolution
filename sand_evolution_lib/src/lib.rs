@@ -119,7 +119,9 @@ pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::err
     let clipboard = Clipboard::new(&navigator)?;
     
     let promise = clipboard.read_text()?;
-    let js_value = JsFuture::from(promise).await?;
+    let js_value = JsFuture::from(promise)
+        .await
+        .map_err(|e| format!("Clipboard read error: {:?}", e))?;
     let text = js_value.as_string().ok_or("Failed to get text")?;
     
     Ok(text)
