@@ -67,7 +67,7 @@ impl Prng {
         // Инициализация хорошего PRNG (xoshiro256**) из системного источника энтропии
         // через getrandom 0.2 (один раз на создание).
         let mut seed_bytes = [0u8; 32];
-        let _ = getrandom::getrandom(&mut seed_bytes);
+        let _ = getrandom::fill(&mut seed_bytes);
 
         let mut state = [0u64; 4];
         for i in 0..4 {
