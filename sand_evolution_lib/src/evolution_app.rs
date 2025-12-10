@@ -433,12 +433,11 @@ impl EvolutionApp {
 
     fn spawn_blocks(&mut self, state: &mut State) {
         for _ in 0..self.number_of_structures_to_add {
-            let nx = (
-                ((state.prng.next() as u32) << 8) | state.prng.next() as u32
-            ) % cs::SECTOR_SIZE.x as u32;
-            let ny = (
-                ((state.prng.next() as u32) << 8) | state.prng.next() as u32
-            ) % cs::SECTOR_SIZE.y as u32;
+            let mut buf = [0u8; 4];
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..20 {
                 for y in 0..20 {
@@ -454,12 +453,11 @@ impl EvolutionApp {
 
     fn spawn_platforms(&mut self, state: &mut State) {
         for _ in 0..self.number_of_structures_to_add {
-            let nx = (
-                ((state.prng.next() as u32) << 8) | state.prng.next() as u32
-            ) % cs::SECTOR_SIZE.x as u32;
-            let ny = (
-                ((state.prng.next() as u32) << 8) | state.prng.next() as u32
-            ) % cs::SECTOR_SIZE.y as u32;
+            let mut buf = [0u8; 4];
+            _ = getrandom::getrandom(&mut buf);
+
+            let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
+            let ny = (((buf[2] as u32) << 8) | buf[3] as u32) % cs::SECTOR_SIZE.y as u32;
 
             for x in 0..50 {
                 state.diffuse_rgba.put_pixel(
