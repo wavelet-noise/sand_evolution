@@ -13,6 +13,7 @@ use crate::{
     fps_meter::FpsMeter,
     state::{State, UpdateResult},
 };
+use specs::{ReadStorage, WriteStorage, Join, Builder, WorldExt};
 
 struct Executor {
     #[cfg(not(target_arch = "wasm32"))]
@@ -47,16 +48,17 @@ pub struct EvolutionApp {
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
     pub hovered: bool,
-    script: String,
+    script: String, // Для обратной совместимости - хранит скрипт выбранного объекта
+    pub selected_object_name: String, // Имя выбранного объекта для редактирования
     pub need_to_recompile: bool,
     pub script_error: String,
     executor: Executor,
-    pub ast: Option<rhai::AST>,
 
     pub w1: bool,
     pub w2: bool,
     pub w3: bool,
     pub w4: bool, // templates / projects window
+    pub w5: bool, // objects tree window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -107,6 +109,45 @@ impl EvolutionApp {
         self.script = value.to_owned();
         self.need_to_recompile = true;
         true
+    }
+
+    /// Получить скрипт объекта по имени из world
+    pub fn get_object_script(&self, world: &specs::World, object_name: &str) -> Option<String> {
+        use specs::{ReadStorage, Join};
+        use crate::ecs::components::{Name, Script};
+        
+        let names = world.read_storage::<Name>();
+        let scripts = world.read_storage::<Script>();
+        let entities = world.entities();
+        
+        for (entity, name_comp) in (&entities, &names).join() {
+            if name_comp.name == object_name {
+                if let Some(script) = scripts.get(entity) {
+                    return Some(script.script.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Установить скрипт объекта по имени в world
+    pub fn set_object_script(&mut self, world: &mut specs::World, object_name: &str, script: &str) {
+        use specs::{ReadStorage, WriteStorage, Join};
+        use crate::ecs::components::{Name, Script};
+        
+        let names = world.read_storage::<Name>();
+        let mut scripts = world.write_storage::<Script>();
+        let entities = world.entities();
+        
+        for (entity, name_comp) in (&entities, &names).join() {
+            if name_comp.name == object_name {
+                if let Some(mut script_comp) = scripts.get_mut(entity) {
+                    script_comp.script = script.to_owned();
+                    script_comp.raw = true;
+                    self.need_to_recompile = true;
+                }
+            }
+        }
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -196,11 +237,13 @@ impl EvolutionApp {
         upd_result: &UpdateResult,
         event_loop_proxy: &EventLoopProxy<UserEventInfo>,
         any_win_hovered: &mut bool,
+        world: &mut specs::World,
     ) {
         let mut w1: bool = self.w1;
         let mut w2: bool = self.w2;
         let mut w3: bool = self.w3;
         let mut w4: bool = self.w4;
+        let mut w5: bool = self.w5;
 
         egui::Window::new("Swithes")
         .default_pos(egui::pos2(10.0,10.0))
@@ -216,6 +259,9 @@ impl EvolutionApp {
             }
             if ui.button("Templates").clicked() {
                 w4 = !w4;
+            }
+            if ui.button("Objects").clicked() {
+                w5 = !w5;
             }
         });
 
@@ -273,19 +319,129 @@ impl EvolutionApp {
             });
         self.w1 = w1;
         
-        egui::Window::new("Level script")
+        egui::Window::new("Objects & Scripts")
             .open(&mut w2)
             .default_pos(egui::pos2(560.0, 5.0))
             .show(context, |ui| {
+                use specs::{ReadStorage, WriteStorage, Join, Builder};
+                use crate::ecs::components::{Name, Script, ScriptType};
+                
+                // Получаем список всех объектов (сначала собираем данные)
+                let mut object_names: Vec<String> = Vec::new();
+                {
+                    let names = world.read_storage::<Name>();
+                    let entities = world.entities();
+                    for (_, name_comp) in (&entities, &names).join() {
+                        object_names.push(name_comp.name.clone());
+                    }
+                }
+                object_names.sort();
+                
+                // Переменные для операций, которые нужно выполнить после освобождения borrow
+                let mut should_create_object = false;
+                let mut new_object_name = String::new();
+                let mut should_delete_object = false;
+                let mut should_save_script = false;
+                
+                // UI для выбора объекта
+                ui.horizontal(|ui| {
+                    ui.label("Object:");
+                    egui::ComboBox::from_id_source("object_selector")
+                        .selected_text(&self.selected_object_name)
+                        .show_ui(ui, |ui| {
+                            for name in &object_names {
+                                ui.selectable_value(&mut self.selected_object_name, name.clone(), name);
+                            }
+                        });
+                    
+                    // Кнопка создания нового объекта
+                    if ui.button("+ New").clicked() {
+                        let mut name = format!("Object {}", object_names.len() + 1);
+                        let mut counter = 1;
+                        while object_names.contains(&name) {
+                            name = format!("Object {}", object_names.len() + counter);
+                            counter += 1;
+                        }
+                        new_object_name = name.clone();
+                        should_create_object = true;
+                        self.selected_object_name = name;
+                    }
+                });
+                
+                // Загружаем скрипт выбранного объекта
+                {
+                    if let Some(script_text) = self.get_object_script(world, &self.selected_object_name) {
+                        self.script = script_text;
+                    } else {
+                        self.script = "".to_owned();
+                    }
+                }
+                
+                // UI для редактирования скрипта
+                ui.separator();
+                ui.label(format!("Script for: {}", self.selected_object_name));
+                
                 // Add a vertical scroll area around the text editor
                 egui::ScrollArea::vertical()
-                    .auto_shrink([true, true]) // Prevent horizontal auto-shrinking if necessary
+                    .auto_shrink([true, true])
                     .enable_scrolling(true)
                     .always_show_scroll(true)
-                    .max_height(500.0)
+                    .max_height(400.0)
                     .show(ui, |ui| {
                         ui.text_edit_multiline(&mut self.script);
                     });
+                
+                // Сохраняем изменения скрипта
+                if ui.button("Save Script").clicked() {
+                    should_save_script = true;
+                }
+                
+                // Кнопка удаления объекта (кроме World Script)
+                if self.selected_object_name != "World Script" {
+                    if ui.button("Delete Object").clicked() {
+                        should_delete_object = true;
+                        self.selected_object_name = "World Script".to_owned();
+                    }
+                }
+                
+                // Выполняем операции после освобождения borrow
+                if should_create_object {
+                    world.create_entity()
+                        .with(Name { name: new_object_name.clone() })
+                        .with(Script {
+                            script: "".to_owned(),
+                            ast: None,
+                            raw: true,
+                            script_type: ScriptType::Entity,
+                        })
+                        .build();
+                }
+                
+                if should_save_script {
+                    let script_text = self.script.clone();
+                    let object_name = self.selected_object_name.clone();
+                    self.set_object_script(world, &object_name, &script_text);
+                }
+                
+                if should_delete_object {
+                    let object_name = self.selected_object_name.clone();
+                    let mut target_entity = None;
+                    {
+                        let names_storage = world.read_storage::<Name>();
+                        let entities_storage = world.entities();
+                        
+                        for (entity, name_comp) in (&entities_storage, &names_storage).join() {
+                            if name_comp.name == object_name {
+                                target_entity = Some(entity);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if let Some(entity) = target_entity {
+                        world.delete_entity(entity).ok();
+                    }
+                }
         
                 if ui
                     .button(if state.toggled {
@@ -567,19 +723,111 @@ impl EvolutionApp {
         }
         
         self.w4 = w4;
+        
+        // Окно дерева объектов
+        egui::Window::new("Objects Tree")
+            .open(&mut w5)
+            .default_pos(egui::pos2(1000.0, 5.0))
+            .default_size(egui::vec2(300.0, 400.0))
+            .show(context, |ui| {
+                use specs::{ReadStorage, Join};
+                use crate::ecs::components::{Name, Script, Position, Velocity};
+                
+                // Корень дерева - Сцена
+                ui.collapsing("Scene", |ui| {
+                    // Получаем список всех объектов
+                    let names = world.read_storage::<Name>();
+                    let scripts = world.read_storage::<Script>();
+                    let positions = world.read_storage::<Position>();
+                    let velocities = world.read_storage::<Velocity>();
+                    let entities = world.entities();
+                    
+                    let mut objects: Vec<(specs::Entity, String, bool, bool, bool)> = Vec::new();
+                    for (entity, name_comp) in (&entities, &names).join() {
+                        let has_script = scripts.get(entity).is_some();
+                        let has_position = positions.get(entity).is_some();
+                        let has_velocity = velocities.get(entity).is_some();
+                        objects.push((entity, name_comp.name.clone(), has_script, has_position, has_velocity));
+                    }
+                    objects.sort_by(|a, b| a.1.cmp(&b.1));
+                    
+                    for (entity, name, has_script, has_position, has_velocity) in objects {
+                        let mut label = name.clone();
+                        let mut components = Vec::new();
+                        if has_script {
+                            components.push("Script");
+                        }
+                        if has_position {
+                            components.push("Position");
+                        }
+                        if has_velocity {
+                            components.push("Velocity");
+                        }
+                        
+                        if !components.is_empty() {
+                            label.push_str(&format!(" [{}]", components.join(", ")));
+                        }
+                        
+                        let is_selected = self.selected_object_name == name;
+                        if ui.selectable_label(is_selected, &label).clicked() {
+                            self.selected_object_name = name.clone();
+                            // Загружаем скрипт выбранного объекта
+                            if let Some(script_text) = self.get_object_script(world, &name) {
+                                self.script = script_text;
+                            } else {
+                                self.script = "".to_owned();
+                            }
+                        }
+                        
+                        // Показываем детали при наведении
+                        ui.horizontal(|ui| {
+                            ui.label(format!("ID: {:?}", entity));
+                            if has_position {
+                                if let Some(pos) = positions.get(entity) {
+                                    ui.label(format!("Pos: ({:.1}, {:.1})", pos.x, pos.y));
+                                }
+                            }
+                            if has_velocity {
+                                if let Some(vel) = velocities.get(entity) {
+                                    ui.label(format!("Vel: ({:.1}, {:.1})", vel.x, vel.y));
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                *any_win_hovered |= context.is_pointer_over_area()
+            });
+        
+        self.w5 = w5;
     }
 
-    pub fn compile_script(&mut self, rhai: &mut RhaiResourceStorage) {
+    pub fn compile_script(
+        &mut self,
+        rhai: &mut RhaiResourceStorage,
+        world: &mut specs::World,
+        script_entity: specs::Entity,
+    ) {
+        let script_text = self.script.clone();
         let result = rhai
             .engine
-            .compile_with_scope(&mut rhai.scope, self.script.as_str());
+            .compile_with_scope(&mut rhai.scope, script_text.as_str());
         match result {
             Ok(value) => {
-                self.ast = Some(value);
+                let mut scripts = world.write_storage::<crate::ecs::components::Script>();
+                if let Some(mut script) = scripts.get_mut(script_entity) {
+                    script.ast = Some(value);
+                    script.script = script_text;
+                    script.raw = false;
+                }
                 self.script_error = "".to_owned();
             }
             Err(err) => {
-                self.ast = None;
+                let mut scripts = world.write_storage::<crate::ecs::components::Script>();
+                if let Some(mut script) = scripts.get_mut(script_entity) {
+                    script.ast = None;
+                    script.raw = true;
+                }
                 self.script_error = err.to_string()
             }
         }
@@ -658,15 +906,16 @@ impl EvolutionApp {
             hovered: false,
             executor,
             script: r"let a = 0; for i in 0..10 { a += i; };".to_owned(),
+            selected_object_name: "World Script".to_owned(),
 
             script_error: "".to_owned(),
-            ast: None,
             need_to_recompile: true,
 
             w1: false,
             w2: false,
             w3: false,
             w4: false,
+            w5: false,
 
             projects: crate::projects::demo_projects(),
             selected_project: None,
