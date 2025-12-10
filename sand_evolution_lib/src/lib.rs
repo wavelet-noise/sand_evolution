@@ -1,6 +1,7 @@
 pub mod cells;
 pub mod cs;
 pub mod ecs;
+pub mod editor;
 pub mod evolution_app;
 pub mod export_file;
 pub mod fps_meter;
@@ -102,7 +103,26 @@ pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Erro
 }
 #[cfg(target_arch = "wasm32")]
 pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> {
+    // В браузере буфер обмена доступен только через асинхронный API
+    // Эта функция будет вызываться из асинхронного контекста
     Ok("".to_owned())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::error::Error>> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::Clipboard;
+    
+    let window = web_sys::window().ok_or("No window")?;
+    let navigator = window.navigator();
+    let clipboard = Clipboard::new(&navigator)?;
+    
+    let promise = clipboard.read_text()?;
+    let js_value = JsFuture::from(promise).await?;
+    let text = js_value.as_string().ok_or("Failed to get text")?;
+    
+    Ok(text)
 }
 
 use crate::shared_state::SharedState;
@@ -125,6 +145,7 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     ctx.get_contents()
 }
 
+use crate::ecs::components::{Name, Position, Script, ScriptType, Velocity, Rotation, Scale};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::export_file::code_to_file;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
@@ -132,7 +153,7 @@ use crate::state::UpdateResult;
 #[cfg(not(feature = "wasm"))]
 use rand::Rng;
 use rhai::EvalAltResult;
-use specs::{Dispatcher, RunNow, WorldExt};
+use specs::{Builder, Dispatcher, Entity, RunNow, WorldExt};
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
 
@@ -145,12 +166,59 @@ pub struct GameContext {
 impl GameContext {
     pub fn new(state: State) -> Self {
         let mut world = specs::World::new();
+        
+        // Регистрируем все компоненты
+        world.register::<Name>();
+        world.register::<Script>();
+        world.register::<Position>();
+        world.register::<Velocity>();
+        world.register::<Rotation>();
+        world.register::<Scale>();
+        
         let mut dispatcher = specs::DispatcherBuilder::new()
             .with(EntityScriptSystem, "entity_script__system", &[])
             .with(GravitySystem, "gravity_system", &[])
             .with(MoveSystem, "move_system", &[])
             .build();
         dispatcher.setup(&mut world);
+
+        // Создаем объект для мирового скрипта
+        world
+            .create_entity()
+            .with(Name {
+                name: "World Script".to_owned(),
+            })
+            .with(Script {
+                script: "".to_owned(),
+                ast: None,
+                raw: true,
+                script_type: ScriptType::World,
+            })
+            .build();
+
+        // Создаем Dummy сущность для проверки
+        world
+            .create_entity()
+            .with(Name {
+                name: "Dummy".to_owned(),
+            })
+            .with(Position {
+                x: 100.0,
+                y: 200.0,
+            })
+            .with(Velocity {
+                x: 1.0,
+                y: 0.0,
+            })
+            .with(Script {
+                script: r#"// Dummy object script
+// This is a test entity with Position, Velocity and Script components
+"#.to_owned(),
+                ast: None,
+                raw: true,
+                script_type: ScriptType::Entity,
+            })
+            .build();
 
         GameContext {
             world,
@@ -161,6 +229,20 @@ impl GameContext {
 
     pub fn dispatch(&mut self) {
         self.dispatcher.dispatch(&self.world);
+    }
+
+    /// Найти entity по имени
+    pub fn find_entity_by_name(&self, name: &str) -> Option<Entity> {
+        use specs::{ReadStorage, Join};
+        let names = self.world.read_storage::<Name>();
+        let entities = self.world.entities();
+        
+        for (entity, name_comp) in (&entities, &names).join() {
+            if name_comp.name == name {
+                return Some(entity);
+            }
+        }
+        None
     }
 
     pub fn update(
@@ -296,9 +378,17 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     ));
     game_context.state.update_with_data(data);
 
-    let mut evolution_app = EvolutionApp::new();
+    // Создаем shared log storage для скриптов перед созданием EvolutionApp
+    // Используем VecDeque как кольцевой буфер с ограничением в 30 записей
+    use std::collections::VecDeque;
+    let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
+    
+    let mut evolution_app = EvolutionApp::new_with_log(script_log_rc.clone());
 
     evolution_app.set_script(script.as_str());
+    
+    // Обновляем объект мирового скрипта начальным скриптом
+    evolution_app.set_object_script(&mut game_context.world, "World Script", script.as_str());
 
     let mut id_dict: HashMap<String, u8> = HashMap::new();
 
@@ -313,7 +403,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         let mut rhai = rhai::Engine::new();
         let mut rhai_scope = rhai::Scope::new();
 
-        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict);
+        // Пока что передаем None, так как доступ к world из скриптов требует дополнительной архитектуры
+        // Функции для работы с объектами можно добавить позже через специальный механизм
+        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone());
 
         game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
@@ -366,17 +458,46 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
                     if evolution_app.need_to_recompile {
-                        if let Some(mut rhai_resource) = game_context
-                            .world
-                            .get_mut::<RhaiResource>()
-                        {
-                            if let Some(storage) = &mut rhai_resource.storage {
-                                evolution_app.compile_script(storage);
+                        // Сначала находим entity
+                        let script_entity = game_context.find_entity_by_name(&evolution_app.selected_object_name);
+                        
+                        if let Some(script_entity) = script_entity {
+                            // Получаем rhai_resource отдельно
+                            let mut rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
+                            
+                            if let Some(mut rhai_resource) = rhai_resource_opt {
+                                if let Some(storage) = &mut rhai_resource.storage {
+                                    // Компилируем скрипт выбранного объекта
+                                    let script_text = evolution_app.get_script().to_owned();
+                                    let result = storage
+                                        .engine
+                                        .compile_with_scope(&mut storage.scope, script_text.as_str());
+                                    
+                                    match result {
+                                        Ok(value) => {
+                                            let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
+                                            if let Some(mut script) = scripts.get_mut(script_entity) {
+                                                script.ast = Some(value);
+                                                script.script = script_text;
+                                                script.raw = false;
+                                            }
+                                            evolution_app.script_error = "".to_owned();
+                                        }
+                                        Err(err) => {
+                                            let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
+                                            if let Some(mut script) = scripts.get_mut(script_entity) {
+                                                script.ast = None;
+                                                script.raw = true;
+                                            }
+                                            evolution_app.script_error = err.to_string()
+                                        }
+                                    }
+                                } else {
+                                    println!("Warning: RhaiResource.storage is None");
+                                }
                             } else {
-                                println!("Warning: RhaiResource.storage is None");
+                                println!("Warning: RhaiResource not found in the world");
                             }
-                        } else {
-                            println!("Warning: RhaiResource not found in the world");
                         }
                     }
                     let sim_steps = steps_per_this_frame as i32;
@@ -419,6 +540,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     &upd_result,
                     &event_loop_proxy,
                     &mut any_win_hovered,
+                    &mut game_context.world,
                 );
 
                 evolution_app.hovered = any_win_hovered;
@@ -492,28 +614,13 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     *control_flow = ControlFlow::Exit;
                 }
                 winit::event::WindowEvent::KeyboardInput {
-                    device_id,
-                    input,
-                    is_synthetic,
+                    device_id: _,
+                    input: _,
+                    is_synthetic: _,
                 } => {
-                    if let winit::event::ElementState::Pressed = input.state {
-                        if input.modifiers.logo() || input.modifiers.ctrl() {
-                            // logo key is Command on macOS
-                            if let Some(virtual_keycode) = input.virtual_keycode {
-                                match virtual_keycode {
-                                    winit::event::VirtualKeyCode::C => {
-                                        _ = copy_text_to_clipboard(evolution_app.get_script());
-                                    }
-                                    winit::event::VirtualKeyCode::V => {
-                                        if let Ok(result) = copy_text_from_clipboard() {
-                                            evolution_app.set_script(result.as_str());
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
+                    // Не обрабатываем события клавиатуры здесь - egui TextEdit сам обрабатывает
+                    // вставку из буфера обмена через стандартные сочетания клавиш (Cmd+V/Ctrl+V)
+                    // Обработка через winit вызывает конфликты и паники на macOS
                 }
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if button == winit::event::MouseButton::Left {

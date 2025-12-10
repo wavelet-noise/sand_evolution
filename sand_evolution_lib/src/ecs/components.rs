@@ -20,11 +20,18 @@ impl Component for Velocity {
     type Storage = specs::VecStorage<Self>;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptType {
+    World,   // Мировой скрипт
+    Entity,  // Скрипт объекта
+}
+
 #[derive(Debug)]
 pub struct Script {
     pub script: String,
     pub ast: Option<rhai::AST>,
     pub raw: bool,
+    pub script_type: ScriptType,
 }
 
 impl Default for Script {
@@ -33,10 +40,51 @@ impl Default for Script {
             script: "".to_owned(),
             ast: None,
             raw: true,
+            script_type: ScriptType::Entity,
         }
     }
 }
 
 impl Component for Script {
     type Storage = specs::HashMapStorage<Self>;
+}
+
+#[derive(Debug, Clone)]
+pub struct Name {
+    pub name: String,
+}
+
+impl Component for Name {
+    type Storage = specs::HashMapStorage<Self>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Rotation {
+    pub angle: f32, // в радианах
+}
+
+impl Default for Rotation {
+    fn default() -> Self {
+        Self { angle: 0.0 }
+    }
+}
+
+impl Component for Rotation {
+    type Storage = specs::VecStorage<Self>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Scale {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Default for Scale {
+    fn default() -> Self {
+        Self { x: 1.0, y: 1.0 }
+    }
+}
+
+impl Component for Scale {
+    type Storage = specs::VecStorage<Self>;
 }

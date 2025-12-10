@@ -1,12 +1,20 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use cgmath::{InnerSpace, Matrix, Matrix2, Matrix3, SquareMatrix, Vector2, Vector3};
 use rhai::EvalAltResult;
 use crate::CellTypeNotFound;
 use crate::shared_state::SharedState;
+use specs::{Builder, WorldExt, ReadStorage, WriteStorage, Join};
 
-pub fn register_rhai(rhai: &mut rhai::Engine, scope: &mut rhai::Scope, shared_state_rc: Rc<RefCell<SharedState>>, id_dict: HashMap<String, u8>) {
+pub fn register_rhai(
+    rhai: &mut rhai::Engine, 
+    scope: &mut rhai::Scope, 
+    shared_state_rc: Rc<RefCell<SharedState>>, 
+    id_dict: HashMap<String, u8>,
+    world_rc: Option<Rc<RefCell<specs::World>>>,
+    script_log_rc: Rc<RefCell<VecDeque<String>>>,
+) {
     //rhai_scope.push_constant("RES_X", dimensions.0);
     //rhai_scope.push_constant("RES_Y", dimensions.1);
 
@@ -52,6 +60,176 @@ pub fn register_rhai(rhai: &mut rhai::Engine, scope: &mut rhai::Scope, shared_st
     rhai.register_fn("fract", move |v: f64| { v.fract() });
     rhai.register_fn("rand", move || -> i64 { crate::random::my_rand() });
     scope.push("time", 0f64);
+    
+    // Register print function for script logging with circular buffer (max 30 entries)
+    const MAX_LOG_ENTRIES: usize = 30;
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |message: &str| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(message.to_owned());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for different types
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: i64| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: f64| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: bool| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for Vector2
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |v: Vector2<f64>| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(format!("vec2({}, {})", v.x, v.y));
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for Vector3
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |v: Vector3<f64>| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(format!("vec3({}, {}, {})", v.x, v.y, v.z));
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+
+    // Функции для работы с объектами
+    if let Some(world_ref) = world_rc {
+        let world_clone = world_ref.clone();
+        rhai.register_fn("create_object", move |name: &str| -> bool {
+            use crate::ecs::components::{Name, Script, ScriptType};
+            let mut world = world_clone.borrow_mut();
+            world.create_entity()
+                .with(Name { name: name.to_owned() })
+                .with(Script {
+                    script: "".to_owned(),
+                    ast: None,
+                    raw: true,
+                    script_type: ScriptType::Entity,
+                })
+                .build();
+            true
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_object_script", move |name: &str, script: &str| -> bool {
+            use specs::{ReadStorage, WriteStorage, Join};
+            use crate::ecs::components::{Name, Script};
+            let mut world = world_clone.borrow_mut();
+            let names = world.read_storage::<Name>();
+            let entities = world.entities();
+            
+            // Сначала находим entity
+            let mut target_entity = None;
+            for (entity, name_comp) in (&entities, &names).join() {
+                if name_comp.name == name {
+                    target_entity = Some(entity);
+                    break;
+                }
+            }
+            
+            // Затем обновляем скрипт
+            if let Some(entity) = target_entity {
+                let mut scripts = world.write_storage::<Script>();
+                if let Some(mut script_comp) = scripts.get_mut(entity) {
+                    script_comp.script = script.to_owned();
+                    script_comp.raw = true;
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("get_object_script", move |name: &str| -> String {
+            use specs::{ReadStorage, Join};
+            use crate::ecs::components::{Name, Script};
+            let world = world_clone.borrow();
+            let names = world.read_storage::<Name>();
+            let scripts = world.read_storage::<Script>();
+            let entities = world.entities();
+            
+            for (entity, name_comp) in (&entities, &names).join() {
+                if name_comp.name == name {
+                    if let Some(script) = scripts.get(entity) {
+                        return script.script.clone();
+                    }
+                }
+            }
+            "".to_owned()
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("delete_object", move |name: &str| -> bool {
+            use specs::{ReadStorage, Join};
+            use crate::ecs::components::Name;
+            if name == "World Script" {
+                return false;
+            }
+            
+            let mut world = world_clone.borrow_mut();
+            let mut target_entity = None;
+            {
+                let names = world.read_storage::<Name>();
+                let entities = world.entities();
+                
+                // Сначала находим entity
+                for (entity, name_comp) in (&entities, &names).join() {
+                    if name_comp.name == name {
+                        target_entity = Some(entity);
+                        break;
+                    }
+                }
+            }
+            
+            // Затем удаляем
+            if let Some(entity) = target_entity {
+                world.delete_entity(entity).ok();
+                return true;
+            }
+            false
+        });
+    }
 
     rhai
         .register_type::<Vector2<f64>>()

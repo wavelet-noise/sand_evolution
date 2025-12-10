@@ -39,19 +39,12 @@ pub fn update_tick(
             for _sim_update in 0..sim_steps {
                 state.tick += 1;
                 if state.toggled {
-                            storage.scope.set_value("tick", state.tick);
-                            if let Some(ast) = &evolution_app.ast {
-                                let result = storage
-                                    .engine
-                                    .eval_ast_with_scope::<()>(&mut storage.scope, ast);
-                                if let Err(err) = &result {
-                                    evolution_app.script_error = err.to_string();
-                                }
-                            }
+                    storage.scope.set_value("tick", state.tick);
                     if state.tick % 500 == 0 {
                         storage.scope.clear();
                         set_frame_vars(state, storage);
                     }
+                    // Мировой скрипт теперь выполняется через EntityScriptSystem
                     //dispatcher.dispatch(world);
                 }
                 for (p, c) in shared_state.borrow_mut().points.iter() {
