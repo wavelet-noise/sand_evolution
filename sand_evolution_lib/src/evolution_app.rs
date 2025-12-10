@@ -14,7 +14,7 @@ use crate::{
     export_file::write_to_file,
     fps_meter::FpsMeter,
     state::{State, UpdateResult},
-    editor::{EditorState, EditorToolbar, EditorViewport, EditorInspector, EditorHierarchy, UndoRedo, GizmoSystem, InputHandler, AddPanel},
+    editor::{EditorState, EditorToolbar, EditorViewport, EditorInspector, EditorHierarchy, UndoRedo, GizmoSystem, InputHandler},
 };
 use specs::WorldExt;
 
@@ -349,22 +349,6 @@ impl EvolutionApp {
             self.selected_object_name = object_name;
             w2 = true;
         }
-        
-        // Add Panel - 90% высоты экрана
-        // Получаем высоту экрана из контекста
-        let screen_height = context.available_rect().height();
-        let panel_height = screen_height * 0.9;
-        egui::Window::new("Add Objects")
-            .default_pos(egui::pos2(320.0, 100.0))
-            .default_size(egui::vec2(200.0, panel_height))
-            .resizable(false)
-            .show(context, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(ui.available_height())
-                    .show(ui, |ui| {
-                AddPanel::ui(ui, &mut self.editor_state, world);
-                    });
-            });
         
         // Show toasts
         self.show_toasts(context);
