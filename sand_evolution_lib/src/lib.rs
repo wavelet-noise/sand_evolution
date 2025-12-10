@@ -562,10 +562,12 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 UserEventInfo::ProjectsLoaded(projects) => {
                     evolution_app.projects = projects;
                     evolution_app.project_loading = false;
+                    evolution_app.projects_fetched = true;
                 }
                 UserEventInfo::ProjectLoadError(err) => {
                     evolution_app.project_error = err;
                     evolution_app.project_loading = false;
+                    evolution_app.projects_fetched = true; // Mark as fetched even on error to prevent retry loop
                 }
             },
             _ => (),
