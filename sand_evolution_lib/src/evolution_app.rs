@@ -430,10 +430,7 @@ impl EvolutionApp {
                                 let is_selected = self.selected_project == Some(idx);
                                 let has_image = project.image_url.is_some();
 
-                                let mut label_text = project.display_name.clone();
-                                if has_image {
-                                    label_text.push_str("  · BG");
-                                }
+                                let label_text = project.display_name.clone();
 
                                 if ui
                                     .selectable_label(is_selected, label_text)
