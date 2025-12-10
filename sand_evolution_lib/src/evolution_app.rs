@@ -63,6 +63,9 @@ pub struct EvolutionApp {
     pub selected_project: Option<usize>,
     pub project_loading: bool,
     pub project_error: String,
+
+    // Last generated share URL for templates
+    pub last_load_url: String,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -428,7 +431,7 @@ impl EvolutionApp {
 
                 // Two-column layout: list on the left, details on the right
                 ui.columns(2, |columns| {
-                    // LEFT: scrollable list of templates
+                    // LEFT: scrollable, clean list of templates (no extra frames)
                     egui::ScrollArea::vertical()
                         .auto_shrink([false, true])
                         .show(&mut columns[0], |ui| {
@@ -436,32 +439,26 @@ impl EvolutionApp {
                                 let is_selected = self.selected_project == Some(idx);
                                 let has_image = project.image_url.is_some();
 
-                                ui.group(|ui| {
-                                    ui.horizontal(|ui| {
-                                        // Select template by click
-                                        if ui
-                                            .selectable_label(is_selected, &project.display_name)
-                                            .clicked()
-                                        {
-                                            self.selected_project = Some(idx);
-                                        }
+                                let mut label_text = project.display_name.clone();
+                                if has_image {
+                                    label_text.push_str("  · BG");
+                                }
 
-                                        if has_image {
-                                            ui.label(
-                                                egui::RichText::new("BG")
-                                                    .small()
-                                                    .color(Color32::from_rgb(180, 220, 255)),
-                                            );
-                                        }
-                                    });
-
-                                    ui.label(
-                                        egui::RichText::new(&project.id)
-                                            .small()
-                                            .monospace()
-                                            .color(Color32::from_gray(150)),
-                                    );
-                                });
+                                if ui
+                                    .selectable_label(is_selected, label_text)
+                                    .on_hover_text(format!(
+                                        "id: {}\nscript: {}\n{}",
+                                        project.id,
+                                        project.script_url,
+                                        project
+                                            .image_url
+                                            .as_deref()
+                                            .unwrap_or("no background image")
+                                    ))
+                                    .clicked()
+                                {
+                                    self.selected_project = Some(idx);
+                                }
                             }
                         });
 
@@ -471,7 +468,6 @@ impl EvolutionApp {
                     if let Some(idx) = self.selected_project {
                         if idx < self.projects.len() {
                             // Clone to avoid holding an immutable borrow of `self`
-                            // while we might mutably borrow it for loading.
                             let project = self.projects[idx].clone();
 
                             right.heading("Selected template");
@@ -481,53 +477,26 @@ impl EvolutionApp {
                             );
 
                             right.add_space(4.0);
-                            right.label(
-                                egui::RichText::new("Assets")
-                                    .small()
-                                    .strong(),
+                            right.label("Script URL:");
+                            let mut script_url_display = project.script_url.clone();
+                            right.add(
+                                egui::TextEdit::multiline(&mut script_url_display)
+                                    .desired_width(right.available_width())
+                                    .font(egui::TextStyle::Monospace)
+                                    .interactive(false),
                             );
 
-                            // Script actions
-                            right.horizontal(|ui| {
-                                if ui
-                                    .button("Open script")
-                                    .on_hover_text(&project.script_url)
-                                    .clicked()
-                                {
-                                    let _ = webbrowser::open(&project.script_url);
-                                }
-
-                                if ui
-                                    .button("Copy script URL")
-                                    .on_hover_text("Copy raw script URL to clipboard")
-                                    .clicked()
-                                {
-                                    let _ = copy_text_to_clipboard(&project.script_url);
-                                }
-                            });
-
-                            // Background actions
+                            right.add_space(4.0);
                             match &project.image_url {
                                 Some(url) => {
-                                    right.horizontal(|ui| {
-                                        if ui
-                                            .button("Open background")
-                                            .on_hover_text(url)
-                                            .clicked()
-                                        {
-                                            let _ = webbrowser::open(url);
-                                        }
-
-                                        if ui
-                                            .button("Copy background URL")
-                                            .on_hover_text(
-                                                "Copy raw background image URL to clipboard",
-                                            )
-                                            .clicked()
-                                        {
-                                            let _ = copy_text_to_clipboard(url);
-                                        }
-                                    });
+                                    right.label("Background URL:");
+                                    let mut bg_url_display = url.clone();
+                                    right.add(
+                                        egui::TextEdit::multiline(&mut bg_url_display)
+                                            .desired_width(right.available_width())
+                                            .font(egui::TextStyle::Monospace)
+                                            .interactive(false),
+                                    );
                                 }
                                 None => {
                                     right.label(
@@ -540,11 +509,11 @@ impl EvolutionApp {
 
                             right.separator();
 
-                            // Primary actions
+                            // Primary action: load template
                             if right
                                 .add_sized(
                                     egui::vec2(right.available_width(), 24.0),
-                                    egui::Button::new("Load selected template"),
+                                    egui::Button::new("Apply template"),
                                 )
                                 .clicked()
                             {
@@ -553,15 +522,14 @@ impl EvolutionApp {
                                 }
                             }
 
+                            // Generate share URL (only shows it; real copy only on native)
                             if right
                                 .add_sized(
                                     egui::vec2(right.available_width(), 24.0),
-                                    egui::Button::new("Copy load URL (current BG + script)"),
+                                    egui::Button::new("Generate load URL"),
                                 )
                                 .clicked()
                             {
-                                // Build URL like in README, using the template's background + script.
-                                // For the web build clipboard this will be exported to a text file.
                                 let mut full_url =
                                     "https://wavelet-noise.github.io/sand_evolution/".to_owned();
 
@@ -575,7 +543,24 @@ impl EvolutionApp {
                                     full_url.push_str(&project.script_url);
                                 }
 
-                                let _ = copy_text_to_clipboard(&full_url);
+                                // Remember URL to show it in read‑only field
+                                self.last_load_url = full_url.clone();
+
+                                // On native builds also copy to clipboard
+                                #[cfg(not(target_arch = "wasm32"))]
+                                {
+                                    let _ = copy_text_to_clipboard(&full_url);
+                                }
+                            }
+
+                            if !self.last_load_url.is_empty() {
+                                right.add_space(4.0);
+                                right.label("Load URL:");
+                                right.add(
+                                    egui::TextEdit::singleline(&mut self.last_load_url)
+                                        .desired_width(right.available_width())
+                                        .interactive(false),
+                                );
                             }
                         } else {
                             right.label("No template selected.");
@@ -689,10 +674,12 @@ impl EvolutionApp {
             w3: false,
             w4: false,
 
-            projects: Vec::new(),
+            projects: crate::projects::demo_projects(),
             selected_project: None,
             project_loading: false,
             project_error: String::new(),
+
+            last_load_url: String::new(),
         }
     }
 }

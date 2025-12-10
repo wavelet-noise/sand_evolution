@@ -25,6 +25,32 @@ struct ProjectList {
     project: Vec<ProjectDescription>,
 }
 
+/// Built-in demo projects used as a fallback when GitHub is unavailable or
+/// when running outside the browser.
+pub fn demo_projects() -> Vec<ProjectDescription> {
+    vec![
+        ProjectDescription {
+            id: "zeus2.rhai".to_owned(),
+            display_name: "zeus2 (demo)".to_owned(),
+            script_url:
+                "https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/refs/heads/main/zeus2.rhai"
+                    .to_owned(),
+            image_url: Some(
+                "https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/main/empty_box.png"
+                    .to_owned(),
+            ),
+        },
+        ProjectDescription {
+            id: "zeus2_script_only.rhai".to_owned(),
+            display_name: "zeus2 (script only demo)".to_owned(),
+            script_url:
+                "https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/refs/heads/main/zeus2.rhai"
+                    .to_owned(),
+            image_url: None,
+        },
+    ]
+}
+
 /// Serialize a list of project descriptions into a TOML string.
 pub fn serialize_projects(projects: &[ProjectDescription]) -> String {
     let list = ProjectList {
