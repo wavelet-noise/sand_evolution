@@ -509,7 +509,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         window.inner_size(),
                         window.scale_factor(),
                     );
-                    game_context.dispatch();
+                    // dispatch() теперь вызывается внутри update_tick на каждом тике симуляции
+                    // Оставляем один вызов для случаев, когда симуляция не запущена
+                    if evolution_app.simulation_steps_per_second == 0 {
+                        game_context.dispatch();
+                    }
                 }
 
                 _ = game_context.state.render(
