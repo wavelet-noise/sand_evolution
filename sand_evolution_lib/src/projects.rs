@@ -21,7 +21,7 @@ impl ProjectDescription {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct ProjectList {
+pub(crate) struct ProjectList {
     project: Vec<ProjectDescription>,
 }
 
@@ -81,7 +81,7 @@ pub fn load_projects_from_file(
 // GitHub integration is available only on wasm builds.
 #[cfg(target_arch = "wasm32")]
 mod github {
-    use super::ProjectDescription;
+    use super::{ProjectDescription, ProjectList};
     use serde::Deserialize;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::JsFuture;
@@ -95,78 +95,38 @@ mod github {
         pub item_type: String,
     }
 
-    const GITHUB_CONTENT_URL: &str =
-        "https://api.github.com/repos/wavelet-noise/sand_evolution_maps/contents";
+    const PROJECTS_TOML_URL: &str =
+        "https://raw.githubusercontent.com/wavelet-noise/sand_evolution_maps/main/projects.toml";
 
     /// Fetch list of projects from GitHub repository.
     pub async fn fetch_github_projects() -> Result<Vec<ProjectDescription>, JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
 
-        let resp_value = JsFuture::from(window.fetch_with_str(GITHUB_CONTENT_URL)).await?;
-        let resp: web_sys::Response = resp_value.dyn_into()?;
+        let resp_value = JsFuture::from(window.fetch_with_str(PROJECTS_TOML_URL)).await
+            .map_err(|e| JsValue::from_str(&format!("Failed to fetch projects.toml: {:?}", e)))?;
+        
+        let toml_resp: web_sys::Response = resp_value.dyn_into()
+            .map_err(|_| JsValue::from_str("Failed to convert response"))?;
 
-        if !resp.ok() {
-            let status = resp.status();
-            let status_text = resp.status_text();
+        if !toml_resp.ok() {
+            let status = toml_resp.status();
+            let status_text = toml_resp.status_text();
             return Err(JsValue::from_str(&format!(
-                "GitHub request failed: {} {}",
+                "Failed to load projects.toml: {} {}",
                 status, status_text
             )));
         }
 
-        let json = JsFuture::from(resp.json()?).await?;
+        let text_js = JsFuture::from(toml_resp.text()?)
+            .map_err(|e| JsValue::from_str(&format!("Failed to read projects.toml text: {:?}", e)))?;
+        
+        let toml_text = text_js.as_string()
+            .ok_or_else(|| JsValue::from_str("projects.toml is not a valid string"))?;
 
-        let items: Vec<GithubContentItem> =
-            serde_wasm_bindgen::from_value(json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let project_list: ProjectList = toml::from_str(&toml_text)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse projects.toml: {}", e)))?;
 
-        let mut scripts: Vec<GithubContentItem> = Vec::new();
-        let mut images: Vec<GithubContentItem> = Vec::new();
-
-        for item in items.into_iter() {
-            if item.item_type == "file" {
-                if item.name.ends_with(".rhai") {
-                    scripts.push(item);
-                } else {
-                    let lower = item.name.to_lowercase();
-                    if lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg")
-                    {
-                        images.push(item);
-                    }
-                }
-            }
-        }
-
-        use std::collections::HashMap;
-        let mut image_by_base: HashMap<String, String> = HashMap::new();
-        for img in images.into_iter() {
-            let lower = img.name.to_lowercase();
-            let base = lower
-                .strip_suffix(".png")
-                .or_else(|| lower.strip_suffix(".jpg"))
-                .or_else(|| lower.strip_suffix(".jpeg"))
-                .unwrap_or(&lower)
-                .to_owned();
-            image_by_base.entry(base).or_insert(img.download_url);
-        }
-
-        let mut result = Vec::new();
-        for script in scripts.into_iter() {
-            let base = script
-                .name
-                .strip_suffix(".rhai")
-                .unwrap_or(script.name.as_str())
-                .to_owned();
-            let key = base.to_lowercase();
-            let image_url = image_by_base.get(&key).cloned();
-            result.push(ProjectDescription {
-                id: script.name.clone(),
-                display_name: base,
-                script_url: script.download_url.clone(),
-                image_url,
-            });
-        }
-
-        Ok(result)
+        Ok(project_list.project)
     }
 
     /// Fetch assets (optional background image + Rhai script text) for a specific project.
