@@ -55,10 +55,10 @@ export interface InitOutput {
   readonly wgpu_render_bundle_pop_debug_group: (a: number) => void;
   readonly wgpu_render_bundle_set_index_buffer: (a: number, b: bigint, c: number, d: bigint, e: bigint) => void;
   readonly wgpu_render_bundle_push_debug_group: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h01ea32c4a698ad61: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__closure__destroy__h11ddb691d12d990a: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__h77c4d55b415d1789: (a: number, b: number, c: any) => void;
   readonly wasm_bindgen__closure__destroy__h619df55e4f3c0493: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__h01ea32c4a698ad61: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__closure__destroy__h11ddb691d12d990a: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__hfb3bc78558ecfa9c: (a: number, b: number) => void;
   readonly wasm_bindgen__closure__destroy__h26acb8ca76b3d3d3: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__h2917f594691f9241: (a: number, b: number, c: any, d: any) => void;
