@@ -34,7 +34,6 @@ log = "0.4"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 cgmath = "0.18"
 instant = "0.1"
-getrandom = { version = "0.3.4", features = ["wasm_js"] }
 rhai = "1.16.2"
 specs = { version = "0.20", default-features = false }
 
