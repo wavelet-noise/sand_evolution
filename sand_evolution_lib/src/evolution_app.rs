@@ -155,11 +155,18 @@ impl EvolutionApp {
         let proxy = event_loop_proxy.clone();
         self.executor.execute(async move {
             match crate::projects::fetch_project_assets(&proj).await {
-                Ok((maybe_image, script_text)) => {
+                Ok((maybe_image, script_text, image_error)) => {
                     if let Some(img) = maybe_image {
                         let _ = proxy.send_event(UserEventInfo::ImageImport(img));
                     }
                     let _ = proxy.send_event(UserEventInfo::TextImport(script_text.into_bytes()));
+                    // Report image loading errors if any (non-critical, script loaded successfully)
+                    if let Some(err_msg) = image_error {
+                        let _ = proxy.send_event(UserEventInfo::ProjectLoadError(format!(
+                            "⚠️ Background image failed to load (script loaded successfully): {}",
+                            err_msg
+                        )));
+                    }
                 }
                 Err(e) => {
                     let _ = proxy.send_event(UserEventInfo::ProjectLoadError(format!(
