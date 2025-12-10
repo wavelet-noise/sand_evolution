@@ -170,26 +170,80 @@ mod github {
     }
 
     /// Fetch assets (optional background image + Rhai script text) for a specific project.
+    /// Returns (image_bytes, script_text, image_error_message)
     pub async fn fetch_project_assets(
         project: &ProjectDescription,
-    ) -> Result<(Option<Vec<u8>>, String), JsValue> {
+    ) -> Result<(Option<Vec<u8>>, String, Option<String>), JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
 
         let mut image_bytes: Option<Vec<u8>> = None;
+        let mut image_error: Option<String> = None;
 
         if let Some(image_url) = &project.image_url {
-            let resp_value = JsFuture::from(window.fetch_with_str(image_url)).await?;
-            let resp: web_sys::Response = resp_value.dyn_into()?;
-            if resp.ok() {
-                let buffer = JsFuture::from(resp.array_buffer()?).await?;
-                let buffer: js_sys::ArrayBuffer = buffer.dyn_into()?;
-                let array = js_sys::Uint8Array::new(&buffer);
-                let mut bytes = vec![0u8; array.length() as usize];
-                array.copy_to(&mut bytes[..]);
-                image_bytes = Some(bytes);
+            // Image loading is optional - if it fails, we continue without it but report the error
+            match JsFuture::from(window.fetch_with_str(image_url)).await {
+                Ok(resp_value) => {
+                    match resp_value.dyn_into::<web_sys::Response>() {
+                        Ok(resp) => {
+                            if resp.ok() {
+                                match resp.array_buffer() {
+                                    Ok(buffer_future) => {
+                                        match JsFuture::from(buffer_future).await {
+                                            Ok(buffer) => {
+                                                match buffer.dyn_into::<js_sys::ArrayBuffer>() {
+                                                    Ok(array_buffer) => {
+                                                        let array = js_sys::Uint8Array::new(&array_buffer);
+                                                        let mut bytes = vec![0u8; array.length() as usize];
+                                                        array.copy_to(&mut bytes[..]);
+                                                        image_bytes = Some(bytes);
+                                                    }
+                                                    Err(e) => {
+                                                        image_error = Some(format!(
+                                                            "Failed to convert image buffer: {:?}",
+                                                            e
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                image_error = Some(format!(
+                                                    "Failed to read image buffer: {:?}",
+                                                    e
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        image_error = Some(format!(
+                                            "Failed to get image array buffer: {:?}",
+                                            e
+                                        ));
+                                    }
+                                }
+                            } else {
+                                let status = resp.status();
+                                let status_text = resp.status_text();
+                                image_error = Some(format!(
+                                    "Image request failed: {} {} for URL: {}",
+                                    status, status_text, image_url
+                                ));
+                            }
+                        }
+                        Err(e) => {
+                            image_error = Some(format!(
+                                "Failed to convert image response: {:?}",
+                                e
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    image_error = Some(format!(
+                        "Failed to fetch image from {}: {:?}",
+                        image_url, e
+                    ));
+                }
             }
-            // Note: If image fetch fails (non-ok response), we silently continue
-            // since background images are optional. The script will still load.
         }
 
         let resp_value = JsFuture::from(window.fetch_with_str(&project.script_url)).await?;
@@ -207,7 +261,7 @@ mod github {
             .as_string()
             .unwrap_or_else(|| "// failed to load script".to_owned());
 
-        Ok((image_bytes, script_text))
+        Ok((image_bytes, script_text, image_error))
     }
 }
 
