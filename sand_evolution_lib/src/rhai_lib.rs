@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use cgmath::{InnerSpace, Matrix, Matrix2, Matrix3, SquareMatrix, Vector2, Vector3};
 use rhai::EvalAltResult;
@@ -13,6 +13,7 @@ pub fn register_rhai(
     shared_state_rc: Rc<RefCell<SharedState>>, 
     id_dict: HashMap<String, u8>,
     world_rc: Option<Rc<RefCell<specs::World>>>,
+    script_log_rc: Rc<RefCell<VecDeque<String>>>,
 ) {
     //rhai_scope.push_constant("RES_X", dimensions.0);
     //rhai_scope.push_constant("RES_Y", dimensions.1);
@@ -59,6 +60,78 @@ pub fn register_rhai(
     rhai.register_fn("fract", move |v: f64| { v.fract() });
     rhai.register_fn("rand", move || -> i64 { crate::random::my_rand() });
     scope.push("time", 0f64);
+    
+    // Register print function for script logging with circular buffer (max 30 entries)
+    const MAX_LOG_ENTRIES: usize = 30;
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |message: &str| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(message.to_owned());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for different types
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: i64| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: f64| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |value: bool| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(value.to_string());
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for Vector2
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |v: Vector2<f64>| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(format!("vec2({}, {})", v.x, v.y));
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
+    
+    // Register print for Vector3
+    {
+        let log_clone = script_log_rc.clone();
+        rhai.register_fn("print", move |v: Vector3<f64>| {
+            let mut log = log_clone.borrow_mut();
+            log.push_back(format!("vec3({}, {}, {})", v.x, v.y, v.z));
+            if log.len() > MAX_LOG_ENTRIES {
+                log.pop_front();
+            }
+        });
+    }
 
     // Функции для работы с объектами
     if let Some(world_ref) = world_rc {
