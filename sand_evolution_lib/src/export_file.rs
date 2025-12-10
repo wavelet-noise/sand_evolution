@@ -1,4 +1,3 @@
-use image::ImageEncoder;
 use std::error::Error;
 
 #[cfg(target_arch = "wasm32")]
@@ -8,8 +7,6 @@ use web_sys::{BlobPropertyBag, Url};
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
-#[cfg(not(target_arch = "wasm32"))]
-use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     fs::write("exported.txt", data)?;

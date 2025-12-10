@@ -1,9 +1,6 @@
-use crate::cells::burning_coal::BurningCoal;
-use crate::cells::burning_gas::BurningGas;
-use crate::cells::coal::Coal;
 use crate::cs::PointType;
 
-use super::{burning_wood, CellRegistry, CellTrait, CellType, fire, Prng};
+use super::{burning_wood, CellRegistry, CellTrait, CellType, Prng};
 
 pub struct DryGrass;
 impl DryGrass {

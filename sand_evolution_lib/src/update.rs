@@ -3,6 +3,7 @@ use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::shared_state::SharedState;
 use crate::{cs, State};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
+use log::error;
 use std::cell::RefCell;
 use std::rc::Rc;
 use specs::RunNow;
