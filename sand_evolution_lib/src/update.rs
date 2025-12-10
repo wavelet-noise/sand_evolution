@@ -20,7 +20,7 @@ pub fn update_tick(
     evolution_app: &mut EvolutionApp,
     world: &mut specs::World,
     shared_state: &Rc<RefCell<SharedState>>,
-    update_start_time: f64,
+    _update_start_time: f64,
 ) {
     //let mut output = ImageBuffer::new(texture_size.width, texture_size.height);
     let mut b_index = 0;
@@ -31,7 +31,7 @@ pub fn update_tick(
     _ = getrandom::getrandom(&mut buf);
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-    if let Some(mut rhai_resource) = world.get_mut::<RhaiResource>() {
+    if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
         if let Some(storage) = &mut rhai_resource.storage {
             if state.toggled {
                 set_frame_vars(state, storage);
