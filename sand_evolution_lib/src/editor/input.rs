@@ -1,5 +1,5 @@
-use egui::{Context, Pos2, PointerButton};
-use specs::{World, WorldExt, ReadStorage};
+use egui::{Context, Pos2};
+use specs::{World, WorldExt};
 use crate::editor::state::{EditorState, EditorMode};
 use crate::editor::gizmo::GizmoSystem;
 use crate::ecs::components::Position;
@@ -109,7 +109,7 @@ impl InputHandler {
         undo_redo: &mut crate::editor::undo_redo::UndoRedo,
     ) {
         use crate::ecs::components::{Position, Rotation, Scale};
-        use specs::{WorldExt, WriteStorage};
+        use specs::WorldExt;
         
         let delta_x = editor_state.drag_current_pos.0 - editor_state.drag_start_pos.0;
         let delta_y = editor_state.drag_current_pos.1 - editor_state.drag_start_pos.1;
@@ -159,7 +159,7 @@ impl InputHandler {
         x2: f32,
         y2: f32,
     ) {
-        use specs::{WorldExt, ReadStorage, Join};
+        use specs::{WorldExt, Join};
         use crate::ecs::components::Position;
         
         let min_x = x1.min(x2);

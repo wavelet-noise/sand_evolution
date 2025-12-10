@@ -1,5 +1,5 @@
 use egui::{Ui, DragValue};
-use specs::{World, WorldExt, ReadStorage, WriteStorage, Entity};
+use specs::{World, WorldExt, Entity};
 use crate::ecs::components::{Position, Rotation, Scale, Name, Script};
 use crate::editor::state::EditorState;
 
@@ -161,8 +161,8 @@ impl EditorInspector {
         // Multi-edit transform
         ui.collapsing("Transform (Multi-edit)", |ui| {
             let positions = world.read_storage::<Position>();
-            let mut rotations = world.write_storage::<Rotation>();
-            let mut scales = world.write_storage::<Scale>();
+            let rotations = world.write_storage::<Rotation>();
+            let scales = world.write_storage::<Scale>();
             
             // Check if all have position
             let all_have_position = entities.iter()

@@ -70,7 +70,7 @@ impl AddPanel {
     }
     
     fn generate_unique_name(world: &World, base: &str) -> String {
-        use specs::{WorldExt, ReadStorage, Join};
+        use specs::{WorldExt, Join};
         use crate::ecs::components::Name;
         
         let names = world.read_storage::<Name>();

@@ -1,4 +1,3 @@
-use crate::cells::helper::fluid_falling_helper;
 use crate::cs::{self, PointType};
 
 use super::{void::Void, CellRegistry, CellTrait, CellType, Prng};

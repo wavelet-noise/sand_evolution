@@ -2,19 +2,15 @@ use cgmath::num_traits::clamp;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wgpu::{util::DeviceExt, TextureFormat, TextureView};
-use winit::{
-    dpi::{LogicalPosition, PhysicalSize},
-    window::Window,
-};
+use winit::dpi::{LogicalPosition, PhysicalSize};
 
-use crate::resources::rhai_resource::RhaiResource;
 use crate::shared_state::SharedState;
 use crate::{
     cells::{stone::Stone, wood::Wood, CellRegistry, Prng},
     cs,
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
-    update, GameContext, Vertex, INDICES, VERTICES,
+    update, Vertex, INDICES, VERTICES,
 };
 
 #[repr(C)]
