@@ -63,6 +63,7 @@ pub struct EvolutionApp {
     pub w2: bool,
     pub w3: bool,
     pub w4: bool, // templates / projects window
+    pub w5: bool, // palette window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -276,6 +277,7 @@ impl EvolutionApp {
         let mut w2: bool = self.w2;
         let mut w3: bool = self.w3;
         let mut w4: bool = self.w4;
+        let mut w5: bool = self.w5;
         let mut w6: bool = self.editor_state.show_grid; // Editor viewport window
 
         // Editor toolbar
@@ -366,19 +368,22 @@ impl EvolutionApp {
         egui::Window::new("Swithes")
         .default_pos(egui::pos2(10.0,10.0))
         .show(context, |ui| {
-            if ui.button("Config").clicked() {
+            if ui.selectable_label(w1, "Config").clicked() {
                 w1 = !w1;
             }
-            if ui.button("Script").clicked() {
+            if ui.selectable_label(w2, "Script").clicked() {
                 w2 = !w2;
             }
-            if ui.button("Sim").clicked() {
+            if ui.selectable_label(w3, "Sim").clicked() {
                 w3 = !w3;
             }
-            if ui.button("Templates").clicked() {
+            if ui.selectable_label(w4, "Templates").clicked() {
                 w4 = !w4;
             }
-            if ui.button("Editor").clicked() {
+            if ui.selectable_label(w5, "Palette").clicked() {
+                w5 = !w5;
+            }
+            if ui.selectable_label(w6, "Editor").clicked() {
                 w6 = !w6;
             }
             
@@ -934,6 +939,137 @@ impl EvolutionApp {
         }
         
         self.w4 = w4;
+        
+        // Floating palette window (movable, positioned at bottom by default)
+        let available = context.available_rect();
+        let palette_y = (available.max.y - 70.0).max(50.0);
+        egui::Window::new("🎨 Palette")
+            .open(&mut w5)
+            .default_pos(egui::pos2(5.0, palette_y))
+            .default_width(available.width() - 10.0)
+            .resizable(true)
+            .collapsible(true)
+            .show(context, |ui| {
+                // Cell type data: (name for dict, display name, color RGB)
+                let cell_types: Vec<(&str, &str, [u8; 3])> = vec![
+                    ("sand", "Sand", [204, 204, 26]),
+                    ("water", "Water", [26, 38, 255]),
+                    ("steam", "Steam", [128, 128, 128]),
+                    ("fire", "Fire", [255, 128, 0]),
+                    ("coal", "Coal", [26, 26, 26]),
+                    ("acid", "Acid", [0, 102, 0]),
+                    ("gas", "Gas", [51, 204, 51]),
+                    ("delute acid", "Delute Acid", [51, 153, 204]),
+                    ("salt", "Salt", [204, 204, 204]),
+                    ("base", "Base", [255, 51, 51]),
+                    ("salty water", "Salty Water", [128, 128, 255]),
+                    ("base water", "Base Water", [255, 128, 255]),
+                    ("liquid_gas", "Liquid Gas", [77, 230, 179]),
+                    ("wood", "Wood", [128, 51, 51]),
+                    ("ice", "Ice", [77, 153, 255]),
+                    ("crushed ice", "Crushed Ice", [128, 204, 255]),
+                    ("snow", "Snow", [204, 230, 255]),
+                    ("electricity", "Electricity", [51, 102, 255]),
+                    ("plasma", "Plasma", [153, 77, 255]),
+                    ("laser", "Laser", [255, 26, 0]),
+                    ("grass", "Grass", [102, 255, 102]),
+                    ("dry grass", "Dry Grass", [179, 125, 107]),
+                    ("black_hole", "Black Hole", [89, 0, 89]),
+                    ("stone", "Stone", [200, 200, 200]),
+                ];
+                
+                ui.horizontal(|ui| {
+                    // Brush size slider
+                    ui.spacing_mut().slider_width = 100.0;
+                    ui.add(
+                        egui::Slider::new(&mut self.number_of_cells_to_add, 1..=2000)
+                            .show_value(true)
+                            .text("🖌")
+                    );
+                    
+                    ui.separator();
+                    
+                    // Scrollable horizontal palette
+                    egui::ScrollArea::horizontal()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+                                
+                                for (dict_name, display_name, color) in &cell_types {
+                                    let color32 = Color32::from_rgb(color[0], color[1], color[2]);
+                                    let is_selected = self.selected_option == *dict_name;
+                                    
+                                    // Button with color square and name
+                                    let button_response = ui.allocate_ui(egui::vec2(90.0, 28.0), |ui| {
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            egui::vec2(90.0, 28.0),
+                                            egui::Sense::click()
+                                        );
+                                        
+                                        if ui.is_rect_visible(rect) {
+                                            let painter = ui.painter();
+                                            
+                                            // Background
+                                            let bg_color = if is_selected {
+                                                Color32::from_rgb(70, 90, 120)
+                                            } else if response.hovered() {
+                                                Color32::from_rgb(55, 55, 65)
+                                            } else {
+                                                Color32::from_rgb(45, 45, 55)
+                                            };
+                                            
+                                            painter.rect_filled(
+                                                rect,
+                                                egui::Rounding::same(4.0),
+                                                bg_color
+                                            );
+                                            
+                                            // Border for selected
+                                            if is_selected {
+                                                painter.rect_stroke(
+                                                    rect,
+                                                    egui::Rounding::same(4.0),
+                                                    egui::Stroke::new(2.0, Color32::from_rgb(100, 180, 255))
+                                                );
+                                            }
+                                            
+                                            // Color square (left side)
+                                            let color_rect = egui::Rect::from_min_size(
+                                                rect.min + egui::vec2(4.0, 4.0),
+                                                egui::vec2(20.0, 20.0)
+                                            );
+                                            painter.rect_filled(
+                                                color_rect,
+                                                egui::Rounding::same(3.0),
+                                                color32
+                                            );
+                                            
+                                            // Text (right of color)
+                                            painter.text(
+                                                rect.min + egui::vec2(28.0, rect.height() / 2.0),
+                                                egui::Align2::LEFT_CENTER,
+                                                *display_name,
+                                                egui::FontId::proportional(11.0),
+                                                Color32::WHITE
+                                            );
+                                        }
+                                        
+                                        response
+                                    });
+                                    
+                                    if button_response.inner.clicked() {
+                                        self.selected_option = dict_name.to_string();
+                                    }
+                                }
+                            });
+                        });
+                });
+                
+                *any_win_hovered |= context.is_pointer_over_area()
+            });
+        
+        self.w5 = w5;
     }
     
     fn show_toasts(&mut self, ctx: &Context) {
@@ -1079,6 +1215,7 @@ impl EvolutionApp {
             w2: false,
             w3: false,
             w4: false,
+            w5: true, // Palette window open by default
 
             projects: crate::projects::demo_projects(),
             selected_project: None,

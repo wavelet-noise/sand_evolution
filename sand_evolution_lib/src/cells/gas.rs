@@ -21,10 +21,23 @@ impl CellTrait for Gas {
         cur: usize,
         container: &mut [CellType],
         pal_container: &CellRegistry,
-        dim: &mut Prng,
-        _: Option<&mut TemperatureContext>,
+        prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
-        fluid_flying_helper(self.den(), i, j, container, pal_container, cur, dim);
+        // Газ конденсируется в сжиженный газ при очень низкой температуре
+        if let Some(temp_ctx) = temp_context {
+            let temperature = (temp_ctx.get_temp)(i, j);
+            
+            // Газ конденсируется при температуре ниже -50 градусов
+            // с небольшой вероятностью, чтобы не конденсировался мгновенно
+            if temperature < -50.0 && prng.next() < 10 {
+                use super::liquid_gas::LiquidGas;
+                container[cur] = LiquidGas::id();
+                return;
+            }
+        }
+        
+        fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
 
     fn den(&self) -> i8 {
