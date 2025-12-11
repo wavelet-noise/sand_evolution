@@ -39,7 +39,7 @@ impl<'a> System<'a> for EntityScriptSystem {
 
     fn run(&mut self, (entities, mut scripts, positions, mut rhai_resource): Self::SystemData) {
         if let Some(rhai) = &mut rhai_resource.storage {
-            // Унифицированная обработка всех скриптов
+            // Unified processing of all scripts
             Self::compile_and_run_all_scripts(&entities, &mut scripts, &positions, &rhai.engine, &mut rhai.scope);
         }
     }
@@ -65,7 +65,7 @@ impl EntityScriptSystem {
         }
     }
 
-    // Унифицированная функция для компиляции и выполнения всех скриптов
+    // Unified function for compiling and executing all scripts
     fn compile_and_run_all_scripts(
         entities: &Entities,
         scripts: &mut WriteStorage<Script>,
@@ -73,10 +73,10 @@ impl EntityScriptSystem {
         engine: &rhai::Engine,
         scope: &mut rhai::Scope,
     ) {
-        // Сначала компилируем все скрипты, которые нужно скомпилировать
+        // First, compile all scripts that need to be compiled
         let mut entities_to_compile: Vec<(specs::Entity, String)> = Vec::new();
         {
-            // Используем временную ссылку для чтения
+            // Use a temporary reference for reading
             let scripts_read: &WriteStorage<Script> = scripts;
             for (entity, script) in (entities, scripts_read).join() {
                 if script.raw {
@@ -86,14 +86,14 @@ impl EntityScriptSystem {
         }
         
         for (entity, script_text) in entities_to_compile {
-            // Теперь можем получить mutable доступ
+            // Now we can get mutable access
             if let Some(script) = scripts.get_mut(entity) {
                 script.ast = Self::compile_script(engine, scope, &script_text);
                 script.raw = false;
             }
         }
 
-        // Затем выполняем все скомпилированные скрипты
+        // Then execute all compiled scripts
         {
             let scripts_read: &WriteStorage<Script> = scripts;
             for (_entity, script) in (entities, scripts_read).join() {

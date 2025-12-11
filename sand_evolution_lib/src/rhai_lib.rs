@@ -133,7 +133,7 @@ pub fn register_rhai(
         });
     }
 
-    // Функции для работы с объектами
+    // Functions for working with objects
     if let Some(world_ref) = world_rc {
         let world_clone = world_ref.clone();
         rhai.register_fn("create_object", move |name: &str| -> bool {
@@ -159,7 +159,7 @@ pub fn register_rhai(
             let names = world.read_storage::<Name>();
             let entities = world.entities();
             
-            // Сначала находим entity
+            // First, find the entity
             let mut target_entity = None;
             for (entity, name_comp) in (&entities, &names).join() {
                 if name_comp.name == name {
@@ -168,7 +168,7 @@ pub fn register_rhai(
                 }
             }
             
-            // Затем обновляем скрипт
+            // Then update the script
             if let Some(entity) = target_entity {
                 let mut scripts = world.write_storage::<Script>();
                 if let Some(script_comp) = scripts.get_mut(entity) {
@@ -213,7 +213,7 @@ pub fn register_rhai(
                 let names = world.read_storage::<Name>();
                 let entities = world.entities();
                 
-                // Сначала находим entity
+                // First, find the entity
                 for (entity, name_comp) in (&entities, &names).join() {
                     if name_comp.name == name {
                         target_entity = Some(entity);
@@ -222,7 +222,7 @@ pub fn register_rhai(
                 }
             }
             
-            // Затем удаляем
+            // Then delete
             if let Some(entity) = target_entity {
                 world.delete_entity(entity).ok();
                 return true;

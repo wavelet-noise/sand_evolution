@@ -24,8 +24,8 @@ impl CellTrait for DryGrass {
         _pal_container: &CellRegistry,
         prng: &mut Prng,
     ) {
-        // Сухая трава восстанавливается при контакте с водой
-        // Проверяем редко для медленного роста
+        // Dry grass recovers on contact with water
+        // Check rarely for slow growth
         if prng.next() > 200 {
             let top = cs::xy_to_index(i, j + 1);
             let down = cs::xy_to_index(i, j - 1);
@@ -37,7 +37,7 @@ impl CellTrait for DryGrass {
             let r_v = container[r];
             let l_v = container[l];
 
-            // Если рядом есть вода, сухая трава превращается в траву
+            // If there's water nearby, dry grass turns into grass
             if top_v == Water::id() || down_v == Water::id() ||
                r_v == Water::id() || l_v == Water::id() {
                 container[cur] = Grass::id();
@@ -45,7 +45,7 @@ impl CellTrait for DryGrass {
             }
         }
 
-        // Медленное смешивание с зелёной травой
+        // Slow mixing with green grass
         if prng.next() > 240 {
             let top = cs::xy_to_index(i, j + 1);
             let down = cs::xy_to_index(i, j - 1);
@@ -57,10 +57,10 @@ impl CellTrait for DryGrass {
             let r_v = container[r];
             let l_v = container[l];
 
-            // Если рядом есть зелёная трава, сухая трава медленно превращается в зелёную
+            // If there's green grass nearby, dry grass slowly turns into green
             if top_v == Grass::id() || down_v == Grass::id() ||
                r_v == Grass::id() || l_v == Grass::id() {
-                // С очень маленькой вероятностью сухая трава зеленеет
+                // With very low probability, dry grass turns green
                 if prng.next() > 250 {
                     container[cur] = Grass::id();
                     return;

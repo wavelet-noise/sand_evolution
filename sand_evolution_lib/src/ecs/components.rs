@@ -22,8 +22,8 @@ impl Component for Velocity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptType {
-    World,   // Мировой скрипт
-    Entity,  // Скрипт объекта
+    World,   // World script
+    Entity,  // Object script
 }
 
 #[derive(Debug)]
@@ -60,7 +60,7 @@ impl Component for Name {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rotation {
-    pub angle: f32, // в радианах
+    pub angle: f32, // in radians
 }
 
 impl Default for Rotation {
