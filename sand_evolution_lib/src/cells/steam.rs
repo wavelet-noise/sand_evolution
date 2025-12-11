@@ -25,12 +25,12 @@ impl CellTrait for Steam {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Пар конденсируется в воду при низкой температуре
+        // Steam condenses into water at low temperature
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Пар конденсируется в воду при температуре ниже -10 градусов
-            // с небольшой вероятностью, чтобы не конденсировался мгновенно
+            // Steam condenses into water at temperature below -10 degrees
+            // with small probability to avoid instant condensation
             if temperature < 0.0 && prng.next() < 10 {
                 use super::water::Water;
                 container[cur] = Water::id();

@@ -196,6 +196,8 @@ pub fn register_rhai(
                     ast: None,
                     raw: true,
                     script_type: ScriptType::Entity,
+                    run_once: false,
+                    has_run: false,
                 })
                 .build();
             true
@@ -224,6 +226,38 @@ pub fn register_rhai(
                 if let Some(script_comp) = scripts.get_mut(entity) {
                     script_comp.script = script.to_owned();
                     script_comp.raw = true;
+                    script_comp.has_run = false;
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_object_script_once", move |name: &str, script: &str| -> bool {
+            use specs::Join;
+            use crate::ecs::components::{Name, Script};
+            let world = world_clone.borrow_mut();
+            let names = world.read_storage::<Name>();
+            let entities = world.entities();
+
+            // First, find the entity
+            let mut target_entity = None;
+            for (entity, name_comp) in (&entities, &names).join() {
+                if name_comp.name == name {
+                    target_entity = Some(entity);
+                    break;
+                }
+            }
+
+            // Then update the script as a one-shot (runs on first tick after compile)
+            if let Some(entity) = target_entity {
+                let mut scripts = world.write_storage::<Script>();
+                if let Some(script_comp) = scripts.get_mut(entity) {
+                    script_comp.script = script.to_owned();
+                    script_comp.raw = true;
+                    script_comp.run_once = true;
+                    script_comp.has_run = false;
                     return true;
                 }
             }

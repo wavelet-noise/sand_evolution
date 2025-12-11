@@ -27,17 +27,17 @@ impl CellTrait for Snow {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Снег тает только на основе температуры - если температура > 0, то тает и охлаждает среду
+        // Snow melts only based on temperature - if temperature > 0, it melts and cools the environment
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Если температура выше 0 градусов, снег тает
+            // If temperature is above 0 degrees, snow melts
             if temperature > 0.0 {
-                // Отдаем холод соседям при таянии (уменьшено, чтобы избежать вспышек)
-                (temp_ctx.add_temp)(i, j + 1, -5.0); // верх
-                (temp_ctx.add_temp)(i, j - 1, -5.0); // низ
-                (temp_ctx.add_temp)(i + 1, j, -5.0); // лево
-                (temp_ctx.add_temp)(i - 1, j, -5.0); // право
+                // Give cold to neighbors when melting (reduced to avoid flashes)
+                (temp_ctx.add_temp)(i, j + 1, -5.0); // top
+                (temp_ctx.add_temp)(i, j - 1, -5.0); // bottom
+                (temp_ctx.add_temp)(i + 1, j, -5.0); // left
+                (temp_ctx.add_temp)(i - 1, j, -5.0); // right
                 
                 container[cur] = Water::id();
                 return;

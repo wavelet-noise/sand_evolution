@@ -7,3 +7,4 @@ Cargo.lock
 exported.txt
 sand_evolution_lib/.DS_Store
 .DS_Store
+scene.toml

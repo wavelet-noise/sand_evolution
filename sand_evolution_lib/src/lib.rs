@@ -191,6 +191,8 @@ impl GameContext {
                 ast: None,
                 raw: true,
                 script_type: ScriptType::World,
+                run_once: false,
+                has_run: false,
             })
             .build();
 
@@ -215,21 +217,23 @@ impl GameContext {
                 ast: None,
                 raw: true,
                 script_type: ScriptType::Entity,
+                run_once: false,
+                has_run: false,
             })
             .build();
 
-        // Create Cooler entity - охлаждает верхний ряд клеток каждый тик
+        // Create Cooler entity - cools the top row of cells every tick
         world
             .create_entity()
             .with(Name {
                 name: "Cooler".to_owned(),
             })
             .with(Script {
-                script: r#"// Скрипт объекта Cooler - охлаждает верхний ряд клеток каждый тик
+                script: r#"// Cooler object script - cools the top row of cells every tick
 let top_row_y = 511;
-let cool_temp = -5.0;
+let cool_temp = -10.0;
 
-// Охлаждаем все клетки верхнего ряда каждый тик
+// Cool all cells in the top row every tick
 for x in 0..GRID_WIDTH {
     set_temperature(x, top_row_y, cool_temp);
 }
@@ -237,6 +241,34 @@ for x in 0..GRID_WIDTH {
                 ast: None,
                 raw: true,
                 script_type: ScriptType::Entity,
+                run_once: false,
+                has_run: false,
+            })
+            .build();
+
+        // Create Clear All entity - clears the entire grid ONCE (on the first tick)
+        world
+            .create_entity()
+            .with(Name {
+                name: "Clear All".to_owned(),
+            })
+            .with(Script {
+                script: r#"// Clear All - one-shot script
+// Runs once and clears the entire grid to Void (id = 0).
+// Important: this also affects the border/boundaries.
+
+for x in 0..GRID_WIDTH {
+    for y in 0..GRID_HEIGHT {
+        set_cell(x, y, 0);
+    }
+}
+"#
+                .to_owned(),
+                ast: None,
+                raw: true,
+                script_type: ScriptType::Entity,
+                run_once: true,
+                has_run: false,
             })
             .build();
 
@@ -500,6 +532,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                                 script.ast = Some(value);
                                                 script.script = script_text;
                                                 script.raw = false;
+                                                // If this is a one-shot script, allow it to run again after edit/compile.
+                                                script.has_run = false;
                                             }
                                             evolution_app.script_error = "".to_owned();
                                         }
@@ -508,6 +542,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                             if let Some(script) = scripts.get_mut(script_entity) {
                                                 script.ast = None;
                                                 script.raw = true;
+                                                script.has_run = false;
                                             }
                                             evolution_app.script_error = err.to_string()
                                         }
@@ -680,6 +715,33 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         }
                         Err(_) => {
                             panic!("Invalid UTF-8 data");
+                        }
+                    }
+                    evolution_app.project_loading = false;
+                }
+                UserEventInfo::SceneImport(bytes) => {
+                    match String::from_utf8(bytes) {
+                        Ok(text) => {
+                            match evolution_app.import_scene_from_toml(&mut game_context.world, &text) {
+                                Ok(()) => {
+                                    evolution_app.editor_state.add_toast(
+                                        "Scene imported".to_owned(),
+                                        crate::editor::state::ToastLevel::Info,
+                                    );
+                                }
+                                Err(err) => {
+                                    evolution_app.editor_state.add_toast(
+                                        format!("Scene import error: {}", err),
+                                        crate::editor::state::ToastLevel::Error,
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            evolution_app.editor_state.add_toast(
+                                "Scene import error: invalid UTF-8".to_owned(),
+                                crate::editor::state::ToastLevel::Error,
+                            );
                         }
                     }
                     evolution_app.project_loading = false;

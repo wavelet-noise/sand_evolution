@@ -24,8 +24,8 @@ pub fn index_to_cell(index: IndexType) -> Point2<PointType> {
     )
 }
 
-// Система температуры по секциям
-// Размер секции для температуры (32x32 пикселя)
+// Temperature system by sections
+// Section size for temperature (32x32 pixels)
 pub const TEMP_SECTION_SIZE: PointType = 32;
 
 pub fn get_temp_section_coords(i: PointType, j: PointType) -> (PointType, PointType) {

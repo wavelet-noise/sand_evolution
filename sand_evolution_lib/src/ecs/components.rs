@@ -32,6 +32,10 @@ pub struct Script {
     pub ast: Option<rhai::AST>,
     pub raw: bool,
     pub script_type: ScriptType,
+    /// If true, the script should execute only once: on the first tick after it becomes runnable.
+    pub run_once: bool,
+    /// Internal flag for one-shot scripts to prevent re-running.
+    pub has_run: bool,
 }
 
 impl Default for Script {
@@ -41,6 +45,8 @@ impl Default for Script {
             ast: None,
             raw: true,
             script_type: ScriptType::Entity,
+            run_once: false,
+            has_run: false,
         }
     }
 }

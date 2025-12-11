@@ -57,15 +57,15 @@ impl CellTrait for Acid {
                     }
                 }
 
-                // При срабатывании кислоты сильно повышаем температуру вокруг
+                // When acid reacts, strongly increase temperature around
                 if reacted {
                     if let Some(temp_ctx) = temp_context {
-                        // Кислота очень сильно нагревает при реакции
-                        (temp_ctx.add_temp)(i, j + 1, 30.0); // верх
-                        (temp_ctx.add_temp)(i, j - 1, 30.0); // низ
-                        (temp_ctx.add_temp)(i + 1, j, 30.0); // право
-                        (temp_ctx.add_temp)(i - 1, j, 30.0); // лево
-                        (temp_ctx.add_temp)(i, j, 20.0); // сама клетка
+                        // Acid heats very strongly during reaction
+                        (temp_ctx.add_temp)(i, j + 1, 30.0); // top
+                        (temp_ctx.add_temp)(i, j - 1, 30.0); // bottom
+                        (temp_ctx.add_temp)(i + 1, j, 30.0); // right
+                        (temp_ctx.add_temp)(i - 1, j, 30.0); // left
+                        (temp_ctx.add_temp)(i, j, 20.0); // cell itself
                     }
                     return;
                 }

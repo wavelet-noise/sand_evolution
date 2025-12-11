@@ -310,11 +310,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var temp_col: vec4<f32>;
     if temp_value < 0.0 {
         // Cold: smooth blue gradient from neutral (black) to bright blue
-        // Используем более заметный градиент для лучшей видимости
+        // Use a more noticeable gradient for better visibility
         let coldness = abs(temp_value) / 100.0;
-        // Более яркий синий с небольшим зеленым оттенком для плавности
+        // Brighter blue with a slight green tint for smoothness
         temp_col = vec4<f32>(0.0, coldness * 0.4, coldness * 1.2, 1.0);
-        // Ограничиваем синий канал до 1.0
+        // Clamp blue channel to 1.0
         temp_col.b = min(temp_col.b, 1.0);
     } else {
         // Hot: red/yellow gradient
@@ -482,9 +482,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(1.0,0.5,1.0,1.0);
     }
-    else if t == 17u // liquid gas (сжиженный газ)
+    else if t == 17u // liquid gas
     {
-      // Холодная голубовато-зеленая жидкость с прозрачностью
+      // Cold bluish-green liquid with transparency
       col = mix(vec4<f32>(0.3, 0.9, 0.7, 0.6) * 0.5, vec4<f32>(0.2, 0.8, 0.6, 0.8), tdnoise);
     }
     else if t == 70u // grass

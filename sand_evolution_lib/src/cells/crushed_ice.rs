@@ -27,19 +27,19 @@ impl CellTrait for CrushedIce {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Дробленый лед тает только на основе температуры - если температура > 0, то тает и охлаждает среду
+        // Crushed ice melts only based on temperature - if temperature > 0, it melts and cools the environment
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Если температура выше 0 градусов, дробленый лед тает
-            // Проверяем редко, чтобы избежать быстрых циклов таяния/замерзания
+            // If temperature is above 0 degrees, crushed ice melts
+            // Check rarely to avoid fast melt/freeze cycles
             if prng.next() > 200 {
                 if temperature > 0.0 {
-                    // Отдаем холод соседям при таянии (уменьшено, чтобы избежать вспышек)
-                    (temp_ctx.add_temp)(i, j + 1, -3.0); // верх
-                    (temp_ctx.add_temp)(i, j - 1, -3.0); // низ
-                    (temp_ctx.add_temp)(i + 1, j, -3.0); // лево
-                    (temp_ctx.add_temp)(i - 1, j, -3.0); // право
+                    // Give cold to neighbors when melting (reduced to avoid flashes)
+                    (temp_ctx.add_temp)(i, j + 1, -3.0); // top
+                    (temp_ctx.add_temp)(i, j - 1, -3.0); // bottom
+                    (temp_ctx.add_temp)(i + 1, j, -3.0); // left
+                    (temp_ctx.add_temp)(i - 1, j, -3.0); // right
                     
                     container[cur] = Water::id();
                     return;
@@ -47,25 +47,25 @@ impl CellTrait for CrushedIce {
             }
         }
         
-        // Специальная логика для крушеного льда: плавает на воде (плотность 0), но падает через Void
-        // Проверяем клетку внизу
+        // Special logic for crushed ice: floats on water (density 0), but falls through Void
+        // Check cell below
         let down = cs::xy_to_index(i, j - 1);
         let down_v = container[down] as usize;
         let down_c = &pal_container.pal[down_v];
         
-        // Если внизу Void, падаем вниз
+        // If Void below, fall down
         if down_v == Void::id() as usize {
             container.swap(cur, down);
             return;
         }
         
-        // Если внизу что-то с плотностью меньше 0 (легче крушеного льда), падаем
+        // If something with density less than 0 below (lighter than crushed ice), fall
         if down_c.den() < self.den() && !down_c.stat() {
             container.swap(cur, down);
             return;
         }
         
-        // Проверяем диагонали вниз
+        // Check diagonals down
         const ORDER: [[usize; 2]; 2] = [[0, 1], [1, 0]];
         let selected_order = ORDER[(prng.next() % 2) as usize];
         

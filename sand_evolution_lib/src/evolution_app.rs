@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::collections::VecDeque;
 
-use crate::export_file::code_to_file;
+use crate::export_file::{code_to_file, scene_to_file};
 use crate::projects::{ProjectDescription};
 use crate::resources::rhai_resource::RhaiResourceStorage;
 use crate::{
@@ -119,6 +119,7 @@ pub fn compact_number_string(n: f32) -> String {
 pub enum UserEventInfo {
     ImageImport(Vec<u8>),
     TextImport(Vec<u8>),
+    SceneImport(Vec<u8>),
     ProjectsLoaded(Vec<ProjectDescription>),
     ProjectLoadError(String),
 }
@@ -168,6 +169,8 @@ impl EvolutionApp {
                 if let Some(script_comp) = scripts.get_mut(entity) {
                     script_comp.script = script.to_owned();
                     script_comp.raw = true;
+                    // If this is a one-shot script, allow it to run again after updating the code.
+                    script_comp.has_run = false;
                     self.need_to_recompile = true;
                 }
             }
@@ -449,6 +452,33 @@ impl EvolutionApp {
                             let bytes = file.read().await;
                             event_loop_proxy
                                 .send_event(create_event_with_data(bytes))
+                                .ok();
+                        }
+                    });
+                }
+
+                // Scene Operations
+                ui.separator();
+                ui.heading("Scene Operations");
+                if ui.button("Export scene (TOML)").clicked() {
+                    let toml_text = self.export_scene_to_toml(world);
+                    if let Err(err) = scene_to_file(&toml_text) {
+                        panic!("Error: {}", err);
+                    }
+                }
+
+                if ui.button("Open scene (TOML)").clicked() {
+                    let dialog = rfd::AsyncFileDialog::new()
+                        .add_filter("TOML", &["toml"])
+                        .add_filter("All", &["*"])
+                        .pick_file();
+
+                    let event_loop_proxy = event_loop_proxy.clone();
+                    self.executor.execute(async move {
+                        if let Some(file) = dialog.await {
+                            let bytes = file.read().await;
+                            event_loop_proxy
+                                .send_event(create_event_with_scene(bytes))
                                 .ok();
                         }
                     });
@@ -1243,4 +1273,183 @@ fn create_event_with_data(bytes: Vec<u8>) -> UserEventInfo {
 
 fn create_event_with_text(bytes: Vec<u8>) -> UserEventInfo {
     UserEventInfo::TextImport(bytes)
+}
+
+fn create_event_with_scene(bytes: Vec<u8>) -> UserEventInfo {
+    UserEventInfo::SceneImport(bytes)
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct SceneToml {
+    #[serde(default = "default_scene_version")]
+    version: u32,
+    #[serde(default)]
+    entity: Vec<SceneEntityToml>,
+}
+
+fn default_scene_version() -> u32 {
+    1
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct SceneEntityToml {
+    name: String,
+    position: Option<Vec2Toml>,
+    rotation: Option<f32>,
+    scale: Option<Vec2Toml>,
+    velocity: Option<Vec2Toml>,
+    script: Option<ScriptToml>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Vec2Toml {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct ScriptToml {
+    code: String,
+    script_type: Option<String>,
+    run_once: Option<bool>,
+}
+
+impl EvolutionApp {
+    pub fn export_scene_to_toml(&self, world: &specs::World) -> String {
+        use specs::Join;
+        use crate::ecs::components::{Name, Position, Rotation, Scale, Velocity, Script};
+
+        let entities = world.entities();
+        let names = world.read_storage::<Name>();
+        let positions = world.read_storage::<Position>();
+        let rotations = world.read_storage::<Rotation>();
+        let scales = world.read_storage::<Scale>();
+        let velocities = world.read_storage::<Velocity>();
+        let scripts = world.read_storage::<Script>();
+
+        let mut out: Vec<SceneEntityToml> = Vec::new();
+        for (entity, name) in (&entities, &names).join() {
+            let pos = positions.get(entity).map(|p| Vec2Toml { x: p.x, y: p.y });
+            let rot = rotations.get(entity).map(|r| r.angle);
+            let scale = scales.get(entity).map(|s| Vec2Toml { x: s.x, y: s.y });
+            let vel = velocities.get(entity).map(|v| Vec2Toml { x: v.x, y: v.y });
+            let script = scripts.get(entity).map(|s| ScriptToml {
+                code: s.script.clone(),
+                script_type: Some(match s.script_type {
+                    crate::ecs::components::ScriptType::World => "World".to_owned(),
+                    crate::ecs::components::ScriptType::Entity => "Entity".to_owned(),
+                }),
+                run_once: Some(s.run_once),
+            });
+
+            out.push(SceneEntityToml {
+                name: name.name.clone(),
+                position: pos,
+                rotation: rot,
+                scale,
+                velocity: vel,
+                script,
+            });
+        }
+
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let scene = SceneToml { version: 1, entity: out };
+        toml::to_string_pretty(&scene).unwrap_or_else(|_| String::new())
+    }
+
+    pub fn import_scene_from_toml(
+        &mut self,
+        world: &mut specs::World,
+        toml_text: &str,
+    ) -> Result<(), String> {
+        use specs::{Builder, Join, WorldExt};
+        use crate::ecs::components::{Name, Position, Rotation, Scale, Velocity, Script, ScriptType};
+
+        let parsed: SceneToml = toml::from_str(toml_text).map_err(|e| e.to_string())?;
+
+        // Clear editor selection to avoid dangling entity handles.
+        self.editor_state.selected_entities.clear();
+
+        // Delete all entities in the world (resources stay intact).
+        let to_delete: Vec<specs::Entity> = {
+            let entities = world.entities();
+            (&entities).join().collect()
+        };
+        for e in to_delete {
+            let _ = world.delete_entity(e);
+        }
+
+        // Recreate entities from TOML.
+        let mut has_world_script = false;
+        for e in parsed.entity {
+            if e.name == "World Script" {
+                has_world_script = true;
+            }
+
+            let mut builder = world.create_entity().with(Name { name: e.name.clone() });
+
+            if let Some(p) = e.position {
+                builder = builder.with(Position { x: p.x, y: p.y });
+            }
+            if let Some(angle) = e.rotation {
+                builder = builder.with(Rotation { angle });
+            }
+            if let Some(s) = e.scale {
+                builder = builder.with(Scale { x: s.x, y: s.y });
+            }
+            if let Some(v) = e.velocity {
+                builder = builder.with(Velocity { x: v.x, y: v.y });
+            }
+            if let Some(script) = e.script {
+                let st = match script.script_type.as_deref() {
+                    Some("World") => ScriptType::World,
+                    Some("Entity") => ScriptType::Entity,
+                    Some(other) if other.eq_ignore_ascii_case("world") => ScriptType::World,
+                    Some(other) if other.eq_ignore_ascii_case("entity") => ScriptType::Entity,
+                    _ => {
+                        if e.name == "World Script" {
+                            ScriptType::World
+                        } else {
+                            ScriptType::Entity
+                        }
+                    }
+                };
+
+                builder = builder.with(Script {
+                    script: script.code,
+                    ast: None,
+                    raw: true,
+                    script_type: st,
+                    run_once: script.run_once.unwrap_or(false),
+                    has_run: false,
+                });
+            }
+
+            builder.build();
+        }
+
+        if !has_world_script {
+            world
+                .create_entity()
+                .with(Name {
+                    name: "World Script".to_owned(),
+                })
+                .with(Script {
+                    script: "".to_owned(),
+                    ast: None,
+                    raw: true,
+                    script_type: ScriptType::World,
+                    run_once: false,
+                    has_run: false,
+                })
+                .build();
+        }
+
+        // After importing, reset selection to world script so script UI has a stable target.
+        self.selected_object_name = "World Script".to_owned();
+        self.last_loaded_object.clear();
+        self.need_to_recompile = true;
+        Ok(())
+    }
 }
