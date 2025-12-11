@@ -24,14 +24,46 @@ impl CellTrait for BurningCoal {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
-        temp_context: Option<&mut TemperatureContext>,
+        mut temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Burning coal should extinguish if the environment is not hot enough.
+        // This makes extinguishing temperature-based (cooling -> no sustained burning).
+        const BURNING_COAL_SUSTAIN_TEMP: f32 = 90.0;
+        let mut extinguish = false;
+        if let Some(temp_ctx) = temp_context.as_deref() {
+            let mut sum = (temp_ctx.get_temp)(i, j);
+            let mut n = 1.0f32;
+
+            if i > 0 {
+                sum += (temp_ctx.get_temp)(i - 1, j);
+                n += 1.0;
+            }
+            if i + 1 < cs::SECTOR_SIZE.x {
+                sum += (temp_ctx.get_temp)(i + 1, j);
+                n += 1.0;
+            }
+            if j > 0 {
+                sum += (temp_ctx.get_temp)(i, j - 1);
+                n += 1.0;
+            }
+            if j + 1 < cs::SECTOR_SIZE.y {
+                sum += (temp_ctx.get_temp)(i, j + 1);
+                n += 1.0;
+            }
+
+            extinguish = (sum / n) < BURNING_COAL_SUSTAIN_TEMP;
+        }
+
         // Burning coal releases heat
-        if let Some(temp_ctx) = temp_context {
+        if let Some(temp_ctx) = temp_context.as_deref_mut() {
             (temp_ctx.add_temp)(i, j + 1, 3.0); // top
             (temp_ctx.add_temp)(i, j - 1, 3.0); // bottom
             (temp_ctx.add_temp)(i + 1, j, 3.0); // right
             (temp_ctx.add_temp)(i - 1, j, 3.0); // left
+        }
+        if extinguish {
+            container[cur] = Coal::id();
+            return;
         }
         if !sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             let bot = cs::xy_to_index(i, j - 1);

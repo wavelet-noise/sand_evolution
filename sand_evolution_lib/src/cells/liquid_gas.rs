@@ -53,8 +53,10 @@ impl CellTrait for LiquidGas {
     }
 
     fn burnable(&self) -> CellType {
-        // Liquid gas is also flammable
-        BurningGas::id()
+        // Disable "contact ignition" (neighbor rules that use burnable()).
+        // Liquid gas should first evaporate to gas by temperature,
+        // and gas ignition is handled via temperature logic.
+        Void::id()
     }
 
     fn heatable(&self) -> CellType {

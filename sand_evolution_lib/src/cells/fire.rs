@@ -18,10 +18,38 @@ impl CellTrait for Cell {
         j: PointType,
         cur: usize,
         container: &mut [CellType],
-        pal_container: &CellRegistry,
+        _pal_container: &CellRegistry,
         prng: &mut Prng,
         mut temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Fire can only exist if the environment is hot enough.
+        // This makes "extinguishing" naturally temperature-based (e.g. lots of evaporation cooling).
+        const FIRE_SUSTAIN_TEMP: f32 = 80.0;
+        let mut extinguish = false;
+        if let Some(temp_ctx) = temp_context.as_deref() {
+            let mut sum = (temp_ctx.get_temp)(i, j);
+            let mut n = 1.0f32;
+
+            if i > 0 {
+                sum += (temp_ctx.get_temp)(i - 1, j);
+                n += 1.0;
+            }
+            if i + 1 < cs::SECTOR_SIZE.x {
+                sum += (temp_ctx.get_temp)(i + 1, j);
+                n += 1.0;
+            }
+            if j > 0 {
+                sum += (temp_ctx.get_temp)(i, j - 1);
+                n += 1.0;
+            }
+            if j + 1 < cs::SECTOR_SIZE.y {
+                sum += (temp_ctx.get_temp)(i, j + 1);
+                n += 1.0;
+            }
+
+            extinguish = (sum / n) < FIRE_SUSTAIN_TEMP;
+        }
+
         if prng.next() > 128 {
             // Fire constantly heats the surrounding environment
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
@@ -30,6 +58,9 @@ impl CellTrait for Cell {
                 (temp_ctx.add_temp)(i, j - 1, 1.5); // bottom
                 (temp_ctx.add_temp)(i + 1, j, 1.5); // right
                 (temp_ctx.add_temp)(i - 1, j, 1.5); // left
+            }
+            if extinguish {
+                container[cur] = Void::id();
             }
             return;
         }
@@ -56,6 +87,10 @@ impl CellTrait for Cell {
             (temp_ctx.add_temp)(i + 1, j, 1.5); // right
             (temp_ctx.add_temp)(i - 1, j, 1.5); // left
         }
+        if extinguish {
+            container[cur] = Void::id();
+            return;
+        }
 
         let top = cs::xy_to_index(i, j + 1);
         let down = cs::xy_to_index(i, j - 1);
@@ -64,7 +99,7 @@ impl CellTrait for Cell {
 
         // Pick a neighbor (track both index and coordinates for temperature checks).
         let arr = [(i, j + 1, top), (i, j - 1, down), (i - 1, j, l), (i + 1, j, r)];
-        let (nx, ny, cc) = arr[(prng.next() % 4) as usize];
+        let (_nx, _ny, _cc) = arr[(prng.next() % 4) as usize];
 
         // Fire does NOT directly ignite/transform neighbors on contact.
         // It only heats (handled above) and moves/disappears.

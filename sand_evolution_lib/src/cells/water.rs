@@ -36,11 +36,14 @@ impl CellTrait for Water {
                 if dim.next() < 120 {
                     use super::steam::Steam;
                     container[cur] = Steam::id();
-                    // Heat is absorbed during evaporation (moderately, so adjacent water doesn't freeze)
-                    (temp_ctx.add_temp)(i, j + 1, -5.0);
-                    (temp_ctx.add_temp)(i, j - 1, -5.0);
-                    (temp_ctx.add_temp)(i + 1, j, -5.0);
-                    (temp_ctx.add_temp)(i - 1, j, -5.0);
+                    // Heat is absorbed during evaporation (latent heat): should strongly cool the area,
+                    // so fire can't sustain at low temperature.
+                    const EVAP_COOLING: f32 = 25.0;
+                    (temp_ctx.add_temp)(i, j, -EVAP_COOLING);
+                    (temp_ctx.add_temp)(i, j + 1, -EVAP_COOLING);
+                    (temp_ctx.add_temp)(i, j - 1, -EVAP_COOLING);
+                    (temp_ctx.add_temp)(i + 1, j, -EVAP_COOLING);
+                    (temp_ctx.add_temp)(i - 1, j, -EVAP_COOLING);
                     return;
                 }
             }
