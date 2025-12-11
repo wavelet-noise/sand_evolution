@@ -96,6 +96,24 @@ pub fn update_tick(
 
         state.prng.gen();
 
+        // Быстрая диффузия температуры - обрабатывает все клетки уменьшенной сетки каждый кадр
+        // Вызываем реже для оптимизации (каждые 2 тика)
+        if state.tick % 2 == 0 {
+            state.diffuse_temperature_fast();
+        }
+
+        // Создаем контекст температуры ОДИН РАЗ перед циклом для переиспользования
+        // Используем указатель для обхода проблем с заимствованиями
+        let state_ptr: *mut State = state;
+        let mut temp_context = crate::cells::TemperatureContext {
+            get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| {
+                unsafe { (*state_ptr).get_temperature(x, y) }
+            }),
+            add_temp: Box::new(move |x: cs::PointType, y: cs::PointType, delta: f32| {
+                unsafe { (*state_ptr).add_temperature(x, y, delta); }
+            }),
+        };
+
         for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
             for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {
                 b_index += 1;
@@ -111,6 +129,14 @@ pub fn update_tick(
                 let cur = cs::xy_to_index(i, j);
                 let cur_v = *state.diffuse_rgba.get(cur).unwrap();
 
+                // Передаем temp_context для клеток с температурными взаимодействиями:
+                // вода (2), пар (3), огонь (4), горящее дерево (6), горящий уголь (7), уголь (8),
+                // кислота (9), разбавленная кислота (12), дерево (50), лед (55), дробленый лед (56), снег (57)
+                // Для остальных ячеек передаем None для оптимизации
+                let needs_temp = cur_v == 2 || cur_v == 3 || cur_v == 4 || cur_v == 6 || 
+                                 cur_v == 7 || cur_v == 8 || cur_v == 9 || cur_v == 12 ||
+                                 cur_v == 50 || cur_v == 55 || cur_v == 56 || cur_v == 57;
+                
                 state.pal_container.pal[cur_v as usize].update(
                     i,
                     j,
@@ -118,6 +144,7 @@ pub fn update_tick(
                     state.diffuse_rgba.as_mut(),
                     &state.pal_container,
                     &mut state.prng,
+                    if needs_temp { Some(&mut temp_context) } else { None },
                 );
             }
         }

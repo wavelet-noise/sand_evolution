@@ -23,3 +23,23 @@ pub fn index_to_cell(index: IndexType) -> Point2<PointType> {
         (index / SECTOR_SIZE.y as IndexType) as PointType,
     )
 }
+
+// Система температуры по секциям
+// Размер секции для температуры (32x32 пикселя)
+pub const TEMP_SECTION_SIZE: PointType = 32;
+
+pub fn get_temp_section_coords(i: PointType, j: PointType) -> (PointType, PointType) {
+    (i / TEMP_SECTION_SIZE, j / TEMP_SECTION_SIZE)
+}
+
+pub fn get_temp_section_index(i: PointType, j: PointType) -> usize {
+    let (sx, sy) = get_temp_section_coords(i, j);
+    let sections_x = (SECTOR_SIZE.x + TEMP_SECTION_SIZE - 1) / TEMP_SECTION_SIZE;
+    (sy as usize * sections_x as usize) + sx as usize
+}
+
+pub fn get_temp_sections_count() -> (usize, usize) {
+    let sections_x = ((SECTOR_SIZE.x + TEMP_SECTION_SIZE - 1) / TEMP_SECTION_SIZE) as usize;
+    let sections_y = ((SECTOR_SIZE.y + TEMP_SECTION_SIZE - 1) / TEMP_SECTION_SIZE) as usize;
+    (sections_x, sections_y)
+}

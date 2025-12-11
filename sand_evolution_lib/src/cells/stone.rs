@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{CellRegistry, CellTrait, CellType, Prng};
+use super::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Stone;
 impl Stone {
@@ -23,6 +23,7 @@ impl CellTrait for Stone {
         _: &mut [CellType],
         _: &CellRegistry,
         _: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
     }
 

@@ -1,4 +1,4 @@
-use crate::cells::{CellRegistry, CellTrait, CellType, Prng};
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cells::helper::fluid_falling_helper;
 use crate::cells::salty_water::SaltyWater;
 use crate::cells::void::Void;
@@ -29,6 +29,7 @@ impl CellTrait for BaseWater {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         dim: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);

@@ -1,6 +1,6 @@
 use crate::cs::PointType;
 
-use super::{CellRegistry, CellTrait, CellType, Prng};
+use super::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Void;
 impl Void {
@@ -23,6 +23,7 @@ impl CellTrait for Void {
         _: &mut [u8],
         _: &CellRegistry,
         _: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
     }
     fn name(&self) -> &str {
