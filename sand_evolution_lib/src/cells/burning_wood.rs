@@ -22,14 +22,46 @@ impl CellTrait for Cell {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         prng: &mut Prng,
-        temp_context: Option<&mut TemperatureContext>,
+        mut temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Burning wood should extinguish if the environment is not hot enough.
+        // This makes "surrounded by water" work via cooling/temperature only.
+        const BURNING_WOOD_SUSTAIN_TEMP: f32 = 60.0;
+        let mut extinguish = false;
+        if let Some(temp_ctx) = temp_context.as_deref() {
+            let mut sum = (temp_ctx.get_temp)(i, j);
+            let mut n = 1.0f32;
+
+            if i > 0 {
+                sum += (temp_ctx.get_temp)(i - 1, j);
+                n += 1.0;
+            }
+            if i + 1 < cs::SECTOR_SIZE.x {
+                sum += (temp_ctx.get_temp)(i + 1, j);
+                n += 1.0;
+            }
+            if j > 0 {
+                sum += (temp_ctx.get_temp)(i, j - 1);
+                n += 1.0;
+            }
+            if j + 1 < cs::SECTOR_SIZE.y {
+                sum += (temp_ctx.get_temp)(i, j + 1);
+                n += 1.0;
+            }
+
+            extinguish = (sum / n) < BURNING_WOOD_SUSTAIN_TEMP;
+        }
+
         // Burning wood releases heat
-        if let Some(temp_ctx) = temp_context {
+        if let Some(temp_ctx) = temp_context.as_deref_mut() {
             (temp_ctx.add_temp)(i, j + 1, 1.0); // top
             (temp_ctx.add_temp)(i, j - 1, 1.0); // bottom
             (temp_ctx.add_temp)(i + 1, j, 1.0); // right
             (temp_ctx.add_temp)(i - 1, j, 1.0); // left
+        }
+        if extinguish {
+            container[cur] = Wood::id();
+            return;
         }
         // Spawn "little fire" sparks independently from burn progression.
         // (My previous change accidentally made sparks rarer by gating this under progress.)

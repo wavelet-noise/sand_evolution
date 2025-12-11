@@ -22,17 +22,24 @@ impl CellTrait for Ice {
         cur: usize,
         container: &mut [CellType],
         _pal_container: &CellRegistry,
-        _prng: &mut Prng,
+        prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Ice melts only based on temperature - if temperature > 0, it melts and cools the environment
+        // Ice melts only based on temperature.
+        // Important: make it probabilistic to avoid instant melting at mild temperatures (e.g. +20°C).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // If temperature is above 0 degrees, ice melts
+            // If temperature is above 0 degrees, ice can melt with probability depending on temperature.
+            // Design target: at +20°C => ~10% chance per tick.
+            // We scale linearly: p(20)=26/256≈10.16%; p grows with temperature and clamps to [0..255].
             if temperature > 0.0 {
-                container[cur] = Water::id();
-                return;
+                let chance_f = ((temperature / 20.0) * 26.0).clamp(0.0, 255.0);
+                let chance = chance_f as u8;
+                if prng.next() < chance {
+                    container[cur] = Water::id();
+                    return;
+                }
             }
         }
 
