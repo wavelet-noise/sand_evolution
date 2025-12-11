@@ -1,4 +1,4 @@
-use super::{helper::fluid_flying_helper, *};
+use super::{{helper::fluid_flying_helper, *, TemperatureContext}};
 use crate::cs::PointType;
 
 pub struct Steam;
@@ -23,7 +23,22 @@ impl CellTrait for Steam {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Пар конденсируется в воду при низкой температуре
+        if let Some(temp_ctx) = temp_context {
+            let temperature = (temp_ctx.get_temp)(i, j);
+            
+            // Пар конденсируется в воду при температуре ниже 0 градусов
+            if temperature < 0.0 {
+                use super::water::Water;
+                container[cur] = Water::id();
+                // При конденсации выделяется тепло
+                (temp_ctx.add_temp)(i, j, 5.0);
+                return;
+            }
+        }
+        
         fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
 

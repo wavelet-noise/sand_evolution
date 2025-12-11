@@ -1,6 +1,6 @@
 use crate::cs::{self, PointType};
 
-use super::{void::Void, CellRegistry, CellTrait, CellType, Prng};
+use super::{{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
 
 pub struct Electricity;
 impl Electricity {
@@ -23,6 +23,7 @@ impl CellTrait for Electricity {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         if prng.next() > 110 {
             let top = cs::xy_to_index(i, j + 1);

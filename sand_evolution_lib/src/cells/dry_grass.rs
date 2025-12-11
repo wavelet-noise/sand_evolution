@@ -1,6 +1,6 @@
 use crate::cs::{self, PointType};
 
-use super::{burning_wood, grass::Grass, water::Water, CellRegistry, CellTrait, CellType, Prng};
+use super::{burning_wood, grass::Grass, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct DryGrass;
 impl DryGrass {
@@ -23,6 +23,7 @@ impl CellTrait for DryGrass {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         // Сухая трава восстанавливается при контакте с водой
         // Проверяем редко для медленного роста
