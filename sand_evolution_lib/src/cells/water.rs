@@ -23,79 +23,56 @@ impl CellTrait for Water {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
+        // ВАЖНО: Проверяем температуру ПЕРЕД падением, чтобы избежать дубликатов
+        // Если проверять после swap, то cur уже не содержит воду!
+        if let Some(temp_ctx) = temp_context {
+            let temperature = (temp_ctx.get_temp)(i, j);
+            
+            // Вода испаряется в пар при высокой температуре
+            if temperature > 15.0 {
+                use super::steam::Steam;
+                container[cur] = Steam::id();
+                // При испарении поглощается тепло (умеренно, чтобы соседняя вода не замерзала)
+                (temp_ctx.add_temp)(i, j + 1, -5.0);
+                (temp_ctx.add_temp)(i, j - 1, -5.0);
+                (temp_ctx.add_temp)(i + 1, j, -5.0);
+                (temp_ctx.add_temp)(i - 1, j, -5.0);
+                return;
+            }
+            
+            // Вода замерзает при низкой температуре
+            if temperature < -3.0 {
+                use super::crushed_ice::CrushedIce;
+                container[cur] = CrushedIce::id();
+                return;
+            }
+        }
+        
+        // Теперь пробуем упасть (после проверки температуры)
         let is_falling = fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1);
         
-        // Проверяем температуру во время падения в половине случаев
         if is_falling {
-            if let Some(temp_ctx) = temp_context {
-                // Проверяем температуру в половине случаев во время падения
-                if dim.next() > 127 {
-                    let temperature = (temp_ctx.get_temp)(i, j);
-                    
-                    // Вода испаряется в пар при высокой температуре (включая нагрев от кислоты)
-                    if temperature > 15.0 {
-                        use super::steam::Steam;
-                        container[cur] = Steam::id();
-                        // При испарении сильно поглощается тепло (сильно охлаждаем среду)
-                        (temp_ctx.add_temp)(i, j + 1, -25.0); // верх
-                        (temp_ctx.add_temp)(i, j - 1, -25.0); // низ
-                        (temp_ctx.add_temp)(i + 1, j, -25.0); // право
-                        (temp_ctx.add_temp)(i - 1, j, -25.0); // лево
-                        return;
-                    }
-                    
-                    // Вода замерзает при низкой температуре (нужна достаточно низкая температура)
-                    if temperature < -3.0 {
-                        use super::crushed_ice::CrushedIce;
-                        container[cur] = CrushedIce::id();
-                        // Устанавливаем температуру льда около 0 градусов через add_temp
-                        let target_temp = 0.0;
-                        (temp_ctx.add_temp)(i, j, target_temp - temperature);
-                        // При кристаллизации выделяется небольшое количество тепла
-                        // Уменьшено, чтобы избежать циклов замерзания/таяния
-                        (temp_ctx.add_temp)(i, j + 1, 1.5); // верх
-                        (temp_ctx.add_temp)(i, j - 1, 1.5); // низ
-                        (temp_ctx.add_temp)(i + 1, j, 1.5); // право
-                        (temp_ctx.add_temp)(i - 1, j, 1.5); // лево
-                        return;
-                    }
-                }
-            }
             return;
         }
         
-        // Когда вода не падает, проверяем температуру всегда
-        if !is_falling {
-            let top = cs::xy_to_index(i, j + 1);
-            let down = cs::xy_to_index(i, j - 1);
-            let r = cs::xy_to_index(i + 1, j);
-            let l = cs::xy_to_index(i - 1, j);
+        // Когда вода не падает, проверяем растворение
+        let top = cs::xy_to_index(i, j + 1);
+        let down = cs::xy_to_index(i, j - 1);
+        let r = cs::xy_to_index(i + 1, j);
+        let l = cs::xy_to_index(i - 1, j);
 
-            let arr = [top, down, l, r];
-            let cc = arr[(dim.next() % 4) as usize];
+        let arr = [top, down, l, r];
+        let cc = arr[(dim.next() % 4) as usize];
 
-            // Вода замерзает только при низкой температуре
-            if dim.next() > 250 {
-                if let Some(temp_ctx) = temp_context {
-                    let temperature = (temp_ctx.get_temp)(i, j);
-                    if temperature < -3.0 {
-                        use super::crushed_ice::CrushedIce;
-                        container[cur] = CrushedIce::id();
-                        return;
-                    }
-                }
-            }
+        if dim.next() > 50 {
+            let cc_v = container[cc] as usize;
+            let cc_c = &pal_container.pal[cc_v];
+            let cc_pt = cc_c.dissolve();
 
-            if dim.next() > 50 {
-                let cc_v = container[cc] as usize;
-                let cc_c = &pal_container.pal[cc_v];
-                let cc_pt = cc_c.dissolve();
-
-                if cc_pt != Void::id() {
-                    container[cc] = Void::id();
-                    container[cur] = cc_pt;
-                    return;
-                }
+            if cc_pt != Void::id() {
+                container[cc] = Void::id();
+                container[cur] = cc_pt;
+                return;
             }
         }
     }

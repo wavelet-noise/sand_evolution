@@ -29,12 +29,11 @@ impl CellTrait for Steam {
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Пар конденсируется в воду при температуре ниже 0 градусов
-            if temperature < 0.0 {
+            // Пар конденсируется в воду при температуре ниже -10 градусов
+            // с небольшой вероятностью, чтобы не конденсировался мгновенно
+            if temperature < 0.0 && prng.next() < 10 {
                 use super::water::Water;
                 container[cur] = Water::id();
-                // При конденсации выделяется тепло
-                (temp_ctx.add_temp)(i, j, 5.0);
                 return;
             }
         }
