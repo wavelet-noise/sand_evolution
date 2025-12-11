@@ -147,7 +147,7 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     ctx.get_contents()
 }
 
-use crate::ecs::components::{Name, Position, Script, ScriptType, Velocity, Rotation, Scale};
+use crate::ecs::components::{Children, Name, Parent, Position, Script, ScriptType, Velocity, Rotation, Scale};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::state::UpdateResult;
@@ -172,6 +172,8 @@ impl GameContext {
         world.register::<Velocity>();
         world.register::<Rotation>();
         world.register::<Scale>();
+        world.register::<Parent>();
+        world.register::<Children>();
         
         let mut dispatcher = specs::DispatcherBuilder::new()
             .with(EntityScriptSystem, "entity_script__system", &[])

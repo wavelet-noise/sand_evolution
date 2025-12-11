@@ -9,13 +9,27 @@ use web_sys::{BlobPropertyBag, Url};
 use std::fs;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
-    fs::write("exported.txt", data)?;
+    if let Some(path) = rfd::FileDialog::new()
+        .set_file_name("exported.txt")
+        .add_filter("Text", &["txt"])
+        .add_filter("All", &["*"])
+        .save_file()
+    {
+        fs::write(path, data)?;
+    }
     Ok(())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn scene_to_file(data: &str) -> Result<(), Box<dyn Error>> {
-    fs::write("scene.toml", data)?;
+    if let Some(path) = rfd::FileDialog::new()
+        .set_file_name("scene.toml")
+        .add_filter("TOML", &["toml"])
+        .add_filter("All", &["*"])
+        .save_file()
+    {
+        fs::write(path, data)?;
+    }
     Ok(())
 }
 
@@ -134,7 +148,14 @@ pub fn scene_to_file(data: &str) -> Result<(), Box<dyn Error>> {
 pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
 ) -> Result<(), Box<dyn Error>> {
-    _ = data.save("exported.png");
+    if let Some(path) = rfd::FileDialog::new()
+        .set_file_name("exported.png")
+        .add_filter("PNG Image", &["png"])
+        .add_filter("All", &["*"])
+        .save_file()
+    {
+        data.save(path)?;
+    }
     Ok(())
 }
 
