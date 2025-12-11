@@ -3,7 +3,7 @@ use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::shared_state::SharedState;
 use crate::{cs, State};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
-use log::error;
+use crate::rhai_lib;
 use std::cell::RefCell;
 use std::rc::Rc;
 use specs::RunNow;
@@ -13,6 +13,9 @@ fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
 
     storage.scope.set_value("time", frame_start_time);
     storage.scope.set_value("frame", state.frame);
+    // Re-set GRID_WIDTH and GRID_HEIGHT after scope.clear() - scripts need these variables
+    storage.scope.set_value("GRID_WIDTH", 1024i64);
+    storage.scope.set_value("GRID_HEIGHT", 512i64);
 }
 
 pub fn update_tick(
@@ -39,6 +42,10 @@ pub fn update_tick(
         if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
             if let Some(storage) = &mut rhai_resource.storage {
                 set_frame_vars(state, storage);
+                // Update state pointer in thread_local
+                let state_ptr: *mut State = state;
+                storage.state_ptr.set(state_ptr);
+                rhai_lib::set_state_ptr(state_ptr);
             }
         }
     }
@@ -46,14 +53,21 @@ pub fn update_tick(
     for _sim_update in 0..sim_steps {
         state.tick += 1;
         if state.toggled {
-            // Set the tick variable in scope
+            // Set the tick variable in scope and update state pointer
             {
                 if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
                     if let Some(storage) = &mut rhai_resource.storage {
                         storage.scope.set_value("tick", state.tick);
+                        // Update state pointer each tick to ensure it's valid
+                        let state_ptr: *mut State = state;
+                        storage.state_ptr.set(state_ptr);
+                        rhai_lib::set_state_ptr(state_ptr);
                         if state.tick % 500 == 0 {
                             storage.scope.clear();
                             set_frame_vars(state, storage);
+                            // Re-set state pointer after clear
+                            storage.state_ptr.set(state_ptr);
+                            rhai_lib::set_state_ptr(state_ptr);
                         }
                     }
                 }

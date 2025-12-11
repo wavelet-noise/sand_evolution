@@ -809,8 +809,10 @@ impl State {
         let prng = Prng::new();
 
         // Инициализация температуры клеток (начальная температура = 0.0)
-        // Приводим к usize перед умножением, чтобы избежать переполнения u16
-        let total_cells = (cs::SECTOR_SIZE.x as usize) * (cs::SECTOR_SIZE.y as usize);
+        // Используем уменьшенную сетку (в 4 раза меньше) для оптимизации
+        let temp_width = (cs::SECTOR_SIZE.x / 4) as usize;
+        let temp_height = (cs::SECTOR_SIZE.y / 4) as usize;
+        let total_cells = temp_width * temp_height;
         let cell_temperatures = vec![0.0; total_cells];
 
         Self {
@@ -870,7 +872,15 @@ impl State {
             .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
-    // Получить температуру клетки по индексу
+    // Преобразовать координаты полной сетки в координаты уменьшенной сетки
+    fn temp_coords_to_index(&self, i: PointType, j: PointType) -> usize {
+        let temp_x = (i / 4) as usize;
+        let temp_y = (j / 4) as usize;
+        let temp_width = (cs::SECTOR_SIZE.x / 4) as usize;
+        temp_y * temp_width + temp_x
+    }
+
+    // Получить температуру клетки по индексу (в уменьшенной сетке)
     pub fn get_cell_temperature(&self, index: usize) -> f32 {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index]
@@ -879,28 +889,28 @@ impl State {
         }
     }
 
-    // Получить температуру клетки по координатам
+    // Получить температуру клетки по координатам (полной сетки)
     pub fn get_temperature(&self, i: PointType, j: PointType) -> f32 {
-        let idx = cs::xy_to_index(i, j);
+        let idx = self.temp_coords_to_index(i, j);
         self.get_cell_temperature(idx)
     }
 
-    // Установить температуру клетки по индексу
+    // Установить температуру клетки по индексу (в уменьшенной сетке)
     pub fn set_cell_temperature(&mut self, index: usize, temp: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] = temp.max(-100.0).min(100.0);
         }
     }
 
-    // Установить температуру клетки по координатам
+    // Установить температуру клетки по координатам (полной сетки)
     pub fn set_temperature(&mut self, i: PointType, j: PointType, temp: f32) {
-        let idx = cs::xy_to_index(i, j);
+        let idx = self.temp_coords_to_index(i, j);
         self.set_cell_temperature(idx, temp);
     }
 
     // Добавить температуру к клетке (для выделения тепла)
     pub fn add_temperature(&mut self, i: PointType, j: PointType, delta: f32) {
-        let idx = cs::xy_to_index(i, j);
+        let idx = self.temp_coords_to_index(i, j);
         if idx < self.cell_temperatures.len() {
             self.cell_temperatures[idx] += delta;
             // Ограничиваем температуру разумными пределами
@@ -908,7 +918,7 @@ impl State {
         }
     }
 
-    // Добавить температуру к клетке по индексу
+    // Добавить температуру к клетке по индексу (в уменьшенной сетке)
     pub fn add_cell_temperature(&mut self, index: usize, delta: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] += delta;
@@ -922,7 +932,7 @@ impl State {
         let diffusion_rate = 0.15;
         let cooling_rate = 0.998;
         
-        // Работаем с уменьшенной сеткой (в 4 раза меньше)
+        // Работаем напрямую с уменьшенной сеткой
         let width = (cs::SECTOR_SIZE.x / 4) as usize;
         let height = (cs::SECTOR_SIZE.y / 4) as usize;
         
@@ -932,19 +942,14 @@ impl State {
         // Обрабатываем все клетки уменьшенной сетки
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
-                // Координаты в полной сетке
-                let x = tx * 4;
-                let y = ty * 4;
+                let idx = ty * width + tx;
+                let current = self.cell_temperatures.get(idx).copied().unwrap_or(0.0);
                 
-                // Быстро получаем среднюю температуру текущего блока
-                let center_idx = cs::xy_to_index(x as cs::PointType, y as cs::PointType);
-                let current = self.cell_temperatures.get(center_idx).copied().unwrap_or(0.0);
-                
-                // Получаем температуры соседних блоков (только центральные точки для скорости)
-                let top_idx = cs::xy_to_index(x as cs::PointType, ((ty + 1) * 4) as cs::PointType);
-                let bot_idx = cs::xy_to_index(x as cs::PointType, ((ty - 1) * 4) as cs::PointType);
-                let left_idx = cs::xy_to_index(((tx - 1) * 4) as cs::PointType, y as cs::PointType);
-                let right_idx = cs::xy_to_index(((tx + 1) * 4) as cs::PointType, y as cs::PointType);
+                // Получаем температуры соседних клеток в уменьшенной сетке
+                let top_idx = (ty + 1) * width + tx;
+                let bot_idx = (ty - 1) * width + tx;
+                let left_idx = ty * width + (tx - 1);
+                let right_idx = ty * width + (tx + 1);
                 
                 let top_temp = self.cell_temperatures.get(top_idx).copied().unwrap_or(current);
                 let bot_temp = self.cell_temperatures.get(bot_idx).copied().unwrap_or(current);
@@ -956,26 +961,15 @@ impl State {
                 let diffused = current + (avg - current) * diffusion_rate;
                 let new_temp = (diffused * cooling_rate).max(-100.0).min(100.0);
                 
-                new_temps[ty * width + tx] = new_temp;
+                new_temps[idx] = new_temp;
             }
         }
         
-        // Применяем новые температуры ко всем клеткам соответствующих блоков
+        // Применяем новые температуры
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
-                let new_temp = new_temps[ty * width + tx];
-                let x = tx * 4;
-                let y = ty * 4;
-                
-                // Применяем ко всем клеткам 4x4 блока
-                for dy in 0..4 {
-                    for dx in 0..4 {
-                        let idx = cs::xy_to_index((x + dx) as cs::PointType, (y + dy) as cs::PointType);
-                        if idx < self.cell_temperatures.len() {
-                            self.cell_temperatures[idx] = new_temp;
-                        }
-                    }
-                }
+                let idx = ty * width + tx;
+                self.cell_temperatures[idx] = new_temps[idx];
             }
         }
     }
@@ -1098,36 +1092,9 @@ impl State {
             texture_size,
         );
         
-        // Upload temperature data to GPU (downscaled 4x)
-        // Average 4x4 blocks of cells into single texture pixel
+        // Upload temperature data to GPU - пишем напрямую из уменьшенной сетки
         let temp_width = dimensions.0 / 4;
         let temp_height = dimensions.1 / 4;
-        let mut temperature_data: Vec<f32> = Vec::with_capacity((temp_width * temp_height) as usize);
-        
-        // Оптимизация: обрабатываем блоками для лучшей производительности
-        for ty in 0..temp_height {
-            for tx in 0..temp_width {
-                let x = tx * 4;
-                let y = ty * 4;
-                
-                // Быстрое усреднение 4x4 блока (16 клеток)
-                let mut sum = 0.0;
-                let mut count = 0;
-                
-                // Обрабатываем только каждую 2-ю клетку для ускорения
-                for dy in (0..4).step_by(2) {
-                    for dx in (0..4).step_by(2) {
-                        if let Some(&temp) = self.cell_temperatures.get(cs::xy_to_index((x + dx) as cs::PointType, (y + dy) as cs::PointType)) {
-                            sum += temp;
-                            count += 1;
-                        }
-                    }
-                }
-                
-                let avg_temp = if count > 0 { sum / count as f32 } else { 0.0 };
-                temperature_data.push(avg_temp);
-            }
-        }
         
         let temp_texture_size = wgpu::Extent3d {
             width: temp_width,
@@ -1142,7 +1109,7 @@ impl State {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            bytemuck::cast_slice(&temperature_data),
+            bytemuck::cast_slice(&self.cell_temperatures),
             wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: std::num::NonZeroU32::new(temp_width * 4), // 4 bytes per f32

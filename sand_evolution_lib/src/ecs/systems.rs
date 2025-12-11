@@ -1,4 +1,4 @@
-use crate::ecs::components::{Position, Script, Velocity};
+use crate::ecs::components::{Name, Position, Script, Velocity};
 use crate::resources::rhai_resource::RhaiResource;
 use specs::{Entities, Join, ReadStorage, System, Write, WriteStorage};
 
@@ -34,13 +34,14 @@ impl<'a> System<'a> for EntityScriptSystem {
         Entities<'a>,
         WriteStorage<'a, Script>,
         ReadStorage<'a, Position>,
+        ReadStorage<'a, Name>,
         Write<'a, RhaiResource>,
     );
 
-    fn run(&mut self, (entities, mut scripts, positions, mut rhai_resource): Self::SystemData) {
+    fn run(&mut self, (entities, mut scripts, positions, names, mut rhai_resource): Self::SystemData) {
         if let Some(rhai) = &mut rhai_resource.storage {
             // Unified processing of all scripts
-            Self::compile_and_run_all_scripts(&entities, &mut scripts, &positions, &rhai.engine, &mut rhai.scope);
+            Self::compile_and_run_all_scripts(&entities, &mut scripts, &positions, &names, &rhai.engine, &mut rhai.scope);
         }
     }
 }
@@ -70,6 +71,7 @@ impl EntityScriptSystem {
         entities: &Entities,
         scripts: &mut WriteStorage<Script>,
         positions: &ReadStorage<Position>,
+        names: &ReadStorage<Name>,
         engine: &rhai::Engine,
         scope: &mut rhai::Scope,
     ) {

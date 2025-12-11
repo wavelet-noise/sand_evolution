@@ -31,70 +31,8 @@ impl CellTrait for Ice {
             
             // Если температура выше 0 градусов, лед тает
             if temperature > 0.0 {
-                // Лед тает и отдает холод (поглощает тепло) соседним клеткам
-                // Уменьшено, чтобы избежать цепной реакции
-                (temp_ctx.add_temp)(i, j + 1, -2.0); // верх
-                (temp_ctx.add_temp)(i, j - 1, -2.0); // низ
-                (temp_ctx.add_temp)(i + 1, j, -2.0); // лево
-                (temp_ctx.add_temp)(i - 1, j, -2.0); // право
-                
                 container[cur] = Water::id();
                 return;
-            }
-            
-            // Лед медленно замораживает соседнюю воду через контакт
-            // Проверяем соседние клетки на наличие воды и понижаем их температуру
-            // Делаем это редко, чтобы избежать агрессивного замерзания
-            if prng.next() > 250 {
-                let top_idx = cs::xy_to_index(i, j + 1);
-                let bot_idx = cs::xy_to_index(i, j - 1);
-                let left_idx = cs::xy_to_index(i + 1, j);
-                let right_idx = cs::xy_to_index(i - 1, j);
-                
-                // Медленно понижаем температуру соседней воды для постепенного замерзания
-                if container[top_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i, j + 1, -2.0); // верх
-                }
-                if container[bot_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i, j - 1, -2.0); // низ
-                }
-                if container[left_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i + 1, j, -2.0); // лево
-                }
-                if container[right_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i - 1, j, -2.0); // право
-                }
-            }
-        } else {
-            // Если нет системы температуры, используем старую логику прямого замерзания
-            let top = cs::xy_to_index(i, j + 1);
-            let bot = cs::xy_to_index(i, j - 1);
-            let left = cs::xy_to_index(i + 1, j);
-            let right = cs::xy_to_index(i - 1, j);
-            
-            let top_v = container[top];
-            let bot_v = container[bot];
-            let left_v = container[left];
-            let right_v = container[right];
-            
-            // Проверяем соседние клетки на наличие воды и замораживаем напрямую (очень редко)
-            if prng.next() > 252 {
-                if top_v == Water::id() {
-                    container[top] = Ice::id();
-                    return;
-                }
-                if bot_v == Water::id() {
-                    container[bot] = Ice::id();
-                    return;
-                }
-                if left_v == Water::id() {
-                    container[left] = Ice::id();
-                    return;
-                }
-                if right_v == Water::id() {
-                    container[right] = Ice::id();
-                    return;
-                }
             }
         }
 

@@ -1,11 +1,22 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::cell::Cell;
 use cgmath::{InnerSpace, Matrix, Matrix2, Matrix3, SquareMatrix, Vector2, Vector3};
 use rhai::EvalAltResult;
 use crate::CellTypeNotFound;
 use crate::shared_state::SharedState;
 use specs::{Builder, WorldExt, Join};
+
+thread_local! {
+    static STATE_PTR: Cell<*mut crate::State> = Cell::new(std::ptr::null_mut());
+}
+
+pub fn set_state_ptr(ptr: *mut crate::State) {
+    STATE_PTR.with(|cell| {
+        cell.set(ptr);
+    });
+}
 
 pub fn register_rhai(
     rhai: &mut rhai::Engine, 
@@ -14,6 +25,7 @@ pub fn register_rhai(
     id_dict: HashMap<String, u8>,
     world_rc: Option<Rc<RefCell<specs::World>>>,
     script_log_rc: Rc<RefCell<VecDeque<String>>>,
+    storage_rc: Option<Rc<RefCell<&mut crate::resources::rhai_resource::RhaiResourceStorage>>>,
 ) {
     //rhai_scope.push_constant("RES_X", dimensions.0);
     //rhai_scope.push_constant("RES_Y", dimensions.1);
@@ -60,6 +72,44 @@ pub fn register_rhai(
     rhai.register_fn("fract", move |v: f64| { v.fract() });
     rhai.register_fn("rand", move || -> i64 { crate::random::my_rand() });
     scope.push("time", 0f64);
+    scope.push("GRID_WIDTH", 1024i64);
+    scope.push("GRID_HEIGHT", 512i64);
+    
+    // Register set_temperature function - reads state pointer from thread_local
+    // Overload for i64, i64, f64 (for integer loop variables)
+    rhai.register_fn("set_temperature", |x: i64, y: i64, temp: f64| {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    (*state_ptr).set_temperature(x as crate::cs::PointType, y as crate::cs::PointType, temp as f32);
+                }
+            }
+        });
+    });
+    
+    // Overload for f64, f64, f64 (for floating point coordinates)
+    rhai.register_fn("set_temperature", |x: f64, y: f64, temp: f64| {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    (*state_ptr).set_temperature(x as crate::cs::PointType, y as crate::cs::PointType, temp as f32);
+                }
+            }
+        });
+    });
+    
+    rhai.register_fn("set_temperature", |v: Vector2::<f64>, temp: f64| {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    (*state_ptr).set_temperature(v.x as crate::cs::PointType, v.y as crate::cs::PointType, temp as f32);
+                }
+            }
+        });
+    });
     
     // Register print function for script logging with circular buffer (max 30 entries)
     const MAX_LOG_ENTRIES: usize = 30;
