@@ -29,12 +29,12 @@ impl CellTrait for Coal {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Coal can ignite at very high temperature
+        // Coal can ignite at high temperature (varies by type/particle size).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Coal ignites at temperature above 150 degrees
-            if temperature > 150.0 && dim.next() > 220 {
+            // A rough baseline: ~450°C for ignition in this simulation.
+            if temperature >= 450.0 && dim.next() > 235 {
                 container[cur] = BurningCoal::id();
                 return;
             }
@@ -51,6 +51,9 @@ impl CellTrait for Coal {
     }
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
+    }
+    fn ignition_temperature(&self) -> Option<f32> {
+        Some(450.0)
     }
     fn name(&self) -> &str {
         "coal"

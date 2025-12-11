@@ -20,16 +20,16 @@ impl CellTrait for Cell {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
-        temp_context: Option<&mut TemperatureContext>,
+        mut temp_context: Option<&mut TemperatureContext>,
     ) {
         if prng.next() > 128 {
             // Fire constantly heats the surrounding environment
-            if let Some(temp_ctx) = temp_context {
+            if let Some(temp_ctx) = temp_context.as_deref_mut() {
                 // Constantly give heat to neighbors
-                (temp_ctx.add_temp)(i, j + 1, 3.0); // top
-                (temp_ctx.add_temp)(i, j - 1, 3.0); // bottom
-                (temp_ctx.add_temp)(i + 1, j, 3.0); // right
-                (temp_ctx.add_temp)(i - 1, j, 3.0); // left
+                (temp_ctx.add_temp)(i, j + 1, 1.5); // top
+                (temp_ctx.add_temp)(i, j - 1, 1.5); // bottom
+                (temp_ctx.add_temp)(i + 1, j, 1.5); // right
+                (temp_ctx.add_temp)(i - 1, j, 1.5); // left
             }
             return;
         }
@@ -37,24 +37,24 @@ impl CellTrait for Cell {
         // Fire is finite - when disappearing gives additional heat to neighboring cells
         if prng.next() > 200 {
             // Give heat to neighboring cells before disappearing
-            if let Some(temp_ctx) = temp_context {
+            if let Some(temp_ctx) = temp_context.as_deref_mut() {
                 // Give additional heat to neighbors when disappearing
-                (temp_ctx.add_temp)(i, j + 1, 5.0); // top
-                (temp_ctx.add_temp)(i, j - 1, 5.0); // bottom
-                (temp_ctx.add_temp)(i + 1, j, 5.0); // right
-                (temp_ctx.add_temp)(i - 1, j, 5.0); // left
+                (temp_ctx.add_temp)(i, j + 1, 2.5); // top
+                (temp_ctx.add_temp)(i, j - 1, 2.5); // bottom
+                (temp_ctx.add_temp)(i + 1, j, 2.5); // right
+                (temp_ctx.add_temp)(i - 1, j, 2.5); // left
             }
             container[cur] = 0;
             return;
         }
         
         // Fire constantly heats the surrounding environment
-        if let Some(temp_ctx) = temp_context {
+        if let Some(temp_ctx) = temp_context.as_deref_mut() {
             // Constantly give heat to neighbors
-            (temp_ctx.add_temp)(i, j + 1, 3.0); // top
-            (temp_ctx.add_temp)(i, j - 1, 3.0); // bottom
-            (temp_ctx.add_temp)(i + 1, j, 3.0); // right
-            (temp_ctx.add_temp)(i - 1, j, 3.0); // left
+            (temp_ctx.add_temp)(i, j + 1, 1.5); // top
+            (temp_ctx.add_temp)(i, j - 1, 1.5); // bottom
+            (temp_ctx.add_temp)(i + 1, j, 1.5); // right
+            (temp_ctx.add_temp)(i - 1, j, 1.5); // left
         }
 
         let top = cs::xy_to_index(i, j + 1);
@@ -62,26 +62,12 @@ impl CellTrait for Cell {
         let r = cs::xy_to_index(i + 1, j);
         let l = cs::xy_to_index(i - 1, j);
 
-        let arr = [top, down, l, r];
-        let cc = arr[(prng.next() % 4) as usize];
+        // Pick a neighbor (track both index and coordinates for temperature checks).
+        let arr = [(i, j + 1, top), (i, j - 1, down), (i - 1, j, l), (i + 1, j, r)];
+        let (nx, ny, cc) = arr[(prng.next() % 4) as usize];
 
-        if prng.next() > 50 {
-            let cc_v = container[cc] as usize;
-            let cc_c = &pal_container.pal[cc_v];
-            let cc_b = cc_c.burnable();
-
-            if cc_b != Void::id() {
-                container[cc] = cc_b;
-                return;
-            }
-
-            let cc_h = cc_c.heatable();
-
-            if cc_h != Void::id() && prng.next() > cc_c.heat_proof() {
-                container[cc] = cc_h;
-                return;
-            }
-        }
+        // Fire does NOT directly ignite/transform neighbors on contact.
+        // It only heats (handled above) and moves/disappears.
 
         let top_v = container[top];
 

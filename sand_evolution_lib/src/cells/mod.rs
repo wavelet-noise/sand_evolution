@@ -119,7 +119,7 @@ impl CellRegistry {
     }
 }
 
-// Context for working with temperature (optional)
+// Context for working with temperature (optional).
 pub struct TemperatureContext<'a> {
     pub get_temp: Box<dyn Fn(PointType, PointType) -> f32 + 'a>,
     pub add_temp: Box<dyn FnMut(PointType, PointType, f32) + 'a>,
@@ -156,6 +156,11 @@ pub trait CellTrait {
     }
     fn heat_proof(&self) -> u8 {
         1
+    }
+    /// Temperature (degrees) at/above which this cell can ignite when heated by fire.
+    /// If None, fire may still interact via `burnable()`/`heatable()` legacy rules.
+    fn ignition_temperature(&self) -> Option<f32> {
+        None
     }
     fn name(&self) -> &str {
         ""

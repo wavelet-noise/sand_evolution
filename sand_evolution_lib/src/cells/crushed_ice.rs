@@ -27,7 +27,7 @@ impl CellTrait for CrushedIce {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Crushed ice melts only based on temperature - if temperature > 0, it melts and cools the environment
+        // Crushed ice melts only based on temperature - if temperature > 0, it melts.
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
@@ -35,12 +35,6 @@ impl CellTrait for CrushedIce {
             // Check rarely to avoid fast melt/freeze cycles
             if prng.next() > 200 {
                 if temperature > 0.0 {
-                    // Give cold to neighbors when melting (reduced to avoid flashes)
-                    (temp_ctx.add_temp)(i, j + 1, -3.0); // top
-                    (temp_ctx.add_temp)(i, j - 1, -3.0); // bottom
-                    (temp_ctx.add_temp)(i + 1, j, -3.0); // left
-                    (temp_ctx.add_temp)(i - 1, j, -3.0); // right
-                    
                     container[cur] = Water::id();
                     return;
                 }
@@ -101,10 +95,10 @@ impl CellTrait for CrushedIce {
             return;
         }
 
-        let top = cs::xy_to_index(i, j + 1);
-        let bot = cs::xy_to_index(i, j - 1);
-        let left = cs::xy_to_index(i + 1, j);
-        let right = cs::xy_to_index(i - 1, j);
+        let _top = cs::xy_to_index(i, j + 1);
+        let _bot = cs::xy_to_index(i, j - 1);
+        let _left = cs::xy_to_index(i + 1, j);
+        let _right = cs::xy_to_index(i - 1, j);
 
         // Crushed ice should not turn into water on contact
         // Only melting at temperature > 0

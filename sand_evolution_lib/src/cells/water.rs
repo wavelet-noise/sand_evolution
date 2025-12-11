@@ -29,21 +29,36 @@ impl CellTrait for Water {
             let temperature = (temp_ctx.get_temp)(i, j);
             
             // Water evaporates into steam at high temperature
-            if temperature > 15.0 {
-                use super::steam::Steam;
-                container[cur] = Steam::id();
-                // Heat is absorbed during evaporation (moderately, so adjacent water doesn't freeze)
-                (temp_ctx.add_temp)(i, j + 1, -5.0);
-                (temp_ctx.add_temp)(i, j - 1, -5.0);
-                (temp_ctx.add_temp)(i + 1, j, -5.0);
-                (temp_ctx.add_temp)(i - 1, j, -5.0);
-                return;
+            // NOTE: Probability depends on temperature only at the boiling point.
+            // At T >= 100, evaporate roughly in ~half of ticks.
+            if temperature >= 100.0 {
+                // 120 / 256 ~= 0.469 (almost half the ticks)
+                if dim.next() < 120 {
+                    use super::steam::Steam;
+                    container[cur] = Steam::id();
+                    // Heat is absorbed during evaporation (moderately, so adjacent water doesn't freeze)
+                    (temp_ctx.add_temp)(i, j + 1, -5.0);
+                    (temp_ctx.add_temp)(i, j - 1, -5.0);
+                    (temp_ctx.add_temp)(i + 1, j, -5.0);
+                    (temp_ctx.add_temp)(i - 1, j, -5.0);
+                    return;
+                }
             }
             
             // Water freezes at low temperature
             if temperature < -3.0 {
-                use super::crushed_ice::CrushedIce;
-                container[cur] = CrushedIce::id();
+                // Crystallization releases heat (we only model latent heat on phase change).
+                // Warm neighbors a bit to avoid "cold flicker" feedback loops.
+                (temp_ctx.add_temp)(i, j + 1, 3.0);
+                (temp_ctx.add_temp)(i, j - 1, 3.0);
+                (temp_ctx.add_temp)(i + 1, j, 3.0);
+                (temp_ctx.add_temp)(i - 1, j, 3.0);
+
+                // Freeze into crushed ice OR snow randomly.
+                // NOTE: tweak probabilities here if desired.
+                use super::{crushed_ice::CrushedIce, snow::Snow};
+                let roll = dim.next();
+                container[cur] = if roll < 128 { CrushedIce::id() } else { Snow::id() };
                 return;
             }
         }

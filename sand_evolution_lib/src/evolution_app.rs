@@ -371,7 +371,7 @@ impl EvolutionApp {
                     if ui
                         .add(egui::SelectableLabel::new(
                             self.display_mode == DisplayMode::Temperature,
-                            "🌡 Temperature",
+                            "🌡 Temperature (°)",
                         ))
                         .clicked()
                     {
@@ -419,6 +419,7 @@ impl EvolutionApp {
                         }
                         if ui.button("↩ Restore from URL").clicked() {
                             state.diffuse_rgba = state.loaded_rgba.clone();
+                            state.reset_temperatures();
                         }
 
                         ui.separator();
@@ -722,7 +723,8 @@ impl EvolutionApp {
         egui::Window::new("⏱ Simulation")
             .open(&mut win_simulation)
             .default_pos(egui::pos2(5.0, 5.0))
-            .fixed_size(egui::vec2(200., 100.))
+            .default_size(egui::vec2(280.0, 460.0))
+            .resizable(true)
             .show(context, |ui| {
                 // Simulation Configuration
                 ui.heading("Pause or simulation speed");
@@ -730,6 +732,19 @@ impl EvolutionApp {
                     egui::Slider::new(&mut self.simulation_steps_per_second, 0..=480)
                         .text("Simulation steps per second"),
                 );
+
+                ui.separator();
+                ui.heading("Temperature");
+                ui.add(
+                    egui::Slider::new(
+                        &mut state.global_temperature,
+                        crate::state::TEMP_MIN..=crate::state::TEMP_MAX,
+                    )
+                    .text("Global temperature (°)"),
+                );
+                if ui.button("Reset global temperature").clicked() {
+                    state.global_temperature = 21.0;
+                }
 
                 ui.separator();
                 ui.label(format!(
@@ -1206,6 +1221,7 @@ impl EvolutionApp {
                 }
             },
         );
+        state.reset_temperatures();
     }
 
     pub fn new() -> Self {

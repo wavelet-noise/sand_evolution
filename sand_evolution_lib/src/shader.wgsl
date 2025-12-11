@@ -5,6 +5,10 @@ struct WorldSettings {
     res_x: f32,
     res_y: f32,
     display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
+    global_temperature: f32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -303,22 +307,30 @@ var t_temperature: texture_2d<f32>;
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     // Get temperature value (needed for both Temperature and Both modes)
     let tex_coord = vec2<i32>(i32(in.uv.x * settings.res_x / 4.0), i32(in.uv.y * settings.res_y / 4.0));
-    let temp_value = textureLoad(t_temperature, tex_coord, 0).r;
+    let temp_value = textureLoad(t_temperature, tex_coord, 0).r + settings.global_temperature;
     
-    // Map temperature to color: cold (blue) -> neutral (black) -> hot (red)
-    // Temperature range: -100 to 100
+    // Map temperature (degrees) to color: cold (blue) -> neutral (black) -> hot (red/yellow).
+    //
+    // Visualization ranges (in degrees):
+    // - cold: 0 .. -100 (saturates below -100)
+    // - hot:  0 ..  300 (saturates above 300)
     var temp_col: vec4<f32>;
     if temp_value < 0.0 {
         // Cold: smooth blue gradient from neutral (black) to bright blue
         // Use a more noticeable gradient for better visibility
-        let coldness = abs(temp_value) / 100.0;
+        let coldness = clamp(abs(temp_value) / 100.0, 0.0, 1.0);
         // Brighter blue with a slight green tint for smoothness
         temp_col = vec4<f32>(0.0, coldness * 0.4, coldness * 1.2, 1.0);
         // Clamp blue channel to 1.0
         temp_col.b = min(temp_col.b, 1.0);
     } else {
         // Hot: red/yellow gradient
-        let hotness = temp_value / 100.0;
+        //
+        // Start "warm" visualization only after +100 degrees to avoid
+        // glowing too early on low positive temperatures.
+        let warm_start = 100.0;
+        let warm_end = 300.0;
+        let hotness = clamp((temp_value - warm_start) / (warm_end - warm_start), 0.0, 1.0);
         temp_col = vec4<f32>(hotness, hotness * 0.5, 0.0, 1.0);
     }
     
@@ -436,7 +448,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 6u // burning_wood
     {
-      col = vec4<f32>(0.8, 1.0, 0.5, 1.0)*1.1;
+      // Warm orange embers with subtle flicker (avoid greenish tint).
+      let flicker = clamp((tdnoise_fast + 1.0) * 0.5, 0.0, 1.0);
+      col = mix(
+        vec4<f32>(1.4, 0.35, 0.03, 1.0),  // darker ember orange
+        vec4<f32>(2.8, 1.15, 0.12, 1.0),  // hotter bright orange/yellow
+        flicker
+      );
     }
     else if t == 7u
     {
@@ -509,7 +527,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         // Blend temperature overlay: use additive blending with reduced intensity
         // Temperature overlay intensity: 0.5 (adjustable)
         let temp_intensity = 0.5;
-        col = col + temp_col * temp_intensity;
+        // Add only RGB; keep alpha from the base cell color.
+        col = vec4<f32>(col.rgb + temp_col.rgb * temp_intensity, col.a);
         // Don't clamp here - allow bloom to work with values > 1.0
     }
 

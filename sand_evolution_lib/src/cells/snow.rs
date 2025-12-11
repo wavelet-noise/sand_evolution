@@ -1,7 +1,7 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    helper::fluid_falling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
+    helper::fluid_falling_helper, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
 pub struct Snow;
@@ -27,18 +27,12 @@ impl CellTrait for Snow {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Snow melts only based on temperature - if temperature > 0, it melts and cools the environment
+        // Snow melts only based on temperature - if temperature > 0, it melts.
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
             // If temperature is above 0 degrees, snow melts
             if temperature > 0.0 {
-                // Give cold to neighbors when melting (reduced to avoid flashes)
-                (temp_ctx.add_temp)(i, j + 1, -5.0); // top
-                (temp_ctx.add_temp)(i, j - 1, -5.0); // bottom
-                (temp_ctx.add_temp)(i + 1, j, -5.0); // left
-                (temp_ctx.add_temp)(i - 1, j, -5.0); // right
-                
                 container[cur] = Water::id();
                 return;
             }
@@ -57,10 +51,10 @@ impl CellTrait for Snow {
             return;
         }
 
-        let top = cs::xy_to_index(i, j + 1);
-        let bot = cs::xy_to_index(i, j - 1);
-        let left = cs::xy_to_index(i + 1, j);
-        let right = cs::xy_to_index(i - 1, j);
+        let _top = cs::xy_to_index(i, j + 1);
+        let _bot = cs::xy_to_index(i, j - 1);
+        let _left = cs::xy_to_index(i + 1, j);
+        let _right = cs::xy_to_index(i - 1, j);
 
         // Snow should not turn into water on contact
         // Only melting at temperature > 0 (if temperature system is added)
