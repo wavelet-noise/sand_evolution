@@ -41,13 +41,8 @@ impl CellTrait for DryIce {
         let left = cs::xy_to_index(i + 1, j);
         let right = cs::xy_to_index(i - 1, j);
 
-        let arr = [top, left, right, bot];
-        let cc = arr[(prng.next() % 4) as usize];
-        let top_v = container[cc];
-
-        if top_v == Void::id() || top_v == Water::id() {
-            container[cur] = Water::id();
-        }
+        // Dry ice should not turn into water on contact
+        // Only melting at temperature (if temperature system is added)
     }
 
     fn stat(&self) -> bool {
