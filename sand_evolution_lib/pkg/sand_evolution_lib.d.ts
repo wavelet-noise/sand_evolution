@@ -55,12 +55,12 @@ export interface InitOutput {
   readonly wgpu_render_bundle_pop_debug_group: (a: number) => void;
   readonly wgpu_render_bundle_set_index_buffer: (a: number, b: bigint, c: number, d: bigint, e: bigint) => void;
   readonly wgpu_render_bundle_push_debug_group: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h77c4d55b415d1789: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__closure__destroy__h619df55e4f3c0493: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h009ec76cbcd346dc: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__closure__destroy__h68cc64288cca3ea3: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__h07316eb0a6a72e4f: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__closure__destroy__h2410a2f9a681e332: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__habb71d1fe9de5b31: (a: number, b: number) => void;
   readonly wasm_bindgen__closure__destroy__h87ac9840e964c286: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__h77c4d55b415d1789: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__closure__destroy__h619df55e4f3c0493: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__h2917f594691f9241: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
