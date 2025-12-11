@@ -1,4 +1,4 @@
-use super::{*, helper::fluid_falling_helper, fire, TemperatureContext};
+use super::{*, helper::fluid_falling_helper, TemperatureContext};
 use crate::cs::PointType;
 pub struct Water;
 impl Water {
@@ -46,15 +46,17 @@ impl CellTrait for Water {
                     
                     // Вода замерзает при низкой температуре (нужна достаточно низкая температура)
                     if temperature < -3.0 {
-                        container[cur] = Ice::id();
+                        use super::crushed_ice::CrushedIce;
+                        container[cur] = CrushedIce::id();
                         // Устанавливаем температуру льда около 0 градусов через add_temp
                         let target_temp = 0.0;
                         (temp_ctx.add_temp)(i, j, target_temp - temperature);
-                        // При кристаллизации выделяется умеренное количество тепла
-                        (temp_ctx.add_temp)(i, j + 1, 3.0); // верх
-                        (temp_ctx.add_temp)(i, j - 1, 3.0); // низ
-                        (temp_ctx.add_temp)(i + 1, j, 3.0); // право
-                        (temp_ctx.add_temp)(i - 1, j, 3.0); // лево
+                        // При кристаллизации выделяется небольшое количество тепла
+                        // Уменьшено, чтобы избежать циклов замерзания/таяния
+                        (temp_ctx.add_temp)(i, j + 1, 1.5); // верх
+                        (temp_ctx.add_temp)(i, j - 1, 1.5); // низ
+                        (temp_ctx.add_temp)(i + 1, j, 1.5); // право
+                        (temp_ctx.add_temp)(i - 1, j, 1.5); // лево
                         return;
                     }
                 }
@@ -73,49 +75,39 @@ impl CellTrait for Water {
             let cc = arr[(dim.next() % 4) as usize];
 
             // Check for freezing on contact with ice
-            // Use a high threshold for slow freezing
-            if dim.next() > 240 {
+            // Use a very high threshold for very slow freezing to avoid aggressive freezing
+            if dim.next() > 250 {
                 let top_v = container[top];
                 let down_v = container[down];
                 let r_v = container[r];
                 let l_v = container[l];
 
                 // Check neighboring cells for ice
+                use super::crushed_ice::CrushedIce;
                 if top_v == Ice::id() || down_v == Ice::id() ||
-                   r_v == Ice::id() || l_v == Ice::id() {
-                    // Water freezes and turns into ice (slowly)
-                    container[cur] = Ice::id();
+                   r_v == Ice::id() || l_v == Ice::id() ||
+                   top_v == CrushedIce::id() || down_v == CrushedIce::id() ||
+                   r_v == CrushedIce::id() || l_v == CrushedIce::id() {
+                    // Water freezes and turns into crushed ice (very slowly)
+                    container[cur] = CrushedIce::id();
                     return;
                 }
                 
                 // Вода замерзает при низкой температуре (нужна достаточно низкая температура)
                 // Используем более низкий порог, чтобы избежать цепной реакции
-                if temperature < -3.0 {
-                    container[cur] = Ice::id();
-                    // Устанавливаем температуру льда около 0 градусов через add_temp
-                    let target_temp = 0.0;
-                    (temp_ctx.add_temp)(i, j, target_temp - temperature);
-                    // При кристаллизации выделяется умеренное количество тепла
-                    // Достаточно, чтобы немного нагреть среду, но не вызвать цепную реакцию
-                    (temp_ctx.add_temp)(i, j + 1, 3.0); // верх
-                    (temp_ctx.add_temp)(i, j - 1, 3.0); // низ
-                    (temp_ctx.add_temp)(i + 1, j, 3.0); // право
-                    (temp_ctx.add_temp)(i - 1, j, 3.0); // лево
-                    return;
-                }
-            } else {
-                // Проверка на замерзание при контакте со льдом (старая логика для совместимости)
-                if dim.next() > 240 {
-                    let top_v = container[top];
-                    let down_v = container[down];
-                    let r_v = container[r];
-                    let l_v = container[l];
-
-                    // Проверяем соседние клетки на наличие льда
-                    if top_v == Ice::id() || down_v == Ice::id() ||
-                       r_v == Ice::id() || l_v == Ice::id() {
-                        // Если нет системы температуры, используем старую логику
-                        container[cur] = Ice::id();
+                if let Some(temp_ctx) = temp_context {
+                    let temperature = (temp_ctx.get_temp)(i, j);
+                    if temperature < -3.0 {
+                        container[cur] = CrushedIce::id();
+                        // Устанавливаем температуру льда около 0 градусов через add_temp
+                        let target_temp = 0.0;
+                        (temp_ctx.add_temp)(i, j, target_temp - temperature);
+                        // При кристаллизации выделяется небольшое количество тепла
+                        // Уменьшено, чтобы избежать циклов замерзания/таяния
+                        (temp_ctx.add_temp)(i, j + 1, 1.5); // верх
+                        (temp_ctx.add_temp)(i, j - 1, 1.5); // низ
+                        (temp_ctx.add_temp)(i + 1, j, 1.5); // право
+                        (temp_ctx.add_temp)(i - 1, j, 1.5); // лево
                         return;
                     }
                 }
