@@ -43,13 +43,8 @@ impl CellTrait for CrushedIce {
         let left = cs::xy_to_index(i + 1, j);
         let right = cs::xy_to_index(i - 1, j);
 
-        let arr = [top, left, right, bot];
-        let cc = arr[(prng.next() % 4) as usize];
-        let rand_v = container[cc];
-
-        if rand_v == Void::id() || rand_v == Water::id() {
-            container[cur] = Water::id();
-        }
+        // Crushed ice should not turn into water on contact
+        // Only melting at temperature > 0
     }
 
     fn den(&self) -> i8 {
