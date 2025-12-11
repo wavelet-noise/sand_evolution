@@ -12,7 +12,7 @@ pub mod update;
 
 pub mod resources;
 pub mod projects;
-mod rhai_lib;
+pub mod rhai_lib;
 mod random;
 
 use ::egui::FontDefinitions;
@@ -218,6 +218,28 @@ impl GameContext {
             })
             .build();
 
+        // Create Cooler entity - охлаждает верхний ряд клеток каждый тик
+        world
+            .create_entity()
+            .with(Name {
+                name: "Cooler".to_owned(),
+            })
+            .with(Script {
+                script: r#"// Скрипт объекта Cooler - охлаждает верхний ряд клеток каждый тик
+let top_row_y = 511;
+let cool_temp = -5.0;
+
+// Охлаждаем все клетки верхнего ряда каждый тик
+for x in 0..GRID_WIDTH {
+    set_temperature(x, top_row_y, cool_temp);
+}
+"#.to_owned(),
+                ast: None,
+                raw: true,
+                script_type: ScriptType::Entity,
+            })
+            .build();
+
         GameContext {
             world,
             dispatcher,
@@ -401,14 +423,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         let mut rhai = rhai::Engine::new();
         let mut rhai_scope = rhai::Scope::new();
 
-        // For now, pass None, as access to world from scripts requires additional architecture
-        // Functions for working with objects can be added later through a special mechanism
-        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone());
-
+        // Register functions
+        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone(), None);
+        
         game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
                 engine: rhai,
                 scope: rhai_scope,
+                state_ptr: std::cell::Cell::new(std::ptr::null_mut()),
             }),
         });
     }
