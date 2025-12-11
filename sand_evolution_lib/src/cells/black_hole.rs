@@ -1,6 +1,6 @@
 use crate::cs::{self, PointType};
 
-use super::{void::Void, CellRegistry, CellTrait, CellType, Prng};
+use super::{{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
 
 pub struct BlackHole;
 
@@ -27,6 +27,7 @@ impl CellTrait for BlackHole {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         _prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         let neighbors = [
             cs::xy_to_index(i, j + 1),

@@ -1,7 +1,7 @@
 use crate::cells::dry_grass::DryGrass;
 use crate::cs::{self, PointType};
 
-use super::{burning_wood, sand::Base, void::Void, water::Water, base_water::BaseWater, CellRegistry, CellTrait, CellType, Prng};
+use super::{burning_wood, sand::Base, void::Void, water::Water, base_water::BaseWater, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Grass;
 impl Grass {
@@ -24,6 +24,7 @@ impl CellTrait for Grass {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         // Check for drying on contact with alkali
         if prng.next() > 180 {

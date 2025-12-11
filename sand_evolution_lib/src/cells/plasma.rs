@@ -1,7 +1,7 @@
 use crate::cells::helper::fluid_falling_helper;
 use crate::cs::{self, PointType};
 
-use super::{void::Void, CellRegistry, CellTrait, CellType, Prng};
+use super::{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Plasma;
 impl Plasma {
@@ -24,6 +24,7 @@ impl CellTrait for Plasma {
         container: &mut [CellType],
         _pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         let top = cs::xy_to_index(i, j + 1);
         let down = cs::xy_to_index(i, j - 1);

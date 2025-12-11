@@ -1,4 +1,4 @@
-use super::*;
+use super::{*, TemperatureContext};
 use crate::cs::{self, PointType};
 
 pub struct BurningCoal;
@@ -24,7 +24,15 @@ impl CellTrait for BurningCoal {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Горящий уголь выделяет тепло
+        if let Some(temp_ctx) = temp_context {
+            (temp_ctx.add_temp)(i, j + 1, 3.0); // верх
+            (temp_ctx.add_temp)(i, j - 1, 3.0); // низ
+            (temp_ctx.add_temp)(i + 1, j, 3.0); // право
+            (temp_ctx.add_temp)(i - 1, j, 3.0); // лево
+        }
         if !sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             let bot = cs::xy_to_index(i, j - 1);
             let bot_v = container[bot] as usize;

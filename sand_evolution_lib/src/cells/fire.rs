@@ -1,4 +1,4 @@
-use super::*;
+use super::{*, TemperatureContext};
 use crate::cs::{self, PointType};
 
 pub const fn new() -> Cell {
@@ -20,14 +20,41 @@ impl CellTrait for Cell {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
         if prng.next() > 128 {
+            // Огонь постоянно нагревает окружающую среду
+            if let Some(temp_ctx) = temp_context {
+                // Постоянно отдаем тепло соседям
+                (temp_ctx.add_temp)(i, j + 1, 3.0); // верх
+                (temp_ctx.add_temp)(i, j - 1, 3.0); // низ
+                (temp_ctx.add_temp)(i + 1, j, 3.0); // право
+                (temp_ctx.add_temp)(i - 1, j, 3.0); // лево
+            }
             return;
         }
 
+        // Огонь конечен - при исчезновении отдает дополнительное тепло соседним клеткам
         if prng.next() > 200 {
+            // Отдаем тепло соседним клеткам перед исчезновением
+            if let Some(temp_ctx) = temp_context {
+                // Отдаем дополнительное тепло соседям при исчезновении
+                (temp_ctx.add_temp)(i, j + 1, 5.0); // верх
+                (temp_ctx.add_temp)(i, j - 1, 5.0); // низ
+                (temp_ctx.add_temp)(i + 1, j, 5.0); // право
+                (temp_ctx.add_temp)(i - 1, j, 5.0); // лево
+            }
             container[cur] = 0;
             return;
+        }
+        
+        // Огонь постоянно нагревает окружающую среду
+        if let Some(temp_ctx) = temp_context {
+            // Постоянно отдаем тепло соседям
+            (temp_ctx.add_temp)(i, j + 1, 3.0); // верх
+            (temp_ctx.add_temp)(i, j - 1, 3.0); // низ
+            (temp_ctx.add_temp)(i + 1, j, 3.0); // право
+            (temp_ctx.add_temp)(i - 1, j, 3.0); // лево
         }
 
         let top = cs::xy_to_index(i, j + 1);
@@ -79,6 +106,8 @@ impl CellTrait for Cell {
             return;
         }
 
+        // Огонь исчезает и отдает тепло соседним клеткам
+        // temp_context уже использован выше, но если мы дошли сюда, значит он был None или уже использован
         container[cur] = 0;
     }
 
