@@ -482,6 +482,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     {
       col = vec4<f32>(1.0,0.5,1.0,1.0);
     }
+    else if t == 17u // liquid gas (сжиженный газ)
+    {
+      // Холодная голубовато-зеленая жидкость с прозрачностью
+      col = mix(vec4<f32>(0.3, 0.9, 0.7, 0.6) * 0.5, vec4<f32>(0.2, 0.8, 0.6, 0.8), tdnoise);
+    }
     else if t == 70u // grass
     {
       col = vec4<f32>(0.4,1.0,0.4,1.0)*((noise_pixel+1.0)/2.0)*0.5;

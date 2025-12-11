@@ -9,6 +9,7 @@ pub mod fire;
 pub mod gas;
 mod helper;
 pub mod ice;
+pub mod liquid_gas;
 pub mod sand;
 pub mod snow;
 pub mod steam;
@@ -47,6 +48,7 @@ use self::{
     gas::Gas,
     helper::sand_falling_helper,
     ice::Ice,
+    liquid_gas::LiquidGas,
     sand::{Base, Salt, Sand},
     snow::Snow,
     steam::Steam,
@@ -183,6 +185,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[14] = Base::boxed();
     cell_registry.pal[15] = SaltyWater::boxed();
     cell_registry.pal[16] = BaseWater::boxed();
+    cell_registry.pal[17] = LiquidGas::boxed();
     cell_registry.pal[50] = Wood::boxed();
     cell_registry.pal[55] = Ice::boxed();
     cell_registry.pal[56] = CrushedIce::boxed();
