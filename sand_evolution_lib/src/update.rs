@@ -34,7 +34,7 @@ pub fn update_tick(
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
     
-    // Устанавливаем переменные фрейма один раз перед циклом
+    // Set frame variables once before the loop
     if state.toggled {
         if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
             if let Some(storage) = &mut rhai_resource.storage {
@@ -46,7 +46,7 @@ pub fn update_tick(
     for _sim_update in 0..sim_steps {
         state.tick += 1;
         if state.toggled {
-            // Устанавливаем переменную tick в scope
+            // Set the tick variable in scope
             {
                 if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
                     if let Some(storage) = &mut rhai_resource.storage {
@@ -59,9 +59,9 @@ pub fn update_tick(
                 }
             }
             
-            // Выполняем системы ECS на каждом тике симуляции
-            // Это включает EntityScriptSystem, который выполняет скрипты объектов
-            // Вызываем системы после освобождения borrow rhai_resource
+            // Execute ECS systems on each simulation tick
+            // This includes EntityScriptSystem, which executes object scripts
+            // Call systems after releasing the borrow of rhai_resource
             {
                 use specs::WorldExt;
                 let mut script_system = EntityScriptSystem;

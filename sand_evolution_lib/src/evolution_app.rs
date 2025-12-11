@@ -51,10 +51,10 @@ pub struct EvolutionApp {
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
     pub hovered: bool,
-    script: String, // Для обратной совместимости - хранит скрипт выбранного объекта
-    pub selected_object_name: String, // Имя выбранного объекта для редактирования
-    last_loaded_object: String, // Последний загруженный объект (для отслеживания изменений)
-    script_modified: bool, // Флаг изменений скрипта
+    script: String, // For backward compatibility - stores the script of the selected object
+    pub selected_object_name: String, // Name of the selected object for editing
+    last_loaded_object: String, // Last loaded object (for tracking changes)
+    script_modified: bool, // Script modification flag
     pub need_to_recompile: bool,
     pub script_error: String,
     executor: Executor,
@@ -78,7 +78,7 @@ pub struct EvolutionApp {
     pub editor_state: EditorState,
     pub undo_redo: UndoRedo,
     
-    // Script log storage - кольцевой буфер с ограничением в 30 записей
+    // Script log storage - circular buffer with a limit of 30 entries
     pub script_log: Rc<RefCell<VecDeque<String>>>,
     pub show_log_window: bool,
 }
@@ -119,12 +119,12 @@ impl EvolutionApp {
 
     pub fn set_script(&mut self, value: &str) -> bool {
         self.script = value.to_owned();
-        self.script_modified = true; // Импортированный скрипт считается измененным
+        self.script_modified = true; // Imported script is considered modified
         self.need_to_recompile = true;
         true
     }
 
-    /// Получить скрипт объекта по имени из world
+    /// Get object script by name from world
     pub fn get_object_script(&self, world: &specs::World, object_name: &str) -> Option<String> {
         use specs::Join;
         use crate::ecs::components::{Name, Script};
@@ -143,7 +143,7 @@ impl EvolutionApp {
         None
     }
 
-    /// Установить скрипт объекта по имени в world
+    /// Set object script by name in world
     pub fn set_object_script(&mut self, world: &mut specs::World, object_name: &str, script: &str) {
         use specs::Join;
         use crate::ecs::components::{Name, Script};
@@ -429,10 +429,10 @@ impl EvolutionApp {
             });
         self.w1 = w1;
         
-        // Ограничиваем максимальный размер окна Script Editor размером приложения
+        // Limit the maximum size of Script Editor window to the application size
         let screen_height = context.available_rect().height();
-        let max_window_height = screen_height * 0.95; // 95% высоты экрана с небольшим отступом
-        // Фиксируем размер окна, чтобы оно не могло стать слишком большим
+        let max_window_height = screen_height * 0.95; // 95% of screen height with a small margin
+        // Fix the window size so it cannot become too large
         let fixed_height = max_window_height.min(600.0);
         
         egui::Window::new("Script Editor")
@@ -443,7 +443,7 @@ impl EvolutionApp {
                 use specs::Join;
                 use crate::ecs::components::Name;
                 
-                // Получаем список всех объектов (сначала собираем данные)
+                // Get the list of all objects (first collect the data)
                 let mut object_names: Vec<String> = Vec::new();
                 {
                     let names = world.read_storage::<Name>();
@@ -454,7 +454,7 @@ impl EvolutionApp {
                 }
                 object_names.sort();
                 
-                // Верхняя панель с выбором объекта
+                // Top panel with object selection
                 ui.horizontal(|ui| {
                     ui.label("Object:");
                     egui::ComboBox::from_id_source("object_selector")
@@ -467,8 +467,8 @@ impl EvolutionApp {
                         });
                 });
                 
-                // Проверяем изменение выбранного объекта и загружаем скрипт только при изменении
-                // Важно: проверка должна быть ПОСЛЕ рендера ComboBox, чтобы изменения обнаруживались в том же кадре
+                // Check for change in selected object and load script only on change
+                // Important: check must be AFTER rendering ComboBox so changes are detected in the same frame
                 if self.selected_object_name != self.last_loaded_object {
                     if let Some(script_text) = self.get_object_script(world, &self.selected_object_name) {
                         self.script = script_text;
@@ -477,15 +477,15 @@ impl EvolutionApp {
                     }
                     self.last_loaded_object = self.selected_object_name.clone();
                     self.script_modified = false;
-                    // Очищаем ошибки при переключении объекта
+                    // Clear errors when switching objects
                     self.script_error.clear();
                 }
                 
                 ui.separator();
                 
-                // Панель инструментов
+                // Toolbar
                 ui.horizontal(|ui| {
-                    // Кнопка включения/выключения скрипта
+                    // Enable/disable script button
                     if ui
                         .button(if state.toggled {
                             "⏸ Disable"
@@ -499,7 +499,7 @@ impl EvolutionApp {
                     
                     ui.separator();
                     
-                    // Кнопки экспорта/импорта
+                    // Export/import buttons
                     if ui.button("📤 Export").clicked() {
                         code_to_file(self.script.as_str());
                     }
@@ -523,23 +523,23 @@ impl EvolutionApp {
                     
                     ui.separator();
                     
-                    // Кнопка открытия окна лога
+                    // Button to open log window
                     if ui.button("📋 Log").clicked() {
                         self.show_log_window = true;
                     }
                 });
                 
-                // Отображение ошибок (всегда резервируем место, чтобы не терять фокус)
+                // Error display (always reserve space to avoid losing focus)
                 ui.separator();
-                // Всегда резервируем фиксированную высоту для области ошибки
-                // Это предотвращает перестройку UI и потерю фокуса
+                // Always reserve a fixed height for the error area
+                // This prevents UI rebuild and loss of focus
                 let error_area_height = ui.text_style_height(&egui::TextStyle::Body) + 8.0;
                 let error_id = egui::Id::new(format!("script_error_{}", self.selected_object_name));
                 let (_id, error_rect) = ui.allocate_space(egui::vec2(ui.available_width(), error_area_height));
                 
-                // Показываем ошибку только если она есть, используя зарезервированное место
-                // Используем стабильный ID для предотвращения перестройки
-                // Не вызываем allocate_ui_at_rect когда ошибки нет, чтобы не вызывать перестройку
+                // Show error only if it exists, using the reserved space
+                // Use a stable ID to prevent rebuild
+                // Don't call allocate_ui_at_rect when there's no error to avoid rebuild
                 if !self.script_error.is_empty() {
                     ui.allocate_ui_at_rect(error_rect, |ui| {
                         ui.push_id(error_id, |ui| {
@@ -553,16 +553,16 @@ impl EvolutionApp {
                 
                 ui.separator();
                 
-                // Редактор кода с улучшенным интерфейсом
-                // Используем стабильный ID для предотвращения перестройки
+                // Code editor with improved interface
+                // Use a stable ID to prevent rebuild
                 let script_label_id = egui::Id::new(format!("script_label_{}", self.selected_object_name));
                 ui.push_id(script_label_id, |ui| {
                     ui.label(format!("Script: {}", self.selected_object_name));
                 });
                 
-                // Улучшенный редактор с лучшим размером
-                // Используем стабильный ID для сохранения фокуса
-                // Растягиваем редактор по всей доступной высоте
+                // Improved editor with better size
+                // Use a stable ID to preserve focus
+                // Stretch the editor to full available height
                 let available_height = ui.available_height();
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
@@ -570,9 +570,9 @@ impl EvolutionApp {
                     .always_show_scroll(true)
                     .max_height(available_height)
                     .show(ui, |ui| {
-                        // Используем стабильный ID на основе имени объекта для сохранения фокуса
+                        // Use a stable ID based on object name to preserve focus
                         let text_edit_id = egui::Id::new(format!("script_editor_{}", self.selected_object_name));
-                        // Выделяем пространство для TextEdit, чтобы он растянулся по вертикали
+                        // Allocate space for TextEdit so it stretches vertically
                         let (_, text_edit_rect) = ui.allocate_space(egui::vec2(ui.available_width(), available_height));
                         ui.allocate_ui_at_rect(text_edit_rect, |ui| {
                         let text_edit = egui::TextEdit::multiline(&mut self.script)
@@ -582,12 +582,12 @@ impl EvolutionApp {
                         
                         let response = ui.add(text_edit);
                         
-                        // Отслеживаем изменения
+                        // Track changes
                         if response.changed() {
                             self.script_modified = true;
                         }
                         
-                        // Обрабатываем вставку из буфера обмена, если TextEdit в фокусе
+                        // Handle clipboard paste if TextEdit is focused
                         if response.has_focus() {
                             let modifiers = ui.input().modifiers;
                             let paste_pressed = (modifiers.command || modifiers.ctrl) && ui.input().key_pressed(egui::Key::V);
@@ -595,7 +595,7 @@ impl EvolutionApp {
                             if paste_pressed {
                                 #[cfg(target_arch = "wasm32")]
                                 {
-                                    // В браузере используем асинхронный API
+                                    // In browser use async API
                                     let event_loop_proxy = event_loop_proxy.clone();
                                     self.executor.execute(async move {
                                         if let Ok(text) = crate::copy_text_from_clipboard_async().await {
@@ -606,10 +606,10 @@ impl EvolutionApp {
                                 
                                 #[cfg(not(target_arch = "wasm32"))]
                                 {
-                                    // На десктопе используем синхронный API
+                                    // On desktop use synchronous API
                                     if let Ok(text) = crate::copy_text_from_clipboard() {
-                                        // Вставляем текст в текущую позицию курсора или в конец
-                                        // Для простоты вставляем в конец, так как получить позицию курсора сложно
+                                        // Insert text at current cursor position or at the end
+                                        // For simplicity, insert at the end, as getting cursor position is difficult
                                         self.script.push_str(&text);
                                         self.script_modified = true;
                                     }
@@ -619,7 +619,7 @@ impl EvolutionApp {
                         });
                     });
                 
-                // Информация о скрипте (используем стабильный ID для предотвращения перестройки)
+                // Script information (use a stable ID to prevent rebuild)
                 ui.separator();
                 let stats_id = egui::Id::new(format!("script_stats_{}", self.selected_object_name));
                 ui.push_id(stats_id, |ui| {
@@ -650,13 +650,13 @@ impl EvolutionApp {
                 
                 ui.separator();
                 
-                // Отображаем логи (последние 30 записей из кольцевого буфера)
+                // Display logs (last 30 entries from circular buffer)
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
                         let logs = self.script_log.borrow();
-                        // VecDeque уже содержит только последние 30 записей благодаря кольцевому буферу
+                        // VecDeque already contains only the last 30 entries thanks to the circular buffer
                         for (index, log_entry) in logs.iter().enumerate() {
                             ui.push_id(index, |ui| {
                                 ui.label(log_entry);

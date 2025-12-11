@@ -85,7 +85,7 @@ pub fn write_to_file(
     let mut buffer = Vec::new();
     let mut cursor = Cursor::new(&mut buffer);
     
-    // Конвертируем ImageBuffer в DynamicImage и сохраняем в PNG
+    // Convert ImageBuffer to DynamicImage and save as PNG
     let dynamic_image = image::DynamicImage::ImageLuma8(data.clone());
     dynamic_image.write_to(&mut cursor, image::ImageOutputFormat::Png)?;
 

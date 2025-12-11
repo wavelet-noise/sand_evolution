@@ -103,8 +103,8 @@ pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Erro
 }
 #[cfg(target_arch = "wasm32")]
 pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> {
-    // В браузере буфер обмена доступен только через асинхронный API
-    // Эта функция будет вызываться из асинхронного контекста
+    // In the browser, clipboard is only available through async API
+    // This function will be called from an async context
     Ok("".to_owned())
 }
 
@@ -165,7 +165,7 @@ impl GameContext {
     pub fn new(state: State) -> Self {
         let mut world = specs::World::new();
         
-        // Регистрируем все компоненты
+        // Register all components
         world.register::<Name>();
         world.register::<Script>();
         world.register::<Position>();
@@ -180,7 +180,7 @@ impl GameContext {
             .build();
         dispatcher.setup(&mut world);
 
-        // Создаем объект для мирового скрипта
+        // Create an object for the world script
         world
             .create_entity()
             .with(Name {
@@ -194,7 +194,7 @@ impl GameContext {
             })
             .build();
 
-        // Создаем Dummy сущность для проверки
+        // Create a Dummy entity for testing
         world
             .create_entity()
             .with(Name {
@@ -229,7 +229,7 @@ impl GameContext {
         self.dispatcher.dispatch(&self.world);
     }
 
-    /// Найти entity по имени
+    /// Find entity by name
     pub fn find_entity_by_name(&self, name: &str) -> Option<Entity> {
         use specs::Join;
         let names = self.world.read_storage::<Name>();
@@ -376,8 +376,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     ));
     game_context.state.update_with_data(data);
 
-    // Создаем shared log storage для скриптов перед созданием EvolutionApp
-    // Используем VecDeque как кольцевой буфер с ограничением в 30 записей
+    // Create shared log storage for scripts before creating EvolutionApp
+    // Use VecDeque as a circular buffer with a limit of 30 entries
     use std::collections::VecDeque;
     let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
     
@@ -385,7 +385,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
     evolution_app.set_script(script.as_str());
     
-    // Обновляем объект мирового скрипта начальным скриптом
+    // Update the world script object with the initial script
     evolution_app.set_object_script(&mut game_context.world, "World Script", script.as_str());
 
     let mut id_dict: HashMap<String, u8> = HashMap::new();
@@ -401,8 +401,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         let mut rhai = rhai::Engine::new();
         let mut rhai_scope = rhai::Scope::new();
 
-        // Пока что передаем None, так как доступ к world из скриптов требует дополнительной архитектуры
-        // Функции для работы с объектами можно добавить позже через специальный механизм
+        // For now, pass None, as access to world from scripts requires additional architecture
+        // Functions for working with objects can be added later through a special mechanism
         rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone());
 
         game_context.world.insert(RhaiResource {
@@ -456,16 +456,16 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
                     if evolution_app.need_to_recompile {
-                        // Сначала находим entity
+                        // First, find the entity
                         let script_entity = game_context.find_entity_by_name(&evolution_app.selected_object_name);
                         
                         if let Some(script_entity) = script_entity {
-                            // Получаем rhai_resource отдельно
+                            // Get rhai_resource separately
                             let rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
                             
                             if let Some(rhai_resource) = rhai_resource_opt {
                                 if let Some(storage) = &mut rhai_resource.storage {
-                                    // Компилируем скрипт выбранного объекта
+                                    // Compile the script of the selected object
                                     let script_text = evolution_app.get_script().to_owned();
                                     let result = storage
                                         .engine
@@ -511,8 +511,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         window.inner_size(),
                         window.scale_factor(),
                     );
-                    // dispatch() теперь вызывается внутри update_tick на каждом тике симуляции
-                    // Оставляем один вызов для случаев, когда симуляция не запущена
+                    // dispatch() is now called inside update_tick on each simulation tick
+                    // Keep one call for cases when simulation is not running
                     if evolution_app.simulation_steps_per_second == 0 {
                         game_context.dispatch();
                     }
@@ -620,9 +620,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     input: _,
                     is_synthetic: _,
                 } => {
-                    // Не обрабатываем события клавиатуры здесь - egui TextEdit сам обрабатывает
-                    // вставку из буфера обмена через стандартные сочетания клавиш (Cmd+V/Ctrl+V)
-                    // Обработка через winit вызывает конфликты и паники на macOS
+                    // Don't handle keyboard events here - egui TextEdit handles
+                    // clipboard paste through standard key combinations (Cmd+V/Ctrl+V)
+                    // Handling through winit causes conflicts and panics on macOS
                 }
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if button == winit::event::MouseButton::Left {
