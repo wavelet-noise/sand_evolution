@@ -126,6 +126,10 @@ impl CellTrait for Grass {
     fn heatable(&self) -> u8 {
         DryGrass::id()
     }
+    fn ignition_temperature(&self) -> Option<f32> {
+        // Green grass is harder to ignite than dry grass; treat it as needing high heat.
+        Some(300.0)
+    }
     fn name(&self) -> &str {
         "grass"
     }

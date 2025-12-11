@@ -84,6 +84,10 @@ impl CellTrait for DryGrass {
     fn proton_transfer(&self) -> CellType {
         burning_wood::id()
     }
+    fn ignition_temperature(&self) -> Option<f32> {
+        // Dry grass ignites easier than wood/green grass.
+        Some(250.0)
+    }
     fn id(&self) -> CellType {
         71
     }

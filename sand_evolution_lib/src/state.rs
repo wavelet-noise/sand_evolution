@@ -19,7 +19,13 @@ pub struct WorldSettings {
     time: f32,
     res_x: f32,
     res_y: f32,
-    display_mode: f32, // 0.0 = Normal, 1.0 = Temperature
+    display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
+    /// Global temperature offset (degrees). Effective temperature = layer + global_temperature.
+    global_temperature: f32,
+    // Keep uniform size a multiple of 16 bytes.
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
 }
 #[derive(Default)]
 pub struct UpdateResult {
@@ -60,12 +66,22 @@ pub struct State {
     pub toggled: bool,
     pub tick: i64,
     pub frame: i64,
-    // Temperature system for each cell
+    // Temperature system for each cell (degrees)
     pub cell_temperatures: Vec<f32>,
+    /// Global/base temperature (degrees).
+    pub global_temperature: f32,
     // Temperature texture for GPU
     temperature_texture: wgpu::Texture,
     temperature_bind_group: wgpu::BindGroup,
 }
+
+/// Minimum allowed temperature in the simulation (degrees).
+pub const TEMP_MIN: f32 = -100.0;
+/// Maximum allowed temperature in the simulation (degrees).
+///
+/// Note: some cells use ignition thresholds above 100 (e.g. coal at 150),
+/// so this needs to be > 150 to make those rules reachable.
+pub const TEMP_MAX: f32 = 500.0;
 
 impl State {
     pub(crate) fn update_with_data(&mut self, p0: &[u8]) {
@@ -75,6 +91,8 @@ impl State {
             let res = image::load_from_memory(p0).expect("Load from memory failed");
             self.loaded_rgba = res.to_luma8();
             self.diffuse_rgba = res.to_luma8();
+            // Imported map should not inherit previous temperature field.
+            self.reset_temperatures();
             println!("Some image loaded");
         }
     }
@@ -161,6 +179,9 @@ impl State {
                 }
             }
         }
+
+        // New random map should start from a clean temperature field.
+        self.reset_temperatures();
     }
     pub fn new(
         device: &wgpu::Device,
@@ -286,6 +307,10 @@ impl State {
             res_x: dimensions.0 as f32,
             res_y: dimensions.1 as f32,
             display_mode: 0.0, // Normal mode by default
+            global_temperature: 21.0,
+            _pad0: 0.0,
+            _pad1: 0.0,
+            _pad2: 0.0,
         };
 
         let raw_ptr = &world_settings as *const WorldSettings;
@@ -848,6 +873,7 @@ impl State {
             tick: 0,
             frame: 0,
             cell_temperatures,
+            global_temperature: 21.0,
             temperature_texture,
             temperature_bind_group,
         }
@@ -883,7 +909,9 @@ impl State {
     // Get cell temperature by index (in reduced grid)
     pub fn get_cell_temperature(&self, index: usize) -> f32 {
         if index < self.cell_temperatures.len() {
-            self.cell_temperatures[index]
+            (self.cell_temperatures[index] + self.global_temperature)
+                .max(TEMP_MIN)
+                .min(TEMP_MAX)
         } else {
             0.0
         }
@@ -898,7 +926,8 @@ impl State {
     // Set cell temperature by index (in reduced grid)
     pub fn set_cell_temperature(&mut self, index: usize, temp: f32) {
         if index < self.cell_temperatures.len() {
-            self.cell_temperatures[index] = temp.max(-100.0).min(100.0);
+            let clamped = temp.max(TEMP_MIN).min(TEMP_MAX);
+            self.cell_temperatures[index] = clamped - self.global_temperature;
         }
     }
 
@@ -913,8 +942,10 @@ impl State {
         let idx = self.temp_coords_to_index(i, j);
         if idx < self.cell_temperatures.len() {
             self.cell_temperatures[idx] += delta;
-            // Clamp temperature to reasonable limits
-            self.cell_temperatures[idx] = self.cell_temperatures[idx].max(-100.0).min(100.0);
+            // Clamp effective temperature to reasonable limits
+            let eff = self.cell_temperatures[idx] + self.global_temperature;
+            let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+            self.cell_temperatures[idx] = clamped - self.global_temperature;
         }
     }
 
@@ -922,14 +953,23 @@ impl State {
     pub fn add_cell_temperature(&mut self, index: usize, delta: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] += delta;
-            // Clamp temperature to reasonable limits
-            self.cell_temperatures[index] = self.cell_temperatures[index].max(-100.0).min(100.0);
+            // Clamp effective temperature to reasonable limits
+            let eff = self.cell_temperatures[index] + self.global_temperature;
+            let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+            self.cell_temperatures[index] = clamped - self.global_temperature;
         }
+    }
+
+    /// Reset per-cell temperature field (local delta, reduced grid) to zero.
+    /// Note: global temperature offset is preserved.
+    pub fn reset_temperatures(&mut self) {
+        self.cell_temperatures.as_mut_slice().fill(0.0);
     }
 
     // Fast temperature diffusion - processes all cells of the reduced grid each frame
     pub fn diffuse_temperature_fast(&mut self) {
-        let diffusion_rate = 0.15;
+        // Tuned to avoid rapid global heat "flooding" from local sources (fire/wood).
+        let diffusion_rate = 0.10;
         let cooling_rate = 0.998;
         
         // Work directly with the reduced grid
@@ -959,7 +999,11 @@ impl State {
                 // Simple diffusion: average with neighbors
                 let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
                 let diffused = current + (avg - current) * diffusion_rate;
-                let new_temp = (diffused * cooling_rate).max(-100.0).min(100.0);
+                // Temperatures are stored as local delta; clamp effective temperature.
+                let new_local = diffused * cooling_rate;
+                let eff = new_local + self.global_temperature;
+                let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+                let new_temp = clamped - self.global_temperature;
                 
                 new_temps[idx] = new_temp;
             }
@@ -1032,6 +1076,7 @@ impl State {
             crate::evolution_app::DisplayMode::Temperature => 1.0,
             crate::evolution_app::DisplayMode::Both => 2.0,
         };
+        self.world_settings.global_temperature = self.global_temperature;
 
         queue.write_buffer(
             &self.settings_buffer,

@@ -4,7 +4,11 @@ struct WorldSettings {
     time: f32,
     res_x: f32,
     res_y: f32,
-    _wasm_padding2: f32,
+    display_mode: f32,
+    global_temperature: f32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;

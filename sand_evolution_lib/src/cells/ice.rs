@@ -1,4 +1,4 @@
-use crate::cs::{self, PointType};
+use crate::cs::PointType;
 
 use super::{water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
@@ -22,7 +22,7 @@ impl CellTrait for Ice {
         cur: usize,
         container: &mut [CellType],
         _pal_container: &CellRegistry,
-        prng: &mut Prng,
+        _prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
         // Ice melts only based on temperature - if temperature > 0, it melts and cools the environment

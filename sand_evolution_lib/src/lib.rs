@@ -248,31 +248,6 @@ for x in 0..GRID_WIDTH {
             })
             .build();
 
-        // Create Clear All entity - clears the entire grid ONCE (on the first tick)
-        world
-            .create_entity()
-            .with(Name {
-                name: "Clear All".to_owned(),
-            })
-            .with(Script {
-                script: r#"// Clear All - one-shot script
-// Runs once and clears the entire grid to Void (id = 0).
-// Important: this also affects the border/boundaries.
-
-for x in 0..GRID_WIDTH {
-    for y in 0..GRID_HEIGHT {
-        set_cell(x, y, 0);
-    }
-}
-"#
-                .to_owned(),
-                ast: None,
-                raw: true,
-                script_type: ScriptType::Entity,
-                run_once: true,
-                has_run: false,
-            })
-            .build();
 
         GameContext {
             world,
@@ -701,6 +676,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         && dimensions.1 == cs::SECTOR_SIZE.y as u32
                     {
                         game_context.state.diffuse_rgba = img;
+                        game_context.state.reset_temperatures();
                     }
                 }
                 _ => {}
