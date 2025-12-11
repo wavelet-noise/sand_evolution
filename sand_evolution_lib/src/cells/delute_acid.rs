@@ -47,13 +47,13 @@ impl CellTrait for DeluteAcid {
                 if cc_pt != Void::id() {
                     container[cc] = Void::id();
                     container[cur] = cc_pt;
-                    // Разбавленная кислота повышает температуру меньше при растворении
+                    // Diluted acid increases temperature less when dissolving
                     if let Some(temp_ctx) = temp_context {
-                        (temp_ctx.add_temp)(i, j + 1, 10.0); // верх
-                        (temp_ctx.add_temp)(i, j - 1, 10.0); // низ
-                        (temp_ctx.add_temp)(i + 1, j, 10.0); // право
-                        (temp_ctx.add_temp)(i - 1, j, 10.0); // лево
-                        (temp_ctx.add_temp)(i, j, 5.0); // сама клетка
+                        (temp_ctx.add_temp)(i, j + 1, 10.0); // top
+                        (temp_ctx.add_temp)(i, j - 1, 10.0); // bottom
+                        (temp_ctx.add_temp)(i + 1, j, 10.0); // right
+                        (temp_ctx.add_temp)(i - 1, j, 10.0); // left
+                        (temp_ctx.add_temp)(i, j, 5.0); // cell itself
                     }
                     return;
                 }
@@ -72,13 +72,13 @@ impl CellTrait for DeluteAcid {
                     } else {
                         container[cur] = Void::id();
                     }
-                    // Разбавленная кислота повышает температуру меньше при протонном переносе
+                    // Diluted acid increases temperature less during proton transfer
                     if let Some(temp_ctx) = temp_context {
-                        (temp_ctx.add_temp)(i, j + 1, 8.0); // верх
-                        (temp_ctx.add_temp)(i, j - 1, 8.0); // низ
-                        (temp_ctx.add_temp)(i + 1, j, 8.0); // право
-                        (temp_ctx.add_temp)(i - 1, j, 8.0); // лево
-                        (temp_ctx.add_temp)(i, j, 4.0); // сама клетка
+                        (temp_ctx.add_temp)(i, j + 1, 8.0); // top
+                        (temp_ctx.add_temp)(i, j - 1, 8.0); // bottom
+                        (temp_ctx.add_temp)(i + 1, j, 8.0); // right
+                        (temp_ctx.add_temp)(i - 1, j, 8.0); // left
+                        (temp_ctx.add_temp)(i, j, 4.0); // cell itself
                     }
                     return;
                 }

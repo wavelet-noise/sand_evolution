@@ -25,19 +25,19 @@ impl CellTrait for Ice {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Лед тает только на основе температуры - если температура > 0, то тает и охлаждает среду
+        // Ice melts only based on temperature - if temperature > 0, it melts and cools the environment
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Если температура выше 0 градусов, лед тает
+            // If temperature is above 0 degrees, ice melts
             if temperature > 0.0 {
                 container[cur] = Water::id();
                 return;
             }
         }
 
-        // Лед не должен превращаться в воду при контакте с пустотой или водой
-        // Только таяние при температуре > 0
+        // Ice should not turn into water on contact with void or water
+        // Only melting at temperature > 0
     }
 
     fn den(&self) -> i8 {

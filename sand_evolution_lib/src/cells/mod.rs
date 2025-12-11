@@ -119,7 +119,7 @@ impl CellRegistry {
     }
 }
 
-// Контекст для работы с температурой (опциональный)
+// Context for working with temperature (optional)
 pub struct TemperatureContext<'a> {
     pub get_temp: Box<dyn Fn(PointType, PointType) -> f32 + 'a>,
     pub add_temp: Box<dyn FnMut(PointType, PointType, f32) + 'a>,

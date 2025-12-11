@@ -29,11 +29,11 @@ impl CellTrait for Coal {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Уголь может загораться при очень высокой температуре
+        // Coal can ignite at very high temperature
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Уголь загорается при температуре выше 150 градусов
+            // Coal ignites at temperature above 150 degrees
             if temperature > 150.0 && dim.next() > 220 {
                 container[cur] = BurningCoal::id();
                 return;

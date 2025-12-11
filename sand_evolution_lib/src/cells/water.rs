@@ -23,16 +23,16 @@ impl CellTrait for Water {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // ВАЖНО: Проверяем температуру ПЕРЕД падением, чтобы избежать дубликатов
-        // Если проверять после swap, то cur уже не содержит воду!
+        // IMPORTANT: Check temperature BEFORE falling to avoid duplicates
+        // If checked after swap, cur no longer contains water!
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Вода испаряется в пар при высокой температуре
+            // Water evaporates into steam at high temperature
             if temperature > 15.0 {
                 use super::steam::Steam;
                 container[cur] = Steam::id();
-                // При испарении поглощается тепло (умеренно, чтобы соседняя вода не замерзала)
+                // Heat is absorbed during evaporation (moderately, so adjacent water doesn't freeze)
                 (temp_ctx.add_temp)(i, j + 1, -5.0);
                 (temp_ctx.add_temp)(i, j - 1, -5.0);
                 (temp_ctx.add_temp)(i + 1, j, -5.0);
@@ -40,7 +40,7 @@ impl CellTrait for Water {
                 return;
             }
             
-            // Вода замерзает при низкой температуре
+            // Water freezes at low temperature
             if temperature < -3.0 {
                 use super::crushed_ice::CrushedIce;
                 container[cur] = CrushedIce::id();
@@ -48,14 +48,14 @@ impl CellTrait for Water {
             }
         }
         
-        // Теперь пробуем упасть (после проверки температуры)
+        // Now try to fall (after temperature check)
         let is_falling = fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1);
         
         if is_falling {
             return;
         }
         
-        // Когда вода не падает, проверяем растворение
+        // When water is not falling, check for dissolution
         let top = cs::xy_to_index(i, j + 1);
         let down = cs::xy_to_index(i, j - 1);
         let r = cs::xy_to_index(i + 1, j);

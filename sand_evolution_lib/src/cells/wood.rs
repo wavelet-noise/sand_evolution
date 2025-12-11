@@ -25,11 +25,11 @@ impl CellTrait for Wood {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Дерево может загораться при высокой температуре
+        // Wood can ignite at high temperature
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Дерево загорается при температуре выше 100 градусов
+            // Wood ignites at temperature above 100 degrees
             if temperature > 100.0 && prng.next() > 200 {
                 container[cur] = burning_wood::id();
                 return;

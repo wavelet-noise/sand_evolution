@@ -24,12 +24,12 @@ impl CellTrait for Gas {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Газ конденсируется в сжиженный газ при очень низкой температуре
+        // Gas condenses into liquid gas at very low temperature
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
             
-            // Газ конденсируется при температуре ниже -50 градусов
-            // с небольшой вероятностью, чтобы не конденсировался мгновенно
+            // Gas condenses at temperature below -50 degrees
+            // with small probability to avoid instant condensation
             if temperature < -50.0 && prng.next() < 10 {
                 use super::liquid_gas::LiquidGas;
                 container[cur] = LiquidGas::id();

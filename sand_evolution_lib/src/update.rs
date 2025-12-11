@@ -110,14 +110,14 @@ pub fn update_tick(
 
         state.prng.gen();
 
-        // Быстрая диффузия температуры - обрабатывает все клетки уменьшенной сетки каждый кадр
-        // Вызываем реже для оптимизации (каждые 2 тика)
+        // Fast temperature diffusion - processes all cells of the reduced grid each frame
+        // Called less frequently for optimization (every 2 ticks)
         if state.tick % 2 == 0 {
             state.diffuse_temperature_fast();
         }
 
-        // Создаем контекст температуры ОДИН РАЗ перед циклом для переиспользования
-        // Используем указатель для обхода проблем с заимствованиями
+        // Create temperature context ONCE before the loop for reuse
+        // Use a pointer to work around borrowing issues
         let state_ptr: *mut State = state;
         let mut temp_context = crate::cells::TemperatureContext {
             get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| {
@@ -143,10 +143,10 @@ pub fn update_tick(
                 let cur = cs::xy_to_index(i, j);
                 let cur_v = *state.diffuse_rgba.get(cur).unwrap();
 
-                // Передаем temp_context для клеток с температурными взаимодействиями:
-                // вода (2), пар (3), огонь (4), горящее дерево (6), горящий уголь (7), уголь (8),
-                // кислота (9), разбавленная кислота (12), дерево (50), лед (55), дробленый лед (56), снег (57)
-                // Для остальных ячеек передаем None для оптимизации
+                // Pass temp_context for cells with temperature interactions:
+                // water (2), steam (3), fire (4), burning wood (6), burning coal (7), coal (8),
+                // acid (9), diluted acid (12), wood (50), ice (55), crushed ice (56), snow (57)
+                // For other cells pass None for optimization
                 let needs_temp = cur_v == 2 || cur_v == 3 || cur_v == 4 || cur_v == 6 || 
                                  cur_v == 7 || cur_v == 8 || cur_v == 9 || cur_v == 12 ||
                                  cur_v == 50 || cur_v == 55 || cur_v == 56 || cur_v == 57;

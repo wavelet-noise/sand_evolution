@@ -92,9 +92,9 @@ impl EditorInspector {
         let script_editor_object_name = RefCell::new(None::<String>);
         
         ui.collapsing("Script", |ui| {
-            let scripts = world.read_storage::<Script>();
+            let mut scripts = world.write_storage::<Script>();
             
-            if let Some(script) = scripts.get(entity) {
+            if let Some(script) = scripts.get_mut(entity) {
                 // Script info
                 ui.horizontal(|ui| {
                     ui.label("Status:");
@@ -109,6 +109,28 @@ impl EditorInspector {
                     ui.label("Raw mode:");
                     ui.label(format!("{}", script.raw));
                 });
+
+                ui.horizontal(|ui| {
+                    ui.label("Run once:");
+                    let mut run_once = script.run_once;
+                    if ui.checkbox(&mut run_once, "First tick only").changed() {
+                        script.run_once = run_once;
+                        // If user enables one-shot, allow it to run on next tick.
+                        if script.run_once {
+                            script.has_run = false;
+                        }
+                    }
+                });
+
+                if script.run_once {
+                    ui.horizontal(|ui| {
+                        ui.label("Executed:");
+                        ui.label(format!("{}", script.has_run));
+                    });
+                    if ui.button("Reset one-shot").clicked() {
+                        script.has_run = false;
+                    }
+                }
                 
                 ui.horizontal(|ui| {
                     ui.label("Code length:");
@@ -125,14 +147,15 @@ impl EditorInspector {
                 }
             } else {
                 ui.label("No Script component");
-                let mut scripts = world.write_storage::<Script>();
                 if ui.button("Add Script Component").clicked() {
                     use crate::ecs::components::ScriptType;
-                    scripts.insert(entity, Script {
+                    let _ = scripts.insert(entity, Script {
                         script: "".to_owned(),
                         ast: None,
                         raw: true,
                         script_type: ScriptType::Entity,
+                        run_once: false,
+                        has_run: false,
                     });
                 }
             }

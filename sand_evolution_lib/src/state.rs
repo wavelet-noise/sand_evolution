@@ -60,9 +60,9 @@ pub struct State {
     pub toggled: bool,
     pub tick: i64,
     pub frame: i64,
-    // Система температуры для каждой клетки
+    // Temperature system for each cell
     pub cell_temperatures: Vec<f32>,
-    // Текстура температуры для GPU
+    // Temperature texture for GPU
     temperature_texture: wgpu::Texture,
     temperature_bind_group: wgpu::BindGroup,
 }
@@ -808,8 +808,8 @@ impl State {
         let last_spawn = -5.0;
         let prng = Prng::new();
 
-        // Инициализация температуры клеток (начальная температура = 0.0)
-        // Используем уменьшенную сетку (в 4 раза меньше) для оптимизации
+        // Initialize cell temperatures (initial temperature = 0.0)
+        // Use a reduced grid (4x smaller) for optimization
         let temp_width = (cs::SECTOR_SIZE.x / 4) as usize;
         let temp_height = (cs::SECTOR_SIZE.y / 4) as usize;
         let total_cells = temp_width * temp_height;
@@ -872,7 +872,7 @@ impl State {
             .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
-    // Преобразовать координаты полной сетки в координаты уменьшенной сетки
+    // Convert full grid coordinates to reduced grid coordinates
     fn temp_coords_to_index(&self, i: PointType, j: PointType) -> usize {
         let temp_x = (i / 4) as usize;
         let temp_y = (j / 4) as usize;
@@ -880,7 +880,7 @@ impl State {
         temp_y * temp_width + temp_x
     }
 
-    // Получить температуру клетки по индексу (в уменьшенной сетке)
+    // Get cell temperature by index (in reduced grid)
     pub fn get_cell_temperature(&self, index: usize) -> f32 {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index]
@@ -889,63 +889,63 @@ impl State {
         }
     }
 
-    // Получить температуру клетки по координатам (полной сетки)
+    // Get cell temperature by coordinates (full grid)
     pub fn get_temperature(&self, i: PointType, j: PointType) -> f32 {
         let idx = self.temp_coords_to_index(i, j);
         self.get_cell_temperature(idx)
     }
 
-    // Установить температуру клетки по индексу (в уменьшенной сетке)
+    // Set cell temperature by index (in reduced grid)
     pub fn set_cell_temperature(&mut self, index: usize, temp: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] = temp.max(-100.0).min(100.0);
         }
     }
 
-    // Установить температуру клетки по координатам (полной сетки)
+    // Set cell temperature by coordinates (full grid)
     pub fn set_temperature(&mut self, i: PointType, j: PointType, temp: f32) {
         let idx = self.temp_coords_to_index(i, j);
         self.set_cell_temperature(idx, temp);
     }
 
-    // Добавить температуру к клетке (для выделения тепла)
+    // Add temperature to cell (for heat generation)
     pub fn add_temperature(&mut self, i: PointType, j: PointType, delta: f32) {
         let idx = self.temp_coords_to_index(i, j);
         if idx < self.cell_temperatures.len() {
             self.cell_temperatures[idx] += delta;
-            // Ограничиваем температуру разумными пределами
+            // Clamp temperature to reasonable limits
             self.cell_temperatures[idx] = self.cell_temperatures[idx].max(-100.0).min(100.0);
         }
     }
 
-    // Добавить температуру к клетке по индексу (в уменьшенной сетке)
+    // Add temperature to cell by index (in reduced grid)
     pub fn add_cell_temperature(&mut self, index: usize, delta: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] += delta;
-            // Ограничиваем температуру разумными пределами
+            // Clamp temperature to reasonable limits
             self.cell_temperatures[index] = self.cell_temperatures[index].max(-100.0).min(100.0);
         }
     }
 
-    // Быстрая диффузия температуры - обрабатывает все клетки уменьшенной сетки каждый кадр
+    // Fast temperature diffusion - processes all cells of the reduced grid each frame
     pub fn diffuse_temperature_fast(&mut self) {
         let diffusion_rate = 0.15;
         let cooling_rate = 0.998;
         
-        // Работаем напрямую с уменьшенной сеткой
+        // Work directly with the reduced grid
         let width = (cs::SECTOR_SIZE.x / 4) as usize;
         let height = (cs::SECTOR_SIZE.y / 4) as usize;
         
-        // Создаем временный буфер для новых температур
+        // Create temporary buffer for new temperatures
         let mut new_temps = vec![0.0f32; width * height];
         
-        // Обрабатываем все клетки уменьшенной сетки
+        // Process all cells of the reduced grid
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
                 let current = self.cell_temperatures.get(idx).copied().unwrap_or(0.0);
                 
-                // Получаем температуры соседних клеток в уменьшенной сетке
+                // Get temperatures of neighboring cells in the reduced grid
                 let top_idx = (ty + 1) * width + tx;
                 let bot_idx = (ty - 1) * width + tx;
                 let left_idx = ty * width + (tx - 1);
@@ -956,7 +956,7 @@ impl State {
                 let left_temp = self.cell_temperatures.get(left_idx).copied().unwrap_or(current);
                 let right_temp = self.cell_temperatures.get(right_idx).copied().unwrap_or(current);
                 
-                // Простая диффузия: усредняем с соседями
+                // Simple diffusion: average with neighbors
                 let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
                 let diffused = current + (avg - current) * diffusion_rate;
                 let new_temp = (diffused * cooling_rate).max(-100.0).min(100.0);
@@ -965,7 +965,7 @@ impl State {
             }
         }
         
-        // Применяем новые температуры
+        // Apply new temperatures
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
@@ -1092,7 +1092,7 @@ impl State {
             texture_size,
         );
         
-        // Upload temperature data to GPU - пишем напрямую из уменьшенной сетки
+        // Upload temperature data to GPU - write directly from the reduced grid
         let temp_width = dimensions.0 / 4;
         let temp_height = dimensions.1 / 4;
         

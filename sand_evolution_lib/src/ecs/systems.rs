@@ -95,12 +95,26 @@ impl EntityScriptSystem {
             }
         }
 
-        // Then execute all compiled scripts
+        // Then execute all compiled scripts (respect one-shot mode)
+        let mut entities_to_run: Vec<specs::Entity> = Vec::new();
         {
             let scripts_read: &WriteStorage<Script> = scripts;
-            for (_entity, script) in (entities, scripts_read).join() {
-                if let Some(ast) = &script.ast {
+            for (entity, script) in (entities, scripts_read).join() {
+                let runnable = script.ast.is_some();
+                let should_run = !script.run_once || !script.has_run;
+                if runnable && should_run {
+                    entities_to_run.push(entity);
+                }
+            }
+        }
+
+        for entity in entities_to_run {
+            if let Some(script) = scripts.get_mut(entity) {
+                if let Some(ast) = script.ast.as_ref() {
                     Self::run_script(engine, scope, ast);
+                    if script.run_once {
+                        script.has_run = true;
+                    }
                 }
             }
         }

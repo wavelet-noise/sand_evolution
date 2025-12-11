@@ -24,12 +24,12 @@ impl CellTrait for Cell {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Горящее дерево выделяет тепло
+        // Burning wood releases heat
         if let Some(temp_ctx) = temp_context {
-            (temp_ctx.add_temp)(i, j + 1, 2.0); // верх
-            (temp_ctx.add_temp)(i, j - 1, 2.0); // низ
-            (temp_ctx.add_temp)(i + 1, j, 2.0); // право
-            (temp_ctx.add_temp)(i - 1, j, 2.0); // лево
+            (temp_ctx.add_temp)(i, j + 1, 2.0); // top
+            (temp_ctx.add_temp)(i, j - 1, 2.0); // bottom
+            (temp_ctx.add_temp)(i + 1, j, 2.0); // right
+            (temp_ctx.add_temp)(i - 1, j, 2.0); // left
         }
         if prng.next() > 200 {
             return;
