@@ -117,6 +117,12 @@ impl CellRegistry {
     }
 }
 
+// Контекст для работы с температурой (опциональный)
+pub struct TemperatureContext<'a> {
+    pub get_temp: Box<dyn Fn(PointType, PointType) -> f32 + 'a>,
+    pub add_temp: Box<dyn FnMut(PointType, PointType, f32) + 'a>,
+}
+
 pub trait CellTrait {
     fn update(
         &self,
@@ -126,6 +132,7 @@ pub trait CellTrait {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     );
     fn den(&self) -> i8 {
         0

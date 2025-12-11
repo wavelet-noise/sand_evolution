@@ -1,7 +1,7 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    fire, helper::fluid_flying_helper, void::Void, CellRegistry, CellTrait, CellType, Prng,
+    fire, helper::fluid_flying_helper, void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
 pub struct BurningGas;
@@ -25,6 +25,7 @@ impl CellTrait for BurningGas {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         let topl = cs::xy_to_index(i - 1, j + 1);
         let topr = cs::xy_to_index(i + 1, j + 1);

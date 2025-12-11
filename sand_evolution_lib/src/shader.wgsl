@@ -4,7 +4,7 @@ struct WorldSettings {
     time: f32,
     res_x: f32,
     res_y: f32,
-    _wasm_padding2: f32,
+    display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -296,11 +296,45 @@ var t_diffuse: texture_2d<u32>;
 @group(1)@binding(1)
 var s_diffuse: sampler;
 
+@group(2) @binding(0)
+var t_temperature: texture_2d<f32>;
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
-    //let temp: f32 = voroNoise2(in.uv * 10.0 + vec2<f32>(settings.time, settings.time), sin(settings.time), 0.0);
-    //return vec4<f32>(temp,temp,temp, 1.0);
+    // Get temperature value (needed for both Temperature and Both modes)
+    let tex_coord = vec2<i32>(i32(in.uv.x * settings.res_x / 4.0), i32(in.uv.y * settings.res_y / 4.0));
+    let temp_value = textureLoad(t_temperature, tex_coord, 0).r;
+    
+    // Map temperature to color: cold (blue) -> neutral (black) -> hot (red)
+    // Temperature range: -100 to 100
+    var temp_col: vec4<f32>;
+    if temp_value < 0.0 {
+        // Cold: smooth blue gradient from neutral (black) to bright blue
+        // Используем более заметный градиент для лучшей видимости
+        let coldness = abs(temp_value) / 100.0;
+        // Более яркий синий с небольшим зеленым оттенком для плавности
+        temp_col = vec4<f32>(0.0, coldness * 0.4, coldness * 1.2, 1.0);
+        // Ограничиваем синий канал до 1.0
+        temp_col.b = min(temp_col.b, 1.0);
+    } else {
+        // Hot: red/yellow gradient
+        let hotness = temp_value / 100.0;
+        temp_col = vec4<f32>(hotness, hotness * 0.5, 0.0, 1.0);
+    }
+    
+    // Check if we're in temperature-only mode
+    if settings.display_mode > 1.5 {
+        // Both mode - render cells first, then overlay temperature
+        // Continue to normal rendering code below
+    } else if settings.display_mode > 0.5 {
+        // Temperature map mode only
+        var out: FragmentOutput;
+        out.albedo = temp_col;
+        out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        return out;
+    }
 
+    // Normal mode or Both mode - render cells
     let uv = in.uv;
     let grain = 0.9;
     let freq = settings.res_y * 10.0;
@@ -465,13 +499,23 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
     }
 
-    var out: FragmentOutput;
-    out.albedo = col;
+    // If in Both mode, blend temperature overlay with cell colors
+    if settings.display_mode > 1.5 {
+        // Blend temperature overlay: use additive blending with reduced intensity
+        // Temperature overlay intensity: 0.5 (adjustable)
+        let temp_intensity = 0.5;
+        col = col + temp_col * temp_intensity;
+        // Don't clamp here - allow bloom to work with values > 1.0
+    }
 
+    var out: FragmentOutput;
+    
+    // Calculate bloom before clamping (bloom needs values > 1.0)
     if (col.r > 1.0 || col.g > 1.0 || col.b > 1.0) {
         out.albedo = normalize(col);
         out.bloom = out.albedo * out.albedo;
     } else {
+        out.albedo = col;
         out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
