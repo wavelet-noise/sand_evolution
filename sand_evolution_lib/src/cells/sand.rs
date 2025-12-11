@@ -6,7 +6,7 @@ use super::{
     CellRegistry,
     CellTrait,
     CellType,
-    gas::Gas, helper::sand_falling_helper, Prng,
+    gas::Gas, helper::sand_falling_helper, Prng, TemperatureContext,
 };
 
 pub struct Sand;
@@ -30,6 +30,7 @@ impl CellTrait for Sand {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
@@ -68,6 +69,7 @@ impl CellTrait for Salt {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
@@ -106,6 +108,7 @@ impl CellTrait for Base {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }

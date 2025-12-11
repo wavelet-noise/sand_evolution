@@ -1,4 +1,4 @@
-use super::{*, helper::fluid_falling_helper};
+use super::{*, helper::fluid_falling_helper, TemperatureContext};
 use crate::cs::PointType;
 
 pub struct Acid;
@@ -22,6 +22,7 @@ impl CellTrait for Acid {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         dim: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
         if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);
@@ -37,22 +38,35 @@ impl CellTrait for Acid {
                 let cc_c = &pal_container.pal[cc_v];
                 let cc_pt = cc_c.proton_transfer();
 
+                let mut reacted = false;
+
                 if cc_pt != Void::id() {
                     container[cc] = cc_pt;
                     container[cur] = DeluteAcid::id();
-                    return;
-                }
-
-                if cc_v == Salt::id() as usize {
+                    reacted = true;
+                } else if cc_v == Salt::id() as usize {
                     container[cc] = SaltyWater::id();
                     container[cur] = DeluteAcid::id();
-                    return;
+                    reacted = true;
+                } else {
+                    let cc_h = cc_c.heatable();
+
+                    if cc_h != Void::id() {
+                        container[cc] = cc_h;
+                        reacted = true;
+                    }
                 }
 
-                let cc_h = cc_c.heatable();
-
-                if cc_h != Void::id() {
-                    container[cc] = cc_h;
+                // При срабатывании кислоты сильно повышаем температуру вокруг
+                if reacted {
+                    if let Some(temp_ctx) = temp_context {
+                        // Кислота очень сильно нагревает при реакции
+                        (temp_ctx.add_temp)(i, j + 1, 30.0); // верх
+                        (temp_ctx.add_temp)(i, j - 1, 30.0); // низ
+                        (temp_ctx.add_temp)(i + 1, j, 30.0); // право
+                        (temp_ctx.add_temp)(i - 1, j, 30.0); // лево
+                        (temp_ctx.add_temp)(i, j, 20.0); // сама клетка
+                    }
                     return;
                 }
             }

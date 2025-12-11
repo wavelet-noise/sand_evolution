@@ -81,6 +81,16 @@ pub struct EvolutionApp {
     // Script log storage - кольцевой буфер с ограничением в 30 записей
     pub script_log: Rc<RefCell<VecDeque<String>>>,
     pub show_log_window: bool,
+    
+    // Display mode: Normal or Temperature map
+    pub display_mode: DisplayMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayMode {
+    Normal,
+    Temperature,
+    Both,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -387,6 +397,20 @@ impl EvolutionApp {
             if ui.button("Editor").clicked() {
                 w6 = !w6;
             }
+            
+            ui.separator();
+            ui.label("Display Mode:");
+            ui.horizontal(|ui| {
+                if ui.selectable_label(self.display_mode == DisplayMode::Normal, "Normal").clicked() {
+                    self.display_mode = DisplayMode::Normal;
+                }
+                if ui.selectable_label(self.display_mode == DisplayMode::Temperature, "Temperature").clicked() {
+                    self.display_mode = DisplayMode::Temperature;
+                }
+                if ui.selectable_label(self.display_mode == DisplayMode::Both, "Both").clicked() {
+                    self.display_mode = DisplayMode::Both;
+                }
+            });
         });
         
         self.editor_state.show_grid = w6;
@@ -1125,6 +1149,8 @@ impl EvolutionApp {
             
             script_log,
             show_log_window: false,
+            
+            display_mode: DisplayMode::Normal,
         }
     }
 }
