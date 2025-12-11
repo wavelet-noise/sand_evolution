@@ -14,7 +14,7 @@ use crate::{
     export_file::write_to_file,
     fps_meter::FpsMeter,
     state::{State, UpdateResult},
-    editor::{EditorState, EditorToolbar, EditorViewport, EditorInspector, EditorHierarchy, UndoRedo, GizmoSystem, InputHandler},
+    editor::{EditorState, EditorInspector, EditorHierarchy, UndoRedo},
 };
 use specs::WorldExt;
 
@@ -60,9 +60,7 @@ pub struct EvolutionApp {
     executor: Executor,
 
     // Windows
-    pub win_project: bool,
-    pub win_map: bool,
-    pub win_scene: bool,
+    pub win_files: bool,
     pub win_script_editor: bool,
     pub win_simulation: bool,
     pub win_templates: bool, // templates / projects window
@@ -275,50 +273,12 @@ impl EvolutionApp {
         // Handle keyboard shortcuts for editor
         // TODO: Fix input handling for egui 0.19 - temporarily disabled
         // Keyboard shortcuts will be handled through other means
-        
-        // Handle mouse input for editor
-        InputHandler::handle_mouse_input(context, &mut self.editor_state, world, &mut self.undo_redo);
-        
-        let mut win_project: bool = self.win_project;
-        let mut win_map: bool = self.win_map;
-        let mut win_scene: bool = self.win_scene;
+
+        let mut win_files: bool = self.win_files;
         let mut win_script_editor: bool = self.win_script_editor;
         let mut win_simulation: bool = self.win_simulation;
         let mut win_templates: bool = self.win_templates;
         let mut win_palette: bool = self.win_palette;
-        let mut w6: bool = self.editor_state.show_grid; // Editor viewport window
-
-        // Editor toolbar
-        if self.editor_state.show_toolbar {
-            egui::Window::new("Editor Toolbar")
-                .default_pos(egui::pos2(10.0, 50.0))
-                .title_bar(false)
-                .resizable(false)
-                .show(context, |ui| {
-                    EditorToolbar::ui(ui, &mut self.editor_state, &self.undo_redo);
-                });
-        }
-        
-        // Editor viewport
-        egui::Window::new("Viewport")
-            .default_pos(egui::pos2(200.0, 50.0))
-            .default_size(egui::vec2(800.0, 600.0))
-            .open(&mut w6)
-            .show(context, |ui| {
-                let viewport_rect = ui.available_rect_before_wrap();
-                EditorViewport::ui(ui, &mut self.editor_state, viewport_rect);
-                
-                // Draw gizmos
-                let painter = ui.painter();
-                let gizmo = GizmoSystem;
-                gizmo.draw(&painter, &self.editor_state, world);
-                
-                // Status bar
-                ui.separator();
-                let cursor_pos = context.pointer_latest_pos()
-                    .map(|p| (p.x, p.y));
-                EditorViewport::status_bar(ui, &self.editor_state, cursor_pos);
-            });
         
         // Calculate panel layout only once at startup
         // Using typical screen size (1920x1080) for initial layout
@@ -386,63 +346,12 @@ impl EvolutionApp {
                 ui.heading("Windows");
                 ui.add_space(4.0);
 
-                egui::CollapsingHeader::new("📁 Files")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        egui::Grid::new("win_switches_files_grid")
-                            .num_columns(2)
-                            .spacing(egui::vec2(10.0, 6.0))
-                            .show(ui, |ui| {
-                                toggle_btn(ui, &mut win_project, "📦 Project");
-                                toggle_btn(ui, &mut win_map, "🗺 Map");
-                                ui.end_row();
-
-                                toggle_btn(ui, &mut win_scene, "🎬 Scene");
-                                ui.end_row();
-                            });
-                    });
-
-                egui::CollapsingHeader::new("🧠 Scripts")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        egui::Grid::new("win_switches_scripts_grid")
-                            .num_columns(2)
-                            .spacing(egui::vec2(10.0, 6.0))
-                            .show(ui, |ui| {
-                                toggle_btn(ui, &mut win_script_editor, "📝 Script Editor");
-                                toggle_btn(ui, &mut self.show_log_window, "📜 Script Log");
-                                ui.end_row();
-                            });
-                    });
-
-                egui::CollapsingHeader::new("⏱ Simulation")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        egui::Grid::new("win_switches_sim_grid")
-                            .num_columns(2)
-                            .spacing(egui::vec2(10.0, 6.0))
-                            .show(ui, |ui| {
-                                toggle_btn(ui, &mut win_simulation, "⏱ Simulation");
-                                ui.end_row();
-                            });
-                    });
-
-                egui::CollapsingHeader::new("🧰 UI")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        egui::Grid::new("win_switches_ui_grid")
-                            .num_columns(2)
-                            .spacing(egui::vec2(10.0, 6.0))
-                            .show(ui, |ui| {
-                                toggle_btn(ui, &mut w6, "🪟 Viewport");
-                                toggle_btn(ui, &mut self.editor_state.show_toolbar, "🧰 Toolbar");
-                                ui.end_row();
-
-                                toggle_btn(ui, &mut win_templates, "🧩 Templates");
-                                toggle_btn(ui, &mut win_palette, "🎨 Palette");
-                                ui.end_row();
-                            });
-                    });
+                toggle_btn(ui, &mut win_files, "📁 Files");
+                toggle_btn(ui, &mut win_script_editor, "📝 Script Editor");
+                toggle_btn(ui, &mut self.show_log_window, "📜 Script Log");
+                toggle_btn(ui, &mut win_simulation, "⏱ Simulation");
+                toggle_btn(ui, &mut win_templates, "🧩 Templates");
+                toggle_btn(ui, &mut win_palette, "🎨 Palette");
 
                 ui.separator();
 
@@ -480,102 +389,97 @@ impl EvolutionApp {
                     }
                 });
             });
-        
-        self.editor_state.show_grid = w6;
 
-        
-        egui::Window::new("📦 Project")
-            .open(&mut win_project)
+        egui::Window::new("📁 Files")
+            .open(&mut win_files)
             .default_pos(egui::pos2(340.0, 5.0))
-            .default_size(egui::vec2(260.0, 90.0))
+            .default_size(egui::vec2(320.0, 420.0))
             .show(context, |ui| {
-                ui.label("Repository:");
-                let url = "https://github.com/wavelet-noise/sand_evolution";
-                if ui.hyperlink(url).clicked() {
-                    _ = webbrowser::open(url);
-                }
-
-                *any_win_hovered |= context.is_pointer_over_area()
-            });
-        self.win_project = win_project;
-
-        egui::Window::new("🗺 Map")
-            .open(&mut win_map)
-            .default_pos(egui::pos2(340.0, 110.0))
-            .default_size(egui::vec2(260.0, 190.0))
-            .show(context, |ui| {
-                ui.heading("Edit");
-                if ui.button("🧹 Clear").clicked() {
-                    Self::clear_map(state);
-                }
-                if ui.button("🎲 Generate random (basic)").clicked() {
-                    state.generate_simple();
-                }
-                if ui.button("↩ Restore from URL").clicked() {
-                    state.diffuse_rgba = state.loaded_rgba.clone();
-                }
+                egui::CollapsingHeader::new("📦 Project")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.label("Repository:");
+                        let url = "https://github.com/wavelet-noise/sand_evolution";
+                        if ui.hyperlink(url).clicked() {
+                            _ = webbrowser::open(url);
+                        }
+                    });
 
                 ui.separator();
-                ui.heading("Import / Export");
-                if ui.button("💾 Export PNG").clicked() {
-                    if let Err(err) = write_to_file(&state.diffuse_rgba) {
-                        panic!("Error: {}", err);
-                    }
-                }
 
-                if ui.button("📂 Open PNG").clicked() {
-                    let dialog = rfd::AsyncFileDialog::new()
-                        .add_filter("Images", &["png"])
-                        .pick_file();
+                egui::CollapsingHeader::new("🗺 Map")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.heading("Edit");
+                        if ui.button("🧹 Clear").clicked() {
+                            Self::clear_map(state);
+                        }
+                        if ui.button("🎲 Generate random (basic)").clicked() {
+                            state.generate_simple();
+                        }
+                        if ui.button("↩ Restore from URL").clicked() {
+                            state.diffuse_rgba = state.loaded_rgba.clone();
+                        }
 
-                    let event_loop_proxy = event_loop_proxy.clone();
-                    self.executor.execute(async move {
-                        if let Some(file) = dialog.await {
-                            let bytes = file.read().await;
-                            event_loop_proxy
-                                .send_event(create_event_with_data(bytes))
-                                .ok();
+                        ui.separator();
+                        ui.heading("Import / Export");
+                        if ui.button("💾 Export PNG").clicked() {
+                            if let Err(err) = write_to_file(&state.diffuse_rgba) {
+                                panic!("Error: {}", err);
+                            }
+                        }
+
+                        if ui.button("📂 Open PNG").clicked() {
+                            let dialog = rfd::AsyncFileDialog::new()
+                                .add_filter("Images", &["png"])
+                                .pick_file();
+
+                            let event_loop_proxy = event_loop_proxy.clone();
+                            self.executor.execute(async move {
+                                if let Some(file) = dialog.await {
+                                    let bytes = file.read().await;
+                                    event_loop_proxy
+                                        .send_event(create_event_with_data(bytes))
+                                        .ok();
+                                }
+                            });
                         }
                     });
-                }
 
-                *any_win_hovered |= context.is_pointer_over_area()
-            });
-        self.win_map = win_map;
+                ui.separator();
 
-        egui::Window::new("🎬 Scene")
-            .open(&mut win_scene)
-            .default_pos(egui::pos2(340.0, 310.0))
-            .default_size(egui::vec2(260.0, 140.0))
-            .show(context, |ui| {
-                ui.heading("Import / Export");
-                if ui.button("💾 Export TOML").clicked() {
-                    let toml_text = self.export_scene_to_toml(world);
-                    if let Err(err) = scene_to_file(&toml_text) {
-                        panic!("Error: {}", err);
-                    }
-                }
+                egui::CollapsingHeader::new("🎬 Scene")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.heading("Import / Export");
+                        if ui.button("💾 Export TOML").clicked() {
+                            let toml_text = self.export_scene_to_toml(world);
+                            if let Err(err) = scene_to_file(&toml_text) {
+                                panic!("Error: {}", err);
+                            }
+                        }
 
-                if ui.button("📂 Open TOML").clicked() {
-                    let dialog = rfd::AsyncFileDialog::new()
-                        .add_filter("TOML", &["toml"])
-                        .add_filter("All", &["*"])
-                        .pick_file();
+                        if ui.button("📂 Open TOML").clicked() {
+                            let dialog = rfd::AsyncFileDialog::new()
+                                .add_filter("TOML", &["toml"])
+                                .add_filter("All", &["*"])
+                                .pick_file();
 
-                    let event_loop_proxy = event_loop_proxy.clone();
-                    self.executor.execute(async move {
-                        if let Some(file) = dialog.await {
-                            let bytes = file.read().await;
-                            event_loop_proxy
-                                .send_event(create_event_with_scene(bytes))
-                                .ok();
+                            let event_loop_proxy = event_loop_proxy.clone();
+                            self.executor.execute(async move {
+                                if let Some(file) = dialog.await {
+                                    let bytes = file.read().await;
+                                    event_loop_proxy
+                                        .send_event(create_event_with_scene(bytes))
+                                        .ok();
+                                }
+                            });
                         }
                     });
-                }
 
-                *any_win_hovered |= context.is_pointer_over_area()
+                *any_win_hovered |= context.is_pointer_over_area();
             });
-        self.win_scene = win_scene;
+        self.win_files = win_files;
         
         // Limit the maximum size of Script Editor window to the application size
         let screen_height = context.available_rect().height();
@@ -1331,9 +1235,7 @@ impl EvolutionApp {
             script_error: "".to_owned(),
             need_to_recompile: true,
 
-            win_project: false,
-            win_map: false,
-            win_scene: false,
+            win_files: true,
             win_script_editor: false,
             win_simulation: false,
             win_templates: false,
