@@ -941,12 +941,13 @@ impl EvolutionApp {
         self.w4 = w4;
         
         // Floating palette window (movable, positioned at bottom by default)
-        let available = context.available_rect();
-        let palette_y = (available.max.y - 70.0).max(50.0);
+        let input_rect = context.input().screen_rect;
+        let palette_y = (input_rect.height() - 70.0).max(50.0);
+        let palette_width = (input_rect.width() - 20.0).max(400.0);
         egui::Window::new("🎨 Palette")
             .open(&mut w5)
-            .default_pos(egui::pos2(5.0, palette_y))
-            .default_width(available.width() - 10.0)
+            .default_pos(egui::pos2(10.0, palette_y))
+            .fixed_size(egui::vec2(palette_width, 50.0))
             .resizable(true)
             .collapsible(true)
             .show(context, |ui| {
