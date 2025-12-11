@@ -59,11 +59,14 @@ pub struct EvolutionApp {
     pub script_error: String,
     executor: Executor,
 
-    pub w1: bool,
-    pub w2: bool,
-    pub w3: bool,
-    pub w4: bool, // templates / projects window
-    pub w5: bool, // palette window
+    // Windows
+    pub win_project: bool,
+    pub win_map: bool,
+    pub win_scene: bool,
+    pub win_script_editor: bool,
+    pub win_simulation: bool,
+    pub win_templates: bool, // templates / projects window
+    pub win_palette: bool, // palette window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -276,11 +279,13 @@ impl EvolutionApp {
         // Handle mouse input for editor
         InputHandler::handle_mouse_input(context, &mut self.editor_state, world, &mut self.undo_redo);
         
-        let mut w1: bool = self.w1;
-        let mut w2: bool = self.w2;
-        let mut w3: bool = self.w3;
-        let mut w4: bool = self.w4;
-        let mut w5: bool = self.w5;
+        let mut win_project: bool = self.win_project;
+        let mut win_map: bool = self.win_map;
+        let mut win_scene: bool = self.win_scene;
+        let mut win_script_editor: bool = self.win_script_editor;
+        let mut win_simulation: bool = self.win_simulation;
+        let mut win_templates: bool = self.win_templates;
+        let mut win_palette: bool = self.win_palette;
         let mut w6: bool = self.editor_state.show_grid; // Editor viewport window
 
         // Editor toolbar
@@ -362,86 +367,163 @@ impl EvolutionApp {
         // Handle request to open scripts window for a specific object
         if let Some(object_name) = self.editor_state.open_scripts_for_object.take() {
             self.selected_object_name = object_name;
-            w2 = true;
+            win_script_editor = true;
         }
         
         // Show toasts
         self.show_toasts(context);
         
-        egui::Window::new("Swithes")
-        .default_pos(egui::pos2(10.0,10.0))
-        .show(context, |ui| {
-            if ui.selectable_label(w1, "Config").clicked() {
-                w1 = !w1;
-            }
-            if ui.selectable_label(w2, "Script").clicked() {
-                w2 = !w2;
-            }
-            if ui.selectable_label(w3, "Sim").clicked() {
-                w3 = !w3;
-            }
-            if ui.selectable_label(w4, "Templates").clicked() {
-                w4 = !w4;
-            }
-            if ui.selectable_label(w5, "Palette").clicked() {
-                w5 = !w5;
-            }
-            if ui.selectable_label(w6, "Editor").clicked() {
-                w6 = !w6;
-            }
-            
-            ui.separator();
-            ui.label("Display Mode:");
-            ui.horizontal(|ui| {
-                if ui.selectable_label(self.display_mode == DisplayMode::Normal, "Normal").clicked() {
-                    self.display_mode = DisplayMode::Normal;
-                }
-                if ui.selectable_label(self.display_mode == DisplayMode::Temperature, "Temperature").clicked() {
-                    self.display_mode = DisplayMode::Temperature;
-                }
-                if ui.selectable_label(self.display_mode == DisplayMode::Both, "Both").clicked() {
-                    self.display_mode = DisplayMode::Both;
-                }
+        egui::Window::new("🪟 Windows")
+            .default_pos(egui::pos2(10.0, 10.0))
+            .resizable(false)
+            .show(context, |ui| {
+                let toggle_btn = |ui: &mut egui::Ui, value: &mut bool, label: &str| {
+                    if ui.add(egui::SelectableLabel::new(*value, label)).clicked() {
+                        *value = !*value;
+                    }
+                };
+
+                ui.heading("Windows");
+                ui.add_space(4.0);
+
+                egui::CollapsingHeader::new("📁 Files")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::Grid::new("win_switches_files_grid")
+                            .num_columns(2)
+                            .spacing(egui::vec2(10.0, 6.0))
+                            .show(ui, |ui| {
+                                toggle_btn(ui, &mut win_project, "📦 Project");
+                                toggle_btn(ui, &mut win_map, "🗺 Map");
+                                ui.end_row();
+
+                                toggle_btn(ui, &mut win_scene, "🎬 Scene");
+                                ui.end_row();
+                            });
+                    });
+
+                egui::CollapsingHeader::new("🧠 Scripts")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::Grid::new("win_switches_scripts_grid")
+                            .num_columns(2)
+                            .spacing(egui::vec2(10.0, 6.0))
+                            .show(ui, |ui| {
+                                toggle_btn(ui, &mut win_script_editor, "📝 Script Editor");
+                                toggle_btn(ui, &mut self.show_log_window, "📜 Script Log");
+                                ui.end_row();
+                            });
+                    });
+
+                egui::CollapsingHeader::new("⏱ Simulation")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::Grid::new("win_switches_sim_grid")
+                            .num_columns(2)
+                            .spacing(egui::vec2(10.0, 6.0))
+                            .show(ui, |ui| {
+                                toggle_btn(ui, &mut win_simulation, "⏱ Simulation");
+                                ui.end_row();
+                            });
+                    });
+
+                egui::CollapsingHeader::new("🧰 UI")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::Grid::new("win_switches_ui_grid")
+                            .num_columns(2)
+                            .spacing(egui::vec2(10.0, 6.0))
+                            .show(ui, |ui| {
+                                toggle_btn(ui, &mut w6, "🪟 Viewport");
+                                toggle_btn(ui, &mut self.editor_state.show_toolbar, "🧰 Toolbar");
+                                ui.end_row();
+
+                                toggle_btn(ui, &mut win_templates, "🧩 Templates");
+                                toggle_btn(ui, &mut win_palette, "🎨 Palette");
+                                ui.end_row();
+                            });
+                    });
+
+                ui.separator();
+
+                ui.heading("Display");
+                ui.add_space(4.0);
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add(egui::SelectableLabel::new(
+                            self.display_mode == DisplayMode::Normal,
+                            "🖼 Normal",
+                        ))
+                        .clicked()
+                    {
+                        self.display_mode = DisplayMode::Normal;
+                    }
+
+                    if ui
+                        .add(egui::SelectableLabel::new(
+                            self.display_mode == DisplayMode::Temperature,
+                            "🌡 Temperature",
+                        ))
+                        .clicked()
+                    {
+                        self.display_mode = DisplayMode::Temperature;
+                    }
+
+                    if ui
+                        .add(egui::SelectableLabel::new(
+                            self.display_mode == DisplayMode::Both,
+                            "🧪 Both",
+                        ))
+                        .clicked()
+                    {
+                        self.display_mode = DisplayMode::Both;
+                    }
+                });
             });
-        });
         
         self.editor_state.show_grid = w6;
 
         
-        egui::Window::new("Configuration")
-            .open(&mut w1)
+        egui::Window::new("📦 Project")
+            .open(&mut win_project)
             .default_pos(egui::pos2(340.0, 5.0))
-            .default_size(egui::vec2(200.0, 100.0))
+            .default_size(egui::vec2(260.0, 90.0))
             .show(context, |ui| {
+                ui.label("Repository:");
                 let url = "https://github.com/wavelet-noise/sand_evolution";
                 if ui.hyperlink(url).clicked() {
                     _ = webbrowser::open(url);
                 }
 
-                ui.separator();
+                *any_win_hovered |= context.is_pointer_over_area()
+            });
+        self.win_project = win_project;
 
-                if ui.button("Clear Map").clicked() {
+        egui::Window::new("🗺 Map")
+            .open(&mut win_map)
+            .default_pos(egui::pos2(340.0, 110.0))
+            .default_size(egui::vec2(260.0, 190.0))
+            .show(context, |ui| {
+                ui.heading("Edit");
+                if ui.button("🧹 Clear").clicked() {
                     Self::clear_map(state);
                 }
-
-                if ui.button("Generate Basic Random Map").clicked() {
+                if ui.button("🎲 Generate random (basic)").clicked() {
                     state.generate_simple();
                 }
-
-                if ui.button("Restore Map from URL").clicked() {
+                if ui.button("↩ Restore from URL").clicked() {
                     state.diffuse_rgba = state.loaded_rgba.clone();
                 }
 
-                // Map Operations
                 ui.separator();
-                ui.heading("Map Operations");
-                if ui.button("Export map").clicked() {
+                ui.heading("Import / Export");
+                if ui.button("💾 Export PNG").clicked() {
                     if let Err(err) = write_to_file(&state.diffuse_rgba) {
                         panic!("Error: {}", err);
                     }
                 }
 
-                if ui.button("Open map").clicked() {
+                if ui.button("📂 Open PNG").clicked() {
                     let dialog = rfd::AsyncFileDialog::new()
                         .add_filter("Images", &["png"])
                         .pick_file();
@@ -457,17 +539,24 @@ impl EvolutionApp {
                     });
                 }
 
-                // Scene Operations
-                ui.separator();
-                ui.heading("Scene Operations");
-                if ui.button("Export scene (TOML)").clicked() {
+                *any_win_hovered |= context.is_pointer_over_area()
+            });
+        self.win_map = win_map;
+
+        egui::Window::new("🎬 Scene")
+            .open(&mut win_scene)
+            .default_pos(egui::pos2(340.0, 310.0))
+            .default_size(egui::vec2(260.0, 140.0))
+            .show(context, |ui| {
+                ui.heading("Import / Export");
+                if ui.button("💾 Export TOML").clicked() {
                     let toml_text = self.export_scene_to_toml(world);
                     if let Err(err) = scene_to_file(&toml_text) {
                         panic!("Error: {}", err);
                     }
                 }
 
-                if ui.button("Open scene (TOML)").clicked() {
+                if ui.button("📂 Open TOML").clicked() {
                     let dialog = rfd::AsyncFileDialog::new()
                         .add_filter("TOML", &["toml"])
                         .add_filter("All", &["*"])
@@ -486,7 +575,7 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        self.w1 = w1;
+        self.win_scene = win_scene;
         
         // Limit the maximum size of Script Editor window to the application size
         let screen_height = context.available_rect().height();
@@ -494,8 +583,8 @@ impl EvolutionApp {
         // Fix the window size so it cannot become too large
         let fixed_height = max_window_height.min(600.0);
         
-        egui::Window::new("Script Editor")
-            .open(&mut w2)
+        egui::Window::new("📝 Script Editor")
+            .open(&mut win_script_editor)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(600.0, fixed_height))
             .show(context, |ui| {
@@ -692,7 +781,7 @@ impl EvolutionApp {
         
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        self.w2 = w2;
+        self.win_script_editor = win_script_editor;
         
         // Script Log Window
         egui::Window::new("Script Log")
@@ -726,8 +815,8 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         
-        egui::Window::new("Simulation")
-            .open(&mut w3)
+        egui::Window::new("⏱ Simulation")
+            .open(&mut win_simulation)
             .default_pos(egui::pos2(5.0, 5.0))
             .fixed_size(egui::vec2(200., 100.))
             .show(context, |ui| {
@@ -798,10 +887,10 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        self.w3 = w3;
+        self.win_simulation = win_simulation;
         // Separate window for GitHub templates / projects
-        egui::Window::new("Templates")
-            .open(&mut w4)
+        egui::Window::new("🧩 Templates")
+            .open(&mut win_templates)
             .default_pos(egui::pos2(780.0, 5.0))
             .default_size(egui::vec2(420.0, 360.0))
             .show(context, |ui| {
@@ -964,18 +1053,18 @@ impl EvolutionApp {
             });
         
         // Auto-fetch projects when window is open but projects haven't been fetched yet
-        if w4 && !self.projects_fetched && !self.project_loading {
+        if win_templates && !self.projects_fetched && !self.project_loading {
             self.start_fetch_github_projects(event_loop_proxy);
         }
         
-        self.w4 = w4;
+        self.win_templates = win_templates;
         
         // Floating palette window (movable, positioned at bottom by default)
         let input_rect = context.input().screen_rect;
         let palette_y = (input_rect.height() - 70.0).max(50.0);
         let palette_width = (input_rect.width() - 20.0).max(400.0);
         egui::Window::new("🎨 Palette")
-            .open(&mut w5)
+            .open(&mut win_palette)
             .default_pos(egui::pos2(10.0, palette_y))
             .fixed_size(egui::vec2(palette_width, 50.0))
             .resizable(true)
@@ -1100,7 +1189,7 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         
-        self.w5 = w5;
+        self.win_palette = win_palette;
     }
     
     fn show_toasts(&mut self, ctx: &Context) {
@@ -1242,11 +1331,13 @@ impl EvolutionApp {
             script_error: "".to_owned(),
             need_to_recompile: true,
 
-            w1: false,
-            w2: false,
-            w3: false,
-            w4: false,
-            w5: true, // Palette window open by default
+            win_project: false,
+            win_map: false,
+            win_scene: false,
+            win_script_editor: false,
+            win_simulation: false,
+            win_templates: false,
+            win_palette: true, // Palette window open by default
 
             projects: crate::projects::demo_projects(),
             selected_project: None,

@@ -10,6 +10,26 @@ impl Component for Position {
     type Storage = specs::VecStorage<Self>;
 }
 
+/// Hierarchy parent pointer (for editor scene graph).
+#[derive(Debug, Clone, Copy)]
+pub struct Parent {
+    pub entity: specs::Entity,
+}
+
+impl Component for Parent {
+    type Storage = specs::HashMapStorage<Self>;
+}
+
+/// Hierarchy children list (for editor scene graph).
+#[derive(Debug, Clone, Default)]
+pub struct Children {
+    pub entities: Vec<specs::Entity>,
+}
+
+impl Component for Children {
+    type Storage = specs::HashMapStorage<Self>;
+}
+
 #[derive(Debug)]
 pub struct Velocity {
     pub x: f32,

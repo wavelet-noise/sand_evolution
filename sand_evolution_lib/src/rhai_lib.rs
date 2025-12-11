@@ -187,10 +187,13 @@ pub fn register_rhai(
     if let Some(world_ref) = world_rc {
         let world_clone = world_ref.clone();
         rhai.register_fn("create_object", move |name: &str| -> bool {
-            use crate::ecs::components::{Name, Script, ScriptType};
+            use crate::ecs::components::{Name, Position, Rotation, Scale, Script, ScriptType};
             let mut world = world_clone.borrow_mut();
             world.create_entity()
                 .with(Name { name: name.to_owned() })
+                .with(Position { x: 0.0, y: 0.0 })
+                .with(Rotation::default())
+                .with(Scale::default())
                 .with(Script {
                     script: "".to_owned(),
                     ast: None,
@@ -201,6 +204,286 @@ pub fn register_rhai(
                 })
                 .build();
             true
+        });
+
+        // Basic "entity access" helpers by name (transform + hierarchy)
+        let world_clone = world_ref.clone();
+        rhai.register_fn("entity_exists", move |name: &str| -> bool {
+            use specs::Join;
+            use crate::ecs::components::Name;
+            let world = world_clone.borrow();
+            let names = world.read_storage::<Name>();
+            let entities = world.entities();
+            (&entities, &names).join().any(|(_, n)| n.name == name)
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("get_position", move |name: &str| -> Vector2<f64> {
+            use specs::Join;
+            use crate::ecs::components::{Name, Position};
+            let world = world_clone.borrow();
+            let names = world.read_storage::<Name>();
+            let positions = world.read_storage::<Position>();
+            let entities = world.entities();
+
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(p) = positions.get(entity) {
+                        return Vector2::new(p.x as f64, p.y as f64);
+                    }
+                    break;
+                }
+            }
+            Vector2::new(0.0, 0.0)
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_position", move |name: &str, x: f64, y: f64| -> bool {
+            use specs::Join;
+            use crate::ecs::components::{Name, Position};
+            let mut world = world_clone.borrow_mut();
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let mut positions = world.write_storage::<Position>();
+
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(p) = positions.get_mut(entity) {
+                        p.x = x as f32;
+                        p.y = y as f32;
+                        return true;
+                    }
+                    // If missing Position, add it.
+                    let _ = positions.insert(entity, Position { x: x as f32, y: y as f32 });
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_position", move |name: &str, v: Vector2<f64>| -> bool {
+            // Delegate to the scalar overload.
+            let mut world = world_clone.borrow_mut();
+            // local helper: find entity and set
+            use specs::Join;
+            use crate::ecs::components::{Name, Position};
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let mut positions = world.write_storage::<Position>();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(p) = positions.get_mut(entity) {
+                        p.x = v.x as f32;
+                        p.y = v.y as f32;
+                        return true;
+                    }
+                    let _ = positions.insert(entity, Position { x: v.x as f32, y: v.y as f32 });
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("get_rotation", move |name: &str| -> f64 {
+            use specs::Join;
+            use crate::ecs::components::{Name, Rotation};
+            let world = world_clone.borrow();
+            let names = world.read_storage::<Name>();
+            let rotations = world.read_storage::<Rotation>();
+            let entities = world.entities();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(r) = rotations.get(entity) {
+                        return r.angle as f64;
+                    }
+                    break;
+                }
+            }
+            0.0
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_rotation", move |name: &str, angle: f64| -> bool {
+            use specs::Join;
+            use crate::ecs::components::{Name, Rotation};
+            let mut world = world_clone.borrow_mut();
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let mut rotations = world.write_storage::<Rotation>();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(r) = rotations.get_mut(entity) {
+                        r.angle = angle as f32;
+                        return true;
+                    }
+                    let _ = rotations.insert(entity, Rotation { angle: angle as f32 });
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("get_scale", move |name: &str| -> Vector2<f64> {
+            use specs::Join;
+            use crate::ecs::components::{Name, Scale};
+            let world = world_clone.borrow();
+            let names = world.read_storage::<Name>();
+            let scales = world.read_storage::<Scale>();
+            let entities = world.entities();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(s) = scales.get(entity) {
+                        return Vector2::new(s.x as f64, s.y as f64);
+                    }
+                    break;
+                }
+            }
+            Vector2::new(1.0, 1.0)
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_scale", move |name: &str, x: f64, y: f64| -> bool {
+            use specs::Join;
+            use crate::ecs::components::{Name, Scale};
+            let mut world = world_clone.borrow_mut();
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let mut scales = world.write_storage::<Scale>();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(s) = scales.get_mut(entity) {
+                        s.x = x as f32;
+                        s.y = y as f32;
+                        return true;
+                    }
+                    let _ = scales.insert(entity, Scale { x: x as f32, y: y as f32 });
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_scale", move |name: &str, v: Vector2<f64>| -> bool {
+            use specs::Join;
+            use crate::ecs::components::{Name, Scale};
+            let mut world = world_clone.borrow_mut();
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let mut scales = world.write_storage::<Scale>();
+            for (entity, n) in (&entities, &names).join() {
+                if n.name == name {
+                    if let Some(s) = scales.get_mut(entity) {
+                        s.x = v.x as f32;
+                        s.y = v.y as f32;
+                        return true;
+                    }
+                    let _ = scales.insert(entity, Scale { x: v.x as f32, y: v.y as f32 });
+                    return true;
+                }
+            }
+            false
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("set_parent", move |child_name: &str, parent_name: &str| -> bool {
+            use specs::Join;
+            use crate::ecs::components::Name;
+
+            if child_name == parent_name {
+                return false;
+            }
+
+            let mut world = world_clone.borrow_mut();
+            let (parent, child) = {
+                let entities = world.entities();
+                let names = world.read_storage::<Name>();
+
+                let mut child = None;
+                let mut parent = None;
+                for (e, n) in (&entities, &names).join() {
+                    if n.name == child_name {
+                        child = Some(e);
+                    } else if n.name == parent_name {
+                        parent = Some(e);
+                    }
+                    if child.is_some() && parent.is_some() {
+                        break;
+                    }
+                }
+                (parent, child)
+            };
+
+            if let (Some(parent), Some(child)) = (parent, child) {
+                crate::ecs::hierarchy::attach_child(&mut world, parent, child);
+                true
+            } else {
+                false
+            }
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("unparent", move |child_name: &str| -> bool {
+            use specs::Join;
+            use crate::ecs::components::Name;
+
+            let mut world = world_clone.borrow_mut();
+            let child = {
+                let entities = world.entities();
+                let names = world.read_storage::<Name>();
+                let mut child = None;
+                for (e, n) in (&entities, &names).join() {
+                    if n.name == child_name {
+                        child = Some(e);
+                        break;
+                    }
+                }
+                child
+            };
+
+            if let Some(child) = child {
+                crate::ecs::hierarchy::detach_from_parent(&mut world, child);
+                true
+            } else {
+                false
+            }
+        });
+
+        let world_clone = world_ref.clone();
+        rhai.register_fn("children", move |parent_name: &str| -> rhai::Array {
+            use specs::Join;
+            use crate::ecs::components::{Children, Name};
+
+            let world = world_clone.borrow();
+            let entities = world.entities();
+            let names = world.read_storage::<Name>();
+            let children_storage = world.read_storage::<Children>();
+
+            let mut parent = None;
+            for (e, n) in (&entities, &names).join() {
+                if n.name == parent_name {
+                    parent = Some(e);
+                    break;
+                }
+            }
+            let Some(parent) = parent else {
+                return rhai::Array::new();
+            };
+
+            let Some(children) = children_storage.get(parent) else {
+                return rhai::Array::new();
+            };
+
+            let mut out = rhai::Array::new();
+            for &ch in &children.entities {
+                if let Some(n) = names.get(ch) {
+                    out.push(rhai::Dynamic::from(n.name.clone()));
+                }
+            }
+            out
         });
 
         let world_clone = world_ref.clone();
@@ -308,7 +591,35 @@ pub fn register_rhai(
             
             // Then delete
             if let Some(entity) = target_entity {
-                world.delete_entity(entity).ok();
+                crate::ecs::hierarchy::delete_subtree(&mut world, entity);
+                return true;
+            }
+            false
+        });
+
+        // Alias: prefer `delete_entity` naming in scripts.
+        let world_clone = world_ref.clone();
+        rhai.register_fn("delete_entity", move |name: &str| -> bool {
+            if name == "World Script" {
+                return false;
+            }
+            let mut world = world_clone.borrow_mut();
+            use specs::Join;
+            use crate::ecs::components::Name;
+
+            let mut target_entity = None;
+            {
+                let names = world.read_storage::<Name>();
+                let entities = world.entities();
+                for (entity, name_comp) in (&entities, &names).join() {
+                    if name_comp.name == name {
+                        target_entity = Some(entity);
+                        break;
+                    }
+                }
+            }
+            if let Some(entity) = target_entity {
+                crate::ecs::hierarchy::delete_subtree(&mut world, entity);
                 return true;
             }
             false
