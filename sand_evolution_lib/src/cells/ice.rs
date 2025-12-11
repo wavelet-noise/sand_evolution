@@ -1,7 +1,6 @@
-use crate::cells::crushed_ice::CrushedIce;
 use crate::cs::{self, PointType};
 
-use super::{void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
+use super::{water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Ice;
 impl Ice {
@@ -43,27 +42,27 @@ impl CellTrait for Ice {
                 return;
             }
             
-            // Лед активно замораживает соседнюю воду через контакт
+            // Лед медленно замораживает соседнюю воду через контакт
             // Проверяем соседние клетки на наличие воды и понижаем их температуру
-            // Делаем это достаточно часто, но не каждый кадр для баланса
-            if prng.next() > 200 {
+            // Делаем это редко, чтобы избежать агрессивного замерзания
+            if prng.next() > 250 {
                 let top_idx = cs::xy_to_index(i, j + 1);
                 let bot_idx = cs::xy_to_index(i, j - 1);
                 let left_idx = cs::xy_to_index(i + 1, j);
                 let right_idx = cs::xy_to_index(i - 1, j);
                 
-                // Значительно понижаем температуру соседней воды для быстрого замерзания
+                // Медленно понижаем температуру соседней воды для постепенного замерзания
                 if container[top_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i, j + 1, -8.0); // верх
+                    (temp_ctx.add_temp)(i, j + 1, -2.0); // верх
                 }
                 if container[bot_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i, j - 1, -8.0); // низ
+                    (temp_ctx.add_temp)(i, j - 1, -2.0); // низ
                 }
                 if container[left_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i + 1, j, -8.0); // лево
+                    (temp_ctx.add_temp)(i + 1, j, -2.0); // лево
                 }
                 if container[right_idx] == Water::id() {
-                    (temp_ctx.add_temp)(i - 1, j, -8.0); // право
+                    (temp_ctx.add_temp)(i - 1, j, -2.0); // право
                 }
             }
         } else {
@@ -78,8 +77,8 @@ impl CellTrait for Ice {
             let left_v = container[left];
             let right_v = container[right];
             
-            // Проверяем соседние клетки на наличие воды и замораживаем напрямую
-            if prng.next() > 240 {
+            // Проверяем соседние клетки на наличие воды и замораживаем напрямую (очень редко)
+            if prng.next() > 252 {
                 if top_v == Water::id() {
                     container[top] = Ice::id();
                     return;
