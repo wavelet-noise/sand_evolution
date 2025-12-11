@@ -1,4 +1,4 @@
-use crate::cells::{CellRegistry, CellTrait, CellType, Prng};
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cells::helper::fluid_falling_helper;
 use crate::cells::void::Void;
 use crate::cells::water::Water;
@@ -28,6 +28,7 @@ impl CellTrait for DeluteAcid {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         dim: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
         if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);
@@ -46,6 +47,14 @@ impl CellTrait for DeluteAcid {
                 if cc_pt != Void::id() {
                     container[cc] = Void::id();
                     container[cur] = cc_pt;
+                    // Разбавленная кислота повышает температуру меньше при растворении
+                    if let Some(temp_ctx) = temp_context {
+                        (temp_ctx.add_temp)(i, j + 1, 10.0); // верх
+                        (temp_ctx.add_temp)(i, j - 1, 10.0); // низ
+                        (temp_ctx.add_temp)(i + 1, j, 10.0); // право
+                        (temp_ctx.add_temp)(i - 1, j, 10.0); // лево
+                        (temp_ctx.add_temp)(i, j, 5.0); // сама клетка
+                    }
                     return;
                 }
             }
@@ -62,6 +71,14 @@ impl CellTrait for DeluteAcid {
                         container[cur] = Water::id();
                     } else {
                         container[cur] = Void::id();
+                    }
+                    // Разбавленная кислота повышает температуру меньше при протонном переносе
+                    if let Some(temp_ctx) = temp_context {
+                        (temp_ctx.add_temp)(i, j + 1, 8.0); // верх
+                        (temp_ctx.add_temp)(i, j - 1, 8.0); // низ
+                        (temp_ctx.add_temp)(i + 1, j, 8.0); // право
+                        (temp_ctx.add_temp)(i - 1, j, 8.0); // лево
+                        (temp_ctx.add_temp)(i, j, 4.0); // сама клетка
                     }
                     return;
                 }

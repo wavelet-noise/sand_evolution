@@ -1,7 +1,7 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    helper::sand_falling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng,
+    helper::sand_falling_helper, void::Void, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
 pub struct CrushedIce;
@@ -25,7 +25,25 @@ impl CellTrait for CrushedIce {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Дробленый лед тает только на основе температуры - если температура > 0, то тает и охлаждает среду
+        if let Some(temp_ctx) = temp_context {
+            let temperature = (temp_ctx.get_temp)(i, j);
+            
+            // Если температура выше 0 градусов, дробленый лед тает
+            if temperature > 0.0 {
+                // Отдаем холод соседям при таянии (уменьшено, чтобы избежать вспышек)
+                (temp_ctx.add_temp)(i, j + 1, -5.0); // верх
+                (temp_ctx.add_temp)(i, j - 1, -5.0); // низ
+                (temp_ctx.add_temp)(i + 1, j, -5.0); // лево
+                (temp_ctx.add_temp)(i - 1, j, -5.0); // право
+                
+                container[cur] = Water::id();
+                return;
+            }
+        }
+        
         if sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             return;
         }

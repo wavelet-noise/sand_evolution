@@ -7,7 +7,7 @@ use winit::dpi::{LogicalPosition, PhysicalSize};
 use crate::shared_state::SharedState;
 use crate::{
     cells::{stone::Stone, wood::Wood, CellRegistry, Prng},
-    cs,
+    cs::{self, PointType},
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
     update, Vertex, INDICES, VERTICES,
@@ -19,7 +19,7 @@ pub struct WorldSettings {
     time: f32,
     res_x: f32,
     res_y: f32,
-    _wasm_padding2: f32,
+    display_mode: f32, // 0.0 = Normal, 1.0 = Temperature
 }
 #[derive(Default)]
 pub struct UpdateResult {
@@ -59,7 +59,12 @@ pub struct State {
     surface_format: TextureFormat,
     pub toggled: bool,
     pub tick: i64,
-    pub frame: i64
+    pub frame: i64,
+    // Система температуры для каждой клетки
+    pub cell_temperatures: Vec<f32>,
+    // Текстура температуры для GPU
+    temperature_texture: wgpu::Texture,
+    temperature_bind_group: wgpu::BindGroup,
 }
 
 impl State {
@@ -280,7 +285,7 @@ impl State {
             time: 0.0,
             res_x: dimensions.0 as f32,
             res_y: dimensions.1 as f32,
-            _wasm_padding2: 2.0,
+            display_mode: 0.0, // Normal mode by default
         };
 
         let raw_ptr = &world_settings as *const WorldSettings;
@@ -462,12 +467,86 @@ impl State {
             label: Some("gbuffer_combine_bind_group"),
         });
 
+        // Create temperature texture (4x smaller for faster diffusion)
+        let temp_texture_size = wgpu::Extent3d {
+            width: dimensions.0 / 4,
+            height: dimensions.1 / 4,
+            depth_or_array_layers: 1,
+        };
+        let temperature_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: temp_texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: TextureFormat::R32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some("temperature_texture"),
+        });
+
+        let mut temperature_texture_view = wgpu::TextureViewDescriptor::default().clone();
+        temperature_texture_view.format = Some(TextureFormat::R32Float);
+        let temperature_texture_view = temperature_texture.create_view(&temperature_texture_view);
+
+        let temperature_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        // Create bind group layout for temperature texture
+        // R32Float doesn't support filtering, so we use NonFiltering
+        let temperature_texture_bgl =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+                label: Some("temperature_texture_bind_group_layout"),
+            });
+
+        let temperature_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &temperature_texture_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&temperature_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&temperature_texture_sampler),
+                },
+            ],
+            label: Some("temperature_bind_group"),
+        });
+
         //-------------------------------
 
         let type_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&settings_bind_group_layout, &uint_texture_plus_sampler_bgl],
+                bind_group_layouts: &[
+                    &settings_bind_group_layout,
+                    &uint_texture_plus_sampler_bgl,
+                    &temperature_texture_bgl,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -729,6 +808,11 @@ impl State {
         let last_spawn = -5.0;
         let prng = Prng::new();
 
+        // Инициализация температуры клеток (начальная температура = 0.0)
+        // Приводим к usize перед умножением, чтобы избежать переполнения u16
+        let total_cells = (cs::SECTOR_SIZE.x as usize) * (cs::SECTOR_SIZE.y as usize);
+        let cell_temperatures = vec![0.0; total_cells];
+
         Self {
             render_pipeline: type_render_pipeline,
             bloom_render_pipeline,
@@ -760,7 +844,10 @@ impl State {
             surface_format,
             toggled: true,
             tick: 0,
-            frame: 0
+            frame: 0,
+            cell_temperatures,
+            temperature_texture,
+            temperature_bind_group,
         }
     }
 
@@ -781,6 +868,116 @@ impl State {
     fn set_cell(&mut self, x: i32, y: i32, t: u8) {
         self.diffuse_rgba
             .put_pixel(x as u32, y as u32, image::Luma([t]));
+    }
+
+    // Получить температуру клетки по индексу
+    pub fn get_cell_temperature(&self, index: usize) -> f32 {
+        if index < self.cell_temperatures.len() {
+            self.cell_temperatures[index]
+        } else {
+            0.0
+        }
+    }
+
+    // Получить температуру клетки по координатам
+    pub fn get_temperature(&self, i: PointType, j: PointType) -> f32 {
+        let idx = cs::xy_to_index(i, j);
+        self.get_cell_temperature(idx)
+    }
+
+    // Установить температуру клетки по индексу
+    pub fn set_cell_temperature(&mut self, index: usize, temp: f32) {
+        if index < self.cell_temperatures.len() {
+            self.cell_temperatures[index] = temp.max(-100.0).min(100.0);
+        }
+    }
+
+    // Установить температуру клетки по координатам
+    pub fn set_temperature(&mut self, i: PointType, j: PointType, temp: f32) {
+        let idx = cs::xy_to_index(i, j);
+        self.set_cell_temperature(idx, temp);
+    }
+
+    // Добавить температуру к клетке (для выделения тепла)
+    pub fn add_temperature(&mut self, i: PointType, j: PointType, delta: f32) {
+        let idx = cs::xy_to_index(i, j);
+        if idx < self.cell_temperatures.len() {
+            self.cell_temperatures[idx] += delta;
+            // Ограничиваем температуру разумными пределами
+            self.cell_temperatures[idx] = self.cell_temperatures[idx].max(-100.0).min(100.0);
+        }
+    }
+
+    // Добавить температуру к клетке по индексу
+    pub fn add_cell_temperature(&mut self, index: usize, delta: f32) {
+        if index < self.cell_temperatures.len() {
+            self.cell_temperatures[index] += delta;
+            // Ограничиваем температуру разумными пределами
+            self.cell_temperatures[index] = self.cell_temperatures[index].max(-100.0).min(100.0);
+        }
+    }
+
+    // Быстрая диффузия температуры - обрабатывает все клетки уменьшенной сетки каждый кадр
+    pub fn diffuse_temperature_fast(&mut self) {
+        let diffusion_rate = 0.15;
+        let cooling_rate = 0.998;
+        
+        // Работаем с уменьшенной сеткой (в 4 раза меньше)
+        let width = (cs::SECTOR_SIZE.x / 4) as usize;
+        let height = (cs::SECTOR_SIZE.y / 4) as usize;
+        
+        // Создаем временный буфер для новых температур
+        let mut new_temps = vec![0.0f32; width * height];
+        
+        // Обрабатываем все клетки уменьшенной сетки
+        for ty in 1..(height - 1) {
+            for tx in 1..(width - 1) {
+                // Координаты в полной сетке
+                let x = tx * 4;
+                let y = ty * 4;
+                
+                // Быстро получаем среднюю температуру текущего блока
+                let center_idx = cs::xy_to_index(x as cs::PointType, y as cs::PointType);
+                let current = self.cell_temperatures.get(center_idx).copied().unwrap_or(0.0);
+                
+                // Получаем температуры соседних блоков (только центральные точки для скорости)
+                let top_idx = cs::xy_to_index(x as cs::PointType, ((ty + 1) * 4) as cs::PointType);
+                let bot_idx = cs::xy_to_index(x as cs::PointType, ((ty - 1) * 4) as cs::PointType);
+                let left_idx = cs::xy_to_index(((tx - 1) * 4) as cs::PointType, y as cs::PointType);
+                let right_idx = cs::xy_to_index(((tx + 1) * 4) as cs::PointType, y as cs::PointType);
+                
+                let top_temp = self.cell_temperatures.get(top_idx).copied().unwrap_or(current);
+                let bot_temp = self.cell_temperatures.get(bot_idx).copied().unwrap_or(current);
+                let left_temp = self.cell_temperatures.get(left_idx).copied().unwrap_or(current);
+                let right_temp = self.cell_temperatures.get(right_idx).copied().unwrap_or(current);
+                
+                // Простая диффузия: усредняем с соседями
+                let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
+                let diffused = current + (avg - current) * diffusion_rate;
+                let new_temp = (diffused * cooling_rate).max(-100.0).min(100.0);
+                
+                new_temps[ty * width + tx] = new_temp;
+            }
+        }
+        
+        // Применяем новые температуры ко всем клеткам соответствующих блоков
+        for ty in 1..(height - 1) {
+            for tx in 1..(width - 1) {
+                let new_temp = new_temps[ty * width + tx];
+                let x = tx * 4;
+                let y = ty * 4;
+                
+                // Применяем ко всем клеткам 4x4 блока
+                for dy in 0..4 {
+                    for dx in 0..4 {
+                        let idx = cs::xy_to_index((x + dx) as cs::PointType, (y + dy) as cs::PointType);
+                        if idx < self.cell_temperatures.len() {
+                            self.cell_temperatures[idx] = new_temp;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn spawn(
@@ -834,11 +1031,18 @@ impl State {
     {
         let update_start_time = instant::now();
         self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
+        
+        // Update display mode from evolution_app
+        self.world_settings.display_mode = match evolution_app.display_mode {
+            crate::evolution_app::DisplayMode::Normal => 0.0,
+            crate::evolution_app::DisplayMode::Temperature => 1.0,
+            crate::evolution_app::DisplayMode::Both => 2.0,
+        };
 
         queue.write_buffer(
             &self.settings_buffer,
             0,
-            bytemuck::cast_slice(&[self.world_settings.time]),
+            bytemuck::cast_slice(&[self.world_settings]),
         );
 
         let sim_upd_start_time = instant::now();
@@ -893,6 +1097,60 @@ impl State {
             },
             texture_size,
         );
+        
+        // Upload temperature data to GPU (downscaled 4x)
+        // Average 4x4 blocks of cells into single texture pixel
+        let temp_width = dimensions.0 / 4;
+        let temp_height = dimensions.1 / 4;
+        let mut temperature_data: Vec<f32> = Vec::with_capacity((temp_width * temp_height) as usize);
+        
+        // Оптимизация: обрабатываем блоками для лучшей производительности
+        for ty in 0..temp_height {
+            for tx in 0..temp_width {
+                let x = tx * 4;
+                let y = ty * 4;
+                
+                // Быстрое усреднение 4x4 блока (16 клеток)
+                let mut sum = 0.0;
+                let mut count = 0;
+                
+                // Обрабатываем только каждую 2-ю клетку для ускорения
+                for dy in (0..4).step_by(2) {
+                    for dx in (0..4).step_by(2) {
+                        if let Some(&temp) = self.cell_temperatures.get(cs::xy_to_index((x + dx) as cs::PointType, (y + dy) as cs::PointType)) {
+                            sum += temp;
+                            count += 1;
+                        }
+                    }
+                }
+                
+                let avg_temp = if count > 0 { sum / count as f32 } else { 0.0 };
+                temperature_data.push(avg_temp);
+            }
+        }
+        
+        let temp_texture_size = wgpu::Extent3d {
+            width: temp_width,
+            height: temp_height,
+            depth_or_array_layers: 1,
+        };
+        
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &self.temperature_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&temperature_data),
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(temp_width * 4), // 4 bytes per f32
+                rows_per_image: std::num::NonZeroU32::new(temp_height),
+            },
+            temp_texture_size,
+        );
+        
         UpdateResult {
             simulation_step_average_time,
             update_time: instant::now() - update_start_time,
@@ -939,6 +1197,7 @@ impl State {
                 render_pass.set_pipeline(&self.render_pipeline);
                 render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
                 render_pass.set_bind_group(1, &self.type_bind_group, &[]);
+                render_pass.set_bind_group(2, &self.temperature_bind_group, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass

@@ -27,6 +27,7 @@ impl CellTrait for DryIce {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
+        _: Option<&mut TemperatureContext>,
     ) {
         if sand_faling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             return;
