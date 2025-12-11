@@ -31,6 +31,23 @@ impl CellTrait for Water {
             let arr = [top, down, l, r];
             let cc = arr[(dim.next() % 4) as usize];
 
+            // Проверка на замерзание при контакте со льдом
+            // Используем высокий порог для медленного замерзания
+            if dim.next() > 240 {
+                let top_v = container[top];
+                let down_v = container[down];
+                let r_v = container[r];
+                let l_v = container[l];
+
+                // Проверяем соседние клетки на наличие льда
+                if top_v == Ice::id() || down_v == Ice::id() ||
+                   r_v == Ice::id() || l_v == Ice::id() {
+                    // Вода замерзает и превращается в лёд (медленно)
+                    container[cur] = Ice::id();
+                    return;
+                }
+            }
+
             if dim.next() > 50 {
                 let cc_v = container[cc] as usize;
                 let cc_c = &pal_container.pal[cc_v];
