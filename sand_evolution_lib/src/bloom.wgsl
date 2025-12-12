@@ -56,5 +56,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     uv.y = 1.0 - uv.y;
     let color = textureSample(t_diffuse, s_diffuse, uv);
     let color2 = textureSample(t_blured, s_diffuse, uv);
-    return color2 + color;
+    // Slight non-linear bloom composite: makes glow feel less "even/linear".
+    let bloom_strength: f32 = 1.15;
+    let bloom_gamma: f32 = 0.85; // <1 => lift low bloom, faster "spread"
+    let bloom_rgb = pow(max(color2.rgb, vec3<f32>(0.0)), vec3<f32>(bloom_gamma)) * bloom_strength;
+    return vec4<f32>(color.rgb + bloom_rgb, 1.0);
 }

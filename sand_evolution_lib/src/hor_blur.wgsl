@@ -70,7 +70,8 @@ fn gaussian(x: f32, sigma: f32) -> f32 {
 }
 
 fn getWeight(index: u32) -> f32 {
-    let sigma: f32 = 2.5;
+    // Wider kernel => bloom spreads less "uniformly" and reaches further.
+    let sigma: f32 = 2.35;
     let x: f32 = f32(index) - 5.0; // Assuming the kernel size is 11 and the middle is at 5
     return gaussian(x, sigma);
 }
@@ -83,9 +84,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
    var color: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
    let range: f32 = 1.0 / settings.res_x;
 
+   // Normalize weights so brightness doesn't drift with sigma changes.
+   var sum_w: f32 = 0.0;
    for (var i = 0u; i < 11u; i = i + 1u) {
-       let offset: f32 = getOffset(i) + 0.5;
-       let weight: f32 = getWeight(i)*3.0;
+       sum_w = sum_w + getWeight(i);
+   }
+   let inv_sum_w: f32 = 1.0 / max(1e-6, sum_w);
+
+   for (var i = 0u; i < 11u; i = i + 1u) {
+       let offset: f32 = getOffset(i);
+       let weight: f32 = getWeight(i) * inv_sum_w;
        let sample_uv: vec2<f32> = vec2<f32>(uv.x + offset * range, uv.y);
        color = color + textureSample(t_diffuse, s_diffuse, sample_uv) * weight;
    }
