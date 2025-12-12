@@ -523,6 +523,44 @@ fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
     return clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(8.0));
 }
 
+// A lightweight brick-edge mask used for "heat glow" modulation.
+// Purposefully simpler than `wall_background_albedo()` (no fbm roughness),
+// so we can sample neighbors cheaply to build pseudo-normals.
+fn wall_brick_mortar_mask_simple(cell_xy: vec2<i32>) -> f32 {
+    let p = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
+
+    // Must match the wall brick grid used in `wall_background_albedo()`.
+    let brick_size = vec2<f32>(16.0, 8.0);
+    var b = p / brick_size;
+
+    // Offset every other row by half a brick.
+    let row_i: i32 = i32(floor(b.y));
+    let row_odd: bool = (row_i & 1) == 1;
+    let x_off = select(0.0, 0.5, row_odd);
+    b = vec2<f32>(b.x + x_off, b.y);
+
+    let f = fract(b);
+    let mortar = 0.075;
+    let edge0 = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+    return smoothstep(mortar, 0.0, edge0); // 1 near seams, 0 inside brick
+}
+
+// Pseudo-normal from brick seam mask gradient (stable in cell space).
+// Used to slightly boost heat incandescence along brick edges.
+fn wall_brick_pseudo_normal(cell_xy: vec2<i32>) -> vec3<f32> {
+    let mx1 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>( 1,  0));
+    let mx0 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>(-1,  0));
+    let my1 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>( 0,  1));
+    let my0 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>( 0, -1));
+
+    // Central difference in "cell units".
+    let dx = (mx1 - mx0) * 0.5;
+    let dy = (my1 - my0) * 0.5;
+
+    // Z=1 gives a "flat surface" baseline; edges tilt the normal.
+    return normalize(vec3<f32>(-dx, -dy, 1.0));
+}
+
 fn is_translucent_fluid_or_gas(t: u32) -> bool {
     // Cells that should show the wall background through them.
     // Keep this list tight: we don't want to accidentally make solids transparent.
@@ -552,6 +590,22 @@ fn fire_color_ramp(heat01: f32) -> vec3<f32> {
     c = mix(c, c2, smoothstep(0.18, 0.50, t));
     c = mix(c, c3, smoothstep(0.50, 0.80, t));
     c = mix(c, c4, smoothstep(0.80, 1.00, t));
+    return c;
+}
+
+// Heat tint for the *wall bricks* in Normal mode (not flames):
+// dull red -> hot red-orange, intentionally avoiding yellow/white.
+fn brick_heat_color_ramp(heat01: f32) -> vec3<f32> {
+    let t = clamp(heat01, 0.0, 1.0);
+    let c0 = vec3<f32>(0.0, 0.0, 0.0);
+    let c1 = vec3<f32>(0.70, 0.03, 0.00); // dull red (heated brick)
+    let c2 = vec3<f32>(1.55, 0.18, 0.02); // bright red-orange
+    let c3 = vec3<f32>(2.35, 0.48, 0.06); // very hot brick (still not yellow/white)
+
+    // Keep most of the range in reds; only at the very top it shifts orange.
+    var c = mix(c0, c1, smoothstep(0.00, 0.28, t));
+    c = mix(c, c2, smoothstep(0.28, 0.78, t));
+    c = mix(c, c3, smoothstep(0.78, 1.00, t));
     return c;
 }
 
@@ -982,17 +1036,37 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
 
         // Feed the same ramp as fire, but clamp the top end so normal-mode heat
         // doesn't frequently go fully white.
-        var heat01 = clamp(pow(heat_e, 1.15) + (shimmer - 0.5) * 0.05, 0.0, 1.0);
-        heat01 = min(heat01, 0.78);
+        // Make it read like hot *material* (brick), not flame:
+        // - a bit steeper response
+        // - less animated noise
+        var heat01 = clamp(pow(heat_e, 1.35) + (shimmer - 0.5) * 0.03, 0.0, 1.0);
+        heat01 = min(heat01, 0.90);
 
-        let heat_rgb = fire_color_ramp(heat01);
+        // Brick edge modulation: compute pseudo-normal from seam mask and make
+        // brick edges heat up slightly stronger (only when the wall is visible).
+        let wall_visible = (t == 0u) || is_translucent_fluid_or_gas(t);
+        var edge_hot: f32 = 0.0;
+        if (wall_visible) {
+            let n = wall_brick_pseudo_normal(cell_xy);
+            let seam = wall_brick_mortar_mask_simple(cell_xy);
+            // Edge strength from the pseudo-normal tilt: 0 on flat areas, 1 on strong edges.
+            let tilt = clamp((1.0 - n.z) * 7.0, 0.0, 1.0);
+            edge_hot = clamp(max(seam, tilt) * (0.25 + 0.75 * heat_e), 0.0, 1.0);
+
+            // Slightly push the color ramp and intensity at seams.
+            heat01 = min(heat01 + 0.06 * edge_hot, 0.82);
+        }
+
+        let heat_rgb = brick_heat_color_ramp(heat01);
 
         // Strength: make falloff steeper (less "washed out" blobs).
         // We drive intensity with a stronger non-linearity than the color ramp:
         // - keeps the hot core smaller
         // - makes cooler outskirts fade exponentially faster
         let heat_falloff = pow(heat_e, 2.35);
-        let heat_intensity = heat_falloff * mix(0.08, 0.18, shimmer);
+        var heat_intensity = heat_falloff * mix(0.06, 0.14, shimmer);
+        heat_intensity *= 1.0 + 0.35 * edge_hot;
+
         col = vec4<f32>(col.rgb + heat_rgb * heat_intensity, col.a);
     }
 
