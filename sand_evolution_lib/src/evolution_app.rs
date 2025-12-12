@@ -133,6 +133,9 @@ pub enum UserEventInfo {
     ImageImport(Vec<u8>),
     TextImport(Vec<u8>),
     SceneImport(Vec<u8>),
+    /// GitHub templates currently don't ship an entity list / scene.
+    /// When applying such a template, we reset the ECS world entities to the hardcoded defaults.
+    ResetWorldEntitiesToHardcoded,
     ProjectsLoaded(Vec<ProjectDescription>),
     ProjectLoadError(String),
 }
@@ -237,6 +240,9 @@ impl EvolutionApp {
         self.executor.execute(async move {
             match crate::projects::fetch_project_assets(&proj).await {
                 Ok((maybe_image, script_text, image_error)) => {
+                    // This project load path does not include a scene/entity list.
+                    // Reset entities to the current hardcoded defaults before applying assets.
+                    let _ = proxy.send_event(UserEventInfo::ResetWorldEntitiesToHardcoded);
                     if let Some(img) = maybe_image {
                         let _ = proxy.send_event(UserEventInfo::ImageImport(img));
                     }
@@ -1527,6 +1533,13 @@ impl EvolutionApp {
 
         let parsed: SceneToml = toml::from_str(toml_text).map_err(|e| e.to_string())?;
 
+        // If the imported "world" has no entity list (common for older / template files),
+        // reset to the current hardcoded defaults instead of leaving an empty scene.
+        if parsed.entity.is_empty() {
+            self.reset_world_entities_to_hardcoded(world);
+            return Ok(());
+        }
+
         // Clear editor selection to avoid dangling entity handles.
         self.editor_state.selected_entities.clear();
 
@@ -1612,5 +1625,29 @@ impl EvolutionApp {
         self.last_loaded_object.clear();
         self.need_to_recompile = true;
         Ok(())
+    }
+
+    pub fn reset_world_entities_to_hardcoded(&mut self, world: &mut specs::World) {
+        use specs::{Join, WorldExt};
+
+        // Clear editor selection to avoid dangling entity handles.
+        self.editor_state.selected_entities.clear();
+
+        // Delete all entities in the world (resources stay intact).
+        let to_delete: Vec<specs::Entity> = {
+            let entities = world.entities();
+            (&entities).join().collect()
+        };
+        for e in to_delete {
+            let _ = world.delete_entity(e);
+        }
+
+        // Recreate the default hardcoded entities (World Script, Dummy, Cooler, ...).
+        crate::init_hardcoded_entities(world);
+
+        // Reset selection to world script so script UI has a stable target.
+        self.selected_object_name = "World Script".to_owned();
+        self.last_loaded_object.clear();
+        self.need_to_recompile = true;
     }
 }
