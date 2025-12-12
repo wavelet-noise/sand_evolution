@@ -61,6 +61,9 @@ impl CellTrait for Laser {
     fn den(&self) -> i8 {
         0
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
     fn name(&self) -> &str {
         "laser"
     }

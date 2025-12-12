@@ -135,6 +135,9 @@ impl CellTrait for Cell {
     fn den(&self) -> i8 {
         -1
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
 
     fn name(&self) -> &str {
         "fire"

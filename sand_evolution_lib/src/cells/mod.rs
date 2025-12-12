@@ -142,6 +142,28 @@ pub trait CellTrait {
     fn stat(&self) -> bool {
         false
     }
+    /// Whether this cell type casts directional shadows in the post-process shader.
+    /// Default: true (override to disable for "flying"/non-occluding particles like gas, fire, etc.).
+    fn casts_shadow(&self) -> bool {
+        true
+    }
+    /// Per-cell-type shadow "color" and opacity used by the post-process shader.
+    ///
+    /// Encoding: RGBA8 where:
+    /// - RGB is a multiplier applied to the background color in shadow (255 = no darkening),
+    /// - A is the shadow opacity/transmittance strength (0 = does not affect shadows, 255 = fully affects).
+    ///
+    /// Defaults:
+    /// - if `casts_shadow()==false` => no contribution to shadows,
+    /// - otherwise => neutral dark shadow similar to the previous hardcoded behavior.
+    fn shadow_rgba(&self) -> [u8; 4] {
+        if !self.casts_shadow() {
+            return [255, 255, 255, 0];
+        }
+        // Previous shader used `dark_rgb = col.rgb * 0.55`.
+        // 0.55 * 255 ~= 140.
+        [140, 140, 140, 255]
+    }
     fn burnable(&self) -> CellType {
         Void::id()
     }

@@ -64,6 +64,11 @@ impl CellTrait for BaseWater {
     fn den(&self) -> i8 {
         2
     }
+
+    fn shadow_rgba(&self) -> [u8; 4] {
+        // Soft shadow for alkaline water as well.
+        [210, 210, 255, 110]
+    }
     fn proton_transfer(&self) -> CellType {
         SaltyWater::id()
     }

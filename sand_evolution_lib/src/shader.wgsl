@@ -9,6 +9,9 @@ struct WorldSettings {
     _pad0: f32,
     _pad1: f32,
     _pad2: f32,
+    _pad3: f32,
+    _pad4: f32,
+    _pad5: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -303,11 +306,151 @@ var s_diffuse: sampler;
 @group(2) @binding(0)
 var t_temperature: texture_2d<f32>;
 
+@group(3) @binding(0)
+var t_shadow_props: texture_2d<f32>;
+@group(3) @binding(1)
+var s_shadow_props: sampler;
+
+fn shadow_props(id: u32) -> vec4<f32> {
+    // Texture is 256x1 (RGBA8Unorm). Channels are normalized to [0..1].
+    // - rgb: shadow multiplier color (1.0 = no darkening)
+    // - a:   shadow opacity/strength (0.0 = does not affect)
+    return textureLoad(t_shadow_props, vec2<i32>(i32(id), 0), 0);
+}
+
+// Manual bilinear sampling for the temperature texture.
+// Needed because (depending on format/usage) the texture may not be filterable,
+// and older WGSL versions don't allow local (nested) functions.
+fn sample_temperature_bilinear(uv: vec2<f32>, dims_i: vec2<i32>, dims_f: vec2<f32>) -> f32 {
+    // Map uv [0..1] to texel space, aligned to texel centers.
+    let pos = uv * dims_f - vec2<f32>(0.5, 0.5);
+    let base = vec2<i32>(i32(floor(pos.x)), i32(floor(pos.y)));
+    let fx = fract(pos.x);
+    let fy = fract(pos.y);
+
+    let max_xy = dims_i - vec2<i32>(1, 1);
+    let p00 = clamp(base, vec2<i32>(0, 0), max_xy);
+    let p10 = clamp(base + vec2<i32>(1, 0), vec2<i32>(0, 0), max_xy);
+    let p01 = clamp(base + vec2<i32>(0, 1), vec2<i32>(0, 0), max_xy);
+    let p11 = clamp(base + vec2<i32>(1, 1), vec2<i32>(0, 0), max_xy);
+
+    let t00 = textureLoad(t_temperature, p00, 0).r;
+    let t10 = textureLoad(t_temperature, p10, 0).r;
+    let t01 = textureLoad(t_temperature, p01, 0).r;
+    let t11 = textureLoad(t_temperature, p11, 0).r;
+
+    let a = mix(t00, t10, fx);
+    let b = mix(t01, t11, fx);
+    return mix(a, b, fy);
+}
+
+// Returns vec4(mult_rgb, strength)
+// - mult_rgb: multiplier color for shadowing (1.0 = no darkening)
+// - strength: accumulated shadow strength [0..1]
+fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
+    // Directional light direction in texel space (x,y), provided via padding fields.
+    // If not set, fall back to a sensible default.
+    var dir = vec2<f32>(settings._pad0, settings._pad1);
+    if dot(dir, dir) < 1e-6 {
+        // Almost strictly down.
+        dir = vec2<f32>(0.03, -1.0);
+    }
+    dir = normalize(dir);
+
+    // DDA-like step: ensure we advance at least one texel per iteration
+    // along the dominant axis to avoid sampling the same cell repeatedly.
+    let inv = 1.0 / max(abs(dir.x), abs(dir.y));
+    let step = dir * inv;
+
+    // Raymarch budget (texel steps).
+    // Use a fixed upper bound for predictable shader compilation.
+    let MAX_STEPS: i32 = 64;
+    let max_steps: i32 = clamp(i32(round(settings._pad3)), 1, MAX_STEPS);
+
+    // Soft shadow: cast a few slightly offset rays (cheap penumbra) and
+    // attenuate darkness by hit distance (near occluders = darker).
+    let perp = vec2<f32>(-dir.y, dir.x);
+    let samples: i32 = 5;
+    // NOTE: avoid `half` identifier (conflicts with Metal's `half` type).
+    let half_samples = f32(samples - 1) * 0.5;
+    var strength_sum: f32 = 0.0;
+    var mult_rgb_sum: vec3<f32> = vec3<f32>(0.0);
+
+    // Stable per-pixel jitter to reduce banding.
+    let jitter = (noise2(vec2<f32>(f32(cell_xy.x), f32(cell_xy.y)) * 0.17) - 0.5) * 0.25;
+
+    for (var s: i32 = 0; s < samples; s = s + 1) {
+        let ofs = (f32(s) - half_samples) * 0.35 + jitter; // sub-texel width
+        var p = vec2<f32>(f32(cell_xy.x) + 0.5, f32(cell_xy.y) + 0.5) + perp * ofs;
+
+        var hit_strength: f32 = 0.0;
+        var hit_mult_rgb: vec3<f32> = vec3<f32>(1.0);
+        for (var i: i32 = 1; i <= MAX_STEPS; i = i + 1) {
+            if (i > max_steps) { break; }
+            // March towards the light source (opposite of light direction).
+            p -= step;
+            // Important: use floor so negatives become -1, -2, ... (i32() truncates toward 0).
+            let pi = vec2<i32>(i32(floor(p.x)), i32(floor(p.y)));
+
+            if (pi.x < 0 || pi.y < 0 || pi.x >= i32(settings.res_x) || pi.y >= i32(settings.res_y)) {
+                break;
+            }
+
+            // Shadow caster check is controlled by per-cell shadow props (alpha=0 => does not occlude).
+            let tt = textureLoad(t_diffuse, pi, 0).x;
+            if (tt != 0u) {
+                let sp = shadow_props(tt);
+                if (sp.a > 0.001) {
+                    // Fade with distance: closer occluder => stronger.
+                    let dist_base = max(0.0, 1.0 - (f32(i) / f32(max_steps)));
+                    let falloff = max(settings._pad4, 0.0);
+                    let dist_k = select(pow(dist_base, falloff), 1.0, falloff < 1e-3);
+                    hit_strength = dist_k * sp.a;
+                    hit_mult_rgb = sp.rgb;
+                    break;
+                }
+            }
+        }
+
+        strength_sum += hit_strength;
+        mult_rgb_sum += hit_mult_rgb * hit_strength;
+    }
+
+    // Don't average by samples: more rays hitting => stronger shadow.
+    let strength = clamp(strength_sum, 0.0, 1.0);
+    var mult_rgb = vec3<f32>(1.0);
+    if (strength_sum > 1e-6) {
+        mult_rgb = clamp(mult_rgb_sum / strength_sum, vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+    return vec4<f32>(mult_rgb, strength);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
-    // Get temperature value (needed for both Temperature and Both modes)
-    let tex_coord = vec2<i32>(i32(in.uv.x * settings.res_x / 4.0), i32(in.uv.y * settings.res_y / 4.0));
-    let temp_value = textureLoad(t_temperature, tex_coord, 0).r + settings.global_temperature;
+    let uv = in.uv;
+
+    // Temperature texture is lower-res (res/4). In Temperature-only mode we keep the
+    // "cell-accurate" point sampling (blocky on purpose). In Normal/Both we smooth it
+    // with manual bilinear interpolation (works even if the texture is not filterable).
+    let temp_dims_i = vec2<i32>(
+        max(1, i32(settings.res_x / 4.0)),
+        max(1, i32(settings.res_y / 4.0)),
+    );
+    let temp_dims_f = vec2<f32>(f32(temp_dims_i.x), f32(temp_dims_i.y));
+
+    let tex_coord_point = vec2<i32>(
+        i32(uv.x * settings.res_x / 4.0),
+        i32(uv.y * settings.res_y / 4.0),
+    );
+    let temp_point = textureLoad(t_temperature, tex_coord_point, 0).r;
+    let temp_smooth = sample_temperature_bilinear(uv, temp_dims_i, temp_dims_f);
+
+    let is_temp_only = (settings.display_mode > 0.5) && (settings.display_mode < 1.5);
+    let temp_value = (select(temp_smooth, temp_point, is_temp_only)) + settings.global_temperature;
+
+    // Soft glow from hot cells in normal render:
+    // Use only the smoothed temperature (no extra averaging/blur here).
+    let hot_glow = smoothstep(220.0, 420.0, temp_smooth + settings.global_temperature);
     
     // Map temperature (degrees) to color: cold (blue) -> neutral (black) -> hot (red/yellow).
     //
@@ -347,7 +490,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     // Normal mode or Both mode - render cells
-    let uv = in.uv;
     let grain = 0.9;
     let freq = settings.res_y * 10.0;
     let noiseScale = 1.0;
@@ -356,6 +498,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     let texel : vec4<u32> = textureLoad(t_diffuse, vec2<i32>(i32(in.uv.x * settings.res_x), i32(in.uv.y * settings.res_y)), 0);
     let t = texel.x;
+    let cell_xy = vec2<i32>(i32(in.uv.x * settings.res_x), i32(in.uv.y * settings.res_y));
 
     let noisy_mixer: f32 = pow(noise2(in.uv * 800.0 + settings.time*400.0), 2.0);
 
@@ -374,7 +517,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 0u
     {
-      col = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+      // Standard background: flat gray.
+      col = vec4<f32>(0.35, 0.35, 0.35, 1.0);
     }
     else if t == 1u
     {
@@ -520,6 +664,31 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     else
     {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
+    }
+
+    // Simple directional shadow cast by walls (stone) onto everything.
+    // This produces the expected "dark полосы" behind blocks on the background.
+    // 0..1 = normal strength, 1..2 = push towards pure black.
+    let shadow_strength = max(settings._pad2, 0.0);
+    let shadow = compute_wall_shadow(cell_xy);
+    // Apply shadows only to the background to avoid "black copy of the map" look.
+    if (t == 0u) {
+        // Base shadow target is the per-cell multiplier color (shadow.rgb).
+        // If strength > 1.0, additionally push the shadow target towards black.
+        let extra_black = clamp(shadow_strength - 1.0, 0.0, 1.0);
+        var dark_rgb = col.rgb * shadow.rgb;
+        dark_rgb = mix(dark_rgb, vec3<f32>(0.0, 0.0, 0.0), extra_black);
+
+        // Final mix factor (clamped) – allows strength > 1.0 to reach full dark target.
+        let k = clamp(shadow.a * shadow_strength, 0.0, 1.0);
+        col = vec4<f32>(mix(col.rgb, dark_rgb, k), col.a);
+    }
+
+    // Add subtle temperature-based emissive glow to the normal render.
+    // Works best together with bloom (values slightly > 1.0 are allowed).
+    if (hot_glow > 0.0) {
+        let glow_col = mix(vec3<f32>(1.15, 0.22, 0.04), vec3<f32>(1.85, 1.05, 0.55), hot_glow);
+        col = vec4<f32>(col.rgb + glow_col * hot_glow * 0.18, col.a);
     }
 
     // If in Both mode, blend temperature overlay with cell colors

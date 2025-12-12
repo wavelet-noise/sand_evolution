@@ -23,15 +23,83 @@ pub struct WorldSettings {
     /// Global temperature offset (degrees). Effective temperature = layer + global_temperature.
     global_temperature: f32,
     // Keep uniform size a multiple of 16 bytes.
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
+    pub(crate) _pad0: f32,
+    pub(crate) _pad1: f32,
+    pub(crate) _pad2: f32,
+    pub(crate) _pad3: f32,
+    pub(crate) _pad4: f32,
+    pub(crate) _pad5: f32,
 }
 #[derive(Default)]
 pub struct UpdateResult {
     pub simulation_step_average_time: f64,
     pub update_time: f64,
     pub dropping: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct DayNightCycle {
+    /// Length of a full day in simulation seconds.
+    pub day_length_seconds: f32,
+    /// Current time of day in [0, day_length_seconds).
+    pub time_of_day_seconds: f32,
+    /// Multiplier for how fast the cycle advances relative to simulation time.
+    pub speed: f32,
+    /// Pause only the day/night cycle (simulation can still run).
+    pub paused: bool,
+    /// Rotation offset so that time=0 matches the initial art direction.
+    pub sun_angle_offset_rad: f32,
+    /// Shadow strength sent to shader (0..1).
+    pub shadow_strength: f32,
+    /// Shadow length in raymarch steps (1..64).
+    pub shadow_length_steps: f32,
+    /// Controls how quickly shadow fades with distance (0 disables distance attenuation).
+    pub shadow_distance_falloff: f32,
+}
+
+impl DayNightCycle {
+    pub fn new(day_length_seconds: f32, initial_dir_xy: (f32, f32)) -> Self {
+        let (mut x, mut y) = initial_dir_xy;
+        let len2 = x * x + y * y;
+        if len2 > 1e-12 {
+            let inv = 1.0 / len2.sqrt();
+            x *= inv;
+            y *= inv;
+        } else {
+            x = -0.8;
+            y = 0.4;
+        }
+
+        Self {
+            day_length_seconds: day_length_seconds.max(0.1),
+            time_of_day_seconds: 0.0,
+            speed: 1.0,
+            // By default keep time-of-day fixed (can be toggled in UI).
+            paused: true,
+            sun_angle_offset_rad: y.atan2(x),
+            shadow_strength: 0.9,
+            shadow_length_steps: 26.0,
+            shadow_distance_falloff: 1.0,
+        }
+    }
+
+    /// Advances the cycle and returns new normalized light direction (x,y).
+    pub fn advance(&mut self, dt_sim_seconds: f32) -> (f32, f32) {
+        if self.paused {
+            return self.current_dir();
+        }
+
+        let dt = (dt_sim_seconds.max(0.0)) * self.speed.max(0.0);
+        self.time_of_day_seconds =
+            (self.time_of_day_seconds + dt).rem_euclid(self.day_length_seconds.max(0.1));
+        self.current_dir()
+    }
+
+    pub fn current_dir(&self) -> (f32, f32) {
+        let phase = (self.time_of_day_seconds / self.day_length_seconds.max(0.1)).clamp(0.0, 1.0);
+        let angle = phase * std::f32::consts::TAU + self.sun_angle_offset_rad;
+        (angle.cos(), angle.sin())
+    }
 }
 
 pub struct State {
@@ -43,17 +111,19 @@ pub struct State {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
-    world_settings: WorldSettings,
+    pub(crate) world_settings: WorldSettings,
     settings_buffer: wgpu::Buffer,
     settings_bind_group: wgpu::BindGroup,
     float_texture_plus_sampler_bgl: wgpu::BindGroupLayout,
     float_texture_plus_sampler_plus_texture_bgl: wgpu::BindGroupLayout,
     pub start_time: f64,
     type_bind_group: wgpu::BindGroup,
+    shadow_props_bind_group: wgpu::BindGroup,
     gbuffer_combine_bind_group: wgpu::BindGroup,
     pub diffuse_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
     pub loaded_rgba: image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
     diffuse_texture: wgpu::Texture,
+    shadow_props_texture: wgpu::Texture,
     pub flip: cs::PointType,
     pub flop: cs::PointType,
     last_spawn: f32,
@@ -66,6 +136,9 @@ pub struct State {
     pub toggled: bool,
     pub tick: i64,
     pub frame: i64,
+    /// Simulation time in seconds (advances with ticks, not wall clock).
+    pub sim_time_seconds: f64,
+    pub day_night: DayNightCycle,
     // Temperature system for each cell (degrees)
     pub cell_temperatures: Vec<f32>,
     /// Global/base temperature (degrees).
@@ -245,6 +318,31 @@ impl State {
             label: Some("diffuse_texture"),
         });
 
+        // Per-cell-type shadow properties: RGBA where
+        // - RGB is the shadow color multiplier (255 = no darkening),
+        // - A is the shadow opacity (0 = does not affect, 255 = fully affects).
+        // Stored as a 256x1 RGBA8 texture and indexed by cell id in the shader.
+        let shadow_props_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: 256,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some("shadow_props_texture"),
+        });
+
+        let mut shadow_props = [255u8; 256 * 4];
+        for (i, cell) in pal_container.pal.iter().enumerate().take(256) {
+            let rgba = cell.shadow_rgba();
+            let o = i * 4;
+            shadow_props[o..o + 4].copy_from_slice(&rgba);
+        }
+
         let viewport_extent = wgpu::Extent3d {
             width: 1024,
             height: 768,
@@ -272,6 +370,26 @@ impl State {
                 rows_per_image: std::num::NonZeroU32::new(dimensions.1),
             },
             texture_size,
+        );
+
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &shadow_props_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &shadow_props,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(256 * 4),
+                rows_per_image: std::num::NonZeroU32::new(1),
+            },
+            wgpu::Extent3d {
+                width: 256,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
         );
 
         let type_render_and_fullscreen_vertex =
@@ -302,15 +420,31 @@ impl State {
 
         let start_time = instant::now();
 
+        // Day/night defaults (also used to seed shader light direction).
+        // "Almost strictly down" in texel space.
+        // Note: in this project, positive Y in texel space corresponds to "up" on screen,
+        // so "down" is negative Y.
+        let initial_sun_dir = (0.03f32, -1.0f32);
+        let day_night = DayNightCycle::new(120.0, initial_sun_dir);
+        let (sun_x, sun_y) = day_night.current_dir();
+
         let world_settings = WorldSettings {
             time: 0.0,
             res_x: dimensions.0 as f32,
             res_y: dimensions.1 as f32,
             display_mode: 0.0, // Normal mode by default
             global_temperature: 21.0,
-            _pad0: 0.0,
-            _pad1: 0.0,
-            _pad2: 0.0,
+            // Directional light/shadows (used by shader.wgsl):
+            // _pad0/_pad1 = sun direction (texel space)
+            // _pad2 = shadow strength [0..2]
+            // _pad3 = shadow length in steps [1..64]
+            // _pad4 = distance falloff exponent [0..4]
+            _pad0: sun_x,
+            _pad1: sun_y,
+            _pad2: day_night.shadow_strength,
+            _pad3: day_night.shadow_length_steps,
+            _pad4: day_night.shadow_distance_falloff,
+            _pad5: 0.0,
         };
 
         let raw_ptr = &world_settings as *const WorldSettings;
@@ -352,10 +486,15 @@ impl State {
         let mut type_texture_view = wgpu::TextureViewDescriptor::default().clone();
         type_texture_view.format = Some(TextureFormat::R8Uint);
 
+        let mut shadow_props_texture_view_desc = wgpu::TextureViewDescriptor::default().clone();
+        shadow_props_texture_view_desc.format = Some(TextureFormat::Rgba8Unorm);
+
         let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
         color_texture_view.format = Some(surface_format);
 
         let cell_type_texture_view = cell_type_texture.create_view(&type_texture_view);
+        let shadow_props_texture_view =
+            shadow_props_texture.create_view(&shadow_props_texture_view_desc);
 
         let type_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -400,6 +539,29 @@ impl State {
                     },
                 ],
                 label: Some("cell_type_bind_group_layout"),
+            });
+
+        let shadow_props_texture_bgl =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+                label: Some("shadow_props_texture_bind_group_layout"),
             });
 
         let float_texture_plus_sampler_bgl =
@@ -475,6 +637,21 @@ impl State {
                 },
             ],
             label: Some("type_bind_group"),
+        });
+
+        let shadow_props_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &shadow_props_texture_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&shadow_props_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&type_texture_sampler),
+                },
+            ],
+            label: Some("shadow_props_bind_group"),
         });
 
         let gbuffer_combine_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -571,6 +748,7 @@ impl State {
                     &settings_bind_group_layout,
                     &uint_texture_plus_sampler_bgl,
                     &temperature_texture_bgl,
+                    &shadow_props_texture_bgl,
                 ],
                 push_constant_ranges: &[],
             });
@@ -854,10 +1032,12 @@ impl State {
             settings_bind_group,
             start_time,
             type_bind_group,
+            shadow_props_bind_group,
             loaded_rgba: diffuse_rgba.clone(),
             diffuse_rgba,
             gbuffer_combine_bind_group,
             diffuse_texture: cell_type_texture,
+            shadow_props_texture,
             float_texture_plus_sampler_bgl,
             float_texture_plus_sampler_plus_texture_bgl,
             flip: a,
@@ -872,6 +1052,8 @@ impl State {
             toggled: true,
             tick: 0,
             frame: 0,
+            sim_time_seconds: 0.0,
+            day_night,
             cell_temperatures,
             global_temperature: 21.0,
             temperature_texture,
@@ -1068,7 +1250,9 @@ impl State {
     ) -> UpdateResult
     {
         let update_start_time = instant::now();
-        self.world_settings.time = (update_start_time - self.start_time) as f32 / 1000.0;
+        // Shader time is simulation-time based (deterministic, starts at 0).
+        // This makes time "fixed at start" and independent from wall clock.
+        self.world_settings.time = self.sim_time_seconds as f32;
         
         // Update display mode from evolution_app
         self.world_settings.display_mode = match evolution_app.display_mode {
@@ -1078,15 +1262,57 @@ impl State {
         };
         self.world_settings.global_temperature = self.global_temperature;
 
-        queue.write_buffer(
-            &self.settings_buffer,
-            0,
-            bytemuck::cast_slice(&[self.world_settings]),
-        );
-
         let sim_upd_start_time = instant::now();
 
         let dimensions = self.diffuse_rgba.dimensions();
+
+        // Update hover info for UI (cell under cursor + temperature)
+        evolution_app.hover_info = None;
+        if let Some(position) = evolution_app.cursor_position {
+            // If pointer is outside the window bounds, don't show stale hover info.
+            if position.x >= 0.0
+                && position.y >= 0.0
+                && position.x <= size.width as f64
+                && position.y <= size.height as f64
+            {
+                let logical_position: LogicalPosition<f64> =
+                    LogicalPosition::from_physical(position, scale_factor);
+                let scaled_window_size = PhysicalSize::new(
+                    size.width as f64 / scale_factor,
+                    size.height as f64 / scale_factor,
+                );
+
+                if scaled_window_size.width > 0.0 && scaled_window_size.height > 0.0 {
+                    let percentage_position: (f64, f64) = (
+                        logical_position.x / scaled_window_size.width as f64,
+                        1.0 - logical_position.y / scaled_window_size.height as f64,
+                    );
+
+                    let px = clamp(
+                        percentage_position.0 * cs::SECTOR_SIZE.x as f64,
+                        0.0,
+                        cs::SECTOR_SIZE.x as f64 - 1.0,
+                    );
+                    let py = clamp(
+                        percentage_position.1 * cs::SECTOR_SIZE.y as f64,
+                        0.0,
+                        cs::SECTOR_SIZE.y as f64 - 1.0,
+                    );
+
+                    let x = px as PointType;
+                    let y = py as PointType;
+                    let cell_id = self.diffuse_rgba.get_pixel(x as u32, y as u32).0[0];
+                    let temperature = self.get_temperature(x, y);
+
+                    evolution_app.hover_info = Some(crate::evolution_app::HoverInfo {
+                        x,
+                        y,
+                        cell_id,
+                        temperature,
+                    });
+                }
+            }
+        }
 
         if evolution_app.pressed && !evolution_app.hovered {
             self.spawn(evolution_app, size, scale_factor);
@@ -1098,17 +1324,30 @@ impl State {
             dropping = true;
         }
 
-        update::update_tick(
-            self,
-            sim_steps,
-            dimensions,
-            evolution_app,
-            world,
-            shared_state,
-            update_start_time,
+        if sim_steps > 0 {
+            update::update_tick(
+                self,
+                sim_steps,
+                dimensions,
+                evolution_app,
+                world,
+                shared_state,
+                update_start_time,
+            );
+        }
+
+        // Upload settings AFTER update_tick so GPU sees current light direction.
+        queue.write_buffer(
+            &self.settings_buffer,
+            0,
+            bytemuck::cast_slice(&[self.world_settings]),
         );
 
-        let simulation_step_average_time = (instant::now() - sim_upd_start_time) / sim_steps as f64;
+        let simulation_step_average_time = if sim_steps > 0 {
+            (instant::now() - sim_upd_start_time) / sim_steps as f64
+        } else {
+            0.0
+        };
 
         let texture_size = wgpu::Extent3d {
             width: dimensions.0,
@@ -1210,6 +1449,7 @@ impl State {
                 render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
                 render_pass.set_bind_group(1, &self.type_bind_group, &[]);
                 render_pass.set_bind_group(2, &self.temperature_bind_group, &[]);
+                render_pass.set_bind_group(3, &self.shadow_props_bind_group, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass

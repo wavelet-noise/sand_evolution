@@ -54,6 +54,11 @@ impl CellTrait for SaltyWater {
         2
     }
 
+    fn shadow_rgba(&self) -> [u8; 4] {
+        // Similar to water: soft, slightly bluish shadow.
+        [205, 220, 255, 115]
+    }
+
     fn name(&self) -> &str {
         "salty water"
     }

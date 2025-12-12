@@ -77,6 +77,9 @@ impl CellTrait for Plasma {
     fn den(&self) -> i8 {
         1
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
     fn name(&self) -> &str {
         "plasma"
     }

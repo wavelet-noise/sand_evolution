@@ -68,6 +68,9 @@ impl CellTrait for BurningGas {
     fn den(&self) -> i8 {
         -10
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
     fn name(&self) -> &str {
         "burning gas"
     }

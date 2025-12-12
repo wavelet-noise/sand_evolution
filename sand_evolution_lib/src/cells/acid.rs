@@ -81,6 +81,10 @@ impl CellTrait for Acid {
         "acid"
     }
 
+    fn shadow_rgba(&self) -> [u8; 4] {
+        [200, 225, 200, 255]
+    }
+
     fn id(&self) -> CellType {
         9
     }
