@@ -523,6 +523,38 @@ fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
     return clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(8.0));
 }
 
+fn is_translucent_fluid_or_gas(t: u32) -> bool {
+    // Cells that should show the wall background through them.
+    // Keep this list tight: we don't want to accidentally make solids transparent.
+    return
+        t == 2u  || // water
+        t == 3u  || // steam
+        t == 9u  || // acid
+        t == 10u || // gas
+        t == 11u || // burning gas (emissive overlay)
+        t == 12u || // delute acid
+        t == 15u || // salty water
+        t == 16u || // base water
+        t == 17u;   // liquid gas
+}
+
+// Fire color ramp: deep red -> orange -> yellow -> white (HDR-ready).
+// Input is normalized "heat" in [0..1].
+fn fire_color_ramp(heat01: f32) -> vec3<f32> {
+    let t = clamp(heat01, 0.0, 1.0);
+    let c0 = vec3<f32>(0.02, 0.00, 0.00); // almost black
+    let c1 = vec3<f32>(0.95, 0.08, 0.01); // deep red
+    let c2 = vec3<f32>(1.00, 0.42, 0.05); // orange
+    let c3 = vec3<f32>(1.00, 0.92, 0.22); // yellow
+    let c4 = vec3<f32>(1.00, 1.00, 1.00); // white-hot
+
+    var c = mix(c0, c1, smoothstep(0.00, 0.18, t));
+    c = mix(c, c2, smoothstep(0.18, 0.50, t));
+    c = mix(c, c3, smoothstep(0.50, 0.80, t));
+    c = mix(c, c4, smoothstep(0.80, 1.00, t));
+    return c;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let uv = in.uv;
@@ -606,6 +638,20 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let t = texel.x;
     let cell_xy = vec2<i32>(i32(in.uv.x * settings.res_x), i32(in.uv.y * settings.res_y));
 
+    // Compute procedural wall once; reuse it for all translucent fluids/gases.
+    let wall_bg = wall_background_albedo(uv, cell_xy);
+    var wall_bg_shadowed = wall_bg;
+    let shadow_strength = max(settings.shadow_strength, 0.0);
+    let need_bg_shadow = (t == 0u) || is_translucent_fluid_or_gas(t);
+    if (need_bg_shadow && shadow_strength > 0.0) {
+        let shadow = compute_wall_shadow(cell_xy);
+        let extra_black = clamp(shadow_strength - 1.0, 0.0, 1.0);
+        var dark_rgb = wall_bg_shadowed * shadow.rgb;
+        dark_rgb = mix(dark_rgb, vec3<f32>(0.0, 0.0, 0.0), extra_black);
+        let k = clamp(shadow.a * shadow_strength, 0.0, 1.0);
+        wall_bg_shadowed = mix(wall_bg_shadowed, dark_rgb, k);
+    }
+
     let noisy_mixer: f32 = pow(noise2(in.uv * 800.0 + settings.time*400.0), 2.0);
 
     let noise_pixel = noise2(in.uv * vec2<f32>(settings.res_x, settings.res_y)*2.0);
@@ -624,38 +670,170 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     else if t == 0u
     {
       // Background: procedural "test room wall" instead of flat gray.
-      col = vec4<f32>(wall_background_albedo(uv, cell_xy), 1.0);
+      col = vec4<f32>(wall_bg_shadowed, 1.0);
     }
     else if t == 1u
     {
       col = vec4<f32>(noise_pixel * 0.8 + 0.1, noise_pixel * 0.8 + 0.1, 0.1, 1.0);
     }
+    else if t == 18u // earth
+    {
+      // Brown soil with subtle noise variation
+      let base = vec3<f32>(0.47, 0.28, 0.14);
+      let n = clamp((noise_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let speck = clamp((sprite_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let rgb = base * (0.85 + 0.30 * n) + vec3<f32>(0.03, 0.02, 0.01) * speck;
+      col = vec4<f32>(rgb, 1.0);
+    }
+    else if t == 19u // gravel
+    {
+      // Gravel: gray-ish stones with speckles
+      let base = vec3<f32>(0.55, 0.55, 0.60);
+      let n = clamp((noise_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let speck = clamp((sprite_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let rgb = mix(base * (0.85 + 0.25 * n), vec3<f32>(0.28, 0.26, 0.24), speck * 0.35);
+      col = vec4<f32>(rgb, 1.0);
+    }
     else if t == 2u // water
     {
-      col = mix(vec4<f32>(0.1, 0.15, 1.0, 2.0) * 0.5, vec4<f32>(0.1, 0.15, 1.1, 1.0), tdnoise);
-      if (col.b > 1.0) {
-        col = mix(vec4<f32>(0.8, 0.8, 1.1,1.0),vec4<f32>(0.3, 0.3, 0.8,1.0),noise_pixel);
+      var water = mix(vec4<f32>(0.1, 0.15, 1.0, 2.0) * 0.5, vec4<f32>(0.1, 0.15, 1.1, 1.0), tdnoise);
+      if (water.b > 1.0) {
+        water = mix(vec4<f32>(0.8, 0.8, 1.1, 1.0), vec4<f32>(0.3, 0.3, 0.8, 1.0), noise_pixel);
       }
+      // Transparency strength used in the in-shader composite pass below.
+      let a = clamp(0.12 + 0.10 * (tdnoise * 0.5 + 0.5), 0.10, 0.25);
+      col = vec4<f32>(water.rgb, a);
     }
     else if t == 3u // steam
     {
-      col = vec4<f32>(0.5)*((tdnoise_fast+2.0)/3.0);
+      let k = clamp((tdnoise_fast + 2.0) / 3.0, 0.0, 1.0);
+      let a = clamp(0.10 + 0.18 * k, 0.10, 0.32);
+      col = vec4<f32>(vec3<f32>(0.5) * k, a);
     }
     else if t == 4u // fire
     {
-      col = mix(
-        vec4<f32>(1.0, 0.0, 0.0, 1.0),
-        vec4<f32>(1.0, 1.0, 0.0, 1.0),
-        tdnoise_faster - 0.04
-      ) * 10.0;
+      // Improved fire shading with separated temperature, flame, and incandescence
+// Drop-in replacement for the original block. Keeps the same inputs and noise sources.
+
+// --- Noise helpers (unchanged) ---
+let n_fast   = clamp(tdnoise_fast   * 0.5 + 0.5, 0.0, 1.0);
+let n_faster = clamp(tdnoise_faster * 0.5 + 0.5, 0.0, 1.0);
+
+// --- Physical temperature (slow signal) ---
+var heat01 = clamp((temp_value - 220.0) / (780.0 - 220.0), 0.0, 1.0);
+// small turbulence that does NOT dominate the physics
+heat01 = clamp(
+  heat01
+  + (n_faster - 0.5) * 0.16
+  + (noise_pixel - 0.5) * 0.04,
+  0.0, 1.0
+);
+
+// --- Sub-cell flame animation ---
+let grid_uv = uv * vec2<f32>(settings.res_x, settings.res_y);
+let cell_uv = fract(grid_uv);              // [0..1) inside the cell
+let cell_pos = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
+
+// Upward advection (hotter = faster rise)
+let flow = vec2<f32>(0.0, -settings.time * (2.0 + 3.0 * heat01));
+let flame_fbm = fbm_simplex_3d(
+  vec3<f32>((cell_pos + cell_uv) * 0.55 + flow, settings.time * 1.25),
+  5, 2.0, 0.5
+);
+let f01 = clamp(flame_fbm * 0.5 + 0.5, 0.0, 1.0);
+
+// Lateral sway to avoid grid-lock
+let sway_n = simplex_noise_3d(vec3<f32>((cell_pos + cell_uv) * 0.18, settings.time * 0.9));
+let sway = clamp(sway_n, -1.0, 1.0) * 0.22;
+
+let x = (cell_uv.x - 0.5) + sway;
+let y = cell_uv.y;              // y grows down
+let v = clamp(y, 0.0, 1.0);     // 0 = top, 1 = base
+let base = 1.0 - v;             // 1 = base, 0 = top
+
+// Flame shape: wide at base, narrow at top
+let width = mix(0.50, 0.14, v);
+let edge = 1.0 - smoothstep(width - 0.10, width, abs(x));
+
+// Ridged noise -> vertical tongues
+let ridge = 1.0 - abs(2.0 * f01 - 1.0);
+let tongues = pow(clamp(ridge, 0.0, 1.0), 1.8);
+
+// Flame mask (fast signal)
+let flame_mask = clamp(
+  edge *
+  (0.45 + 0.75 * tongues) *
+  (0.35 + 0.65 * base),
+  0.0, 1.0
+);
+
+// --- Separate flame vs heat ---
+let flame01 = clamp(flame_mask * (0.6 + 0.6 * heat01), 0.0, 1.0);
+
+// Incandescence (slow, material glow)
+let incand01 = pow(heat01, 1.25);
+
+// --- Color ---
+// Color is driven by the hotter of heat or flame
+let color_t = clamp(max(incand01, flame01), 0.0, 1.0);
+let rgb = fire_color_ramp(color_t);
+
+// --- Intensity (non-linear, flame-dominated) ---
+let flicker = clamp(0.80 + 0.45 * n_fast, 0.70, 1.30);
+let intensity =
+  (3.0 + 10.0 * pow(incand01, 1.4)) *
+  mix(0.7, 1.8, flame01) *
+  flicker;
+
+// --- Optional micro-sparks (cheap but effective) ---
+let spark = step(0.985, f01) * step(0.7, base) * heat01;
+let spark_rgb = vec3<f32>(1.0, 0.8, 0.4) * spark * 6.0;
+
+col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
+
     }
     else if t == 5u // slow fire
     {
-      col = mix(
-        vec4<f32>(1.0, 0.0, 0.0, 1.0),
-        vec4<f32>(1.0, 0.5, 0.0, 1.0),
-        tdnoise_faster - 0.04
-      ) * 2.0;
+      // Cooler + dimmer version: more orange, less white.
+      let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
+      let n_faster = clamp(tdnoise_faster * 0.5 + 0.5, 0.0, 1.0);
+
+      var heat01 = clamp((temp_value - 180.0) / (520.0 - 180.0), 0.0, 1.0);
+      heat01 = clamp(heat01 + (n_faster - 0.5) * 0.18 + (noise_pixel - 0.5) * 0.04, 0.0, 1.0);
+      heat01 = min(heat01, 0.88); // prevent frequent pure-white on slow fire
+
+      // A softer variant of the same sub-cell flame animation.
+      let grid_uv = uv * vec2<f32>(settings.res_x, settings.res_y);
+      let cell_uv = fract(grid_uv);
+      let cell_pos = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
+
+      let flow = vec2<f32>(0.0, -settings.time * (1.4 + 2.0 * heat01));
+      let flame_fbm = fbm_simplex_3d(
+        vec3<f32>((cell_pos + cell_uv) * 0.45 + flow, settings.time * 1.05),
+        4, 2.0, 0.5
+      );
+      let f01 = clamp(flame_fbm * 0.5 + 0.5, 0.0, 1.0);
+
+      let sway_n = simplex_noise_3d(vec3<f32>((cell_pos + cell_uv) * 0.15, settings.time * 0.75));
+      let sway = clamp(sway_n, -1.0, 1.0) * 0.16;
+
+      let x = (cell_uv.x - 0.5) + sway;
+      let y = cell_uv.y;
+      let v = clamp(y, 0.0, 1.0);
+      let width = mix(0.18, 0.52, v);
+      let edge = 1.0 - smoothstep(width - 0.12, width, abs(x));
+
+      let ridge = 1.0 - abs(2.0 * f01 - 1.0);
+      let tongues = pow(clamp(ridge, 0.0, 1.0), 1.5);
+      let flame_mask = clamp(edge * (0.50 + 0.60 * tongues) * (0.35 + 0.65 * v), 0.0, 1.0);
+
+      heat01 = clamp(heat01 + (flame_mask - 0.5) * 0.10, 0.0, 0.90);
+
+      let rgb = fire_color_ramp(heat01);
+      let flicker = clamp(0.88 + 0.30 * n_fast, 0.78, 1.18);
+      let shape_intensity = mix(0.65, 1.35, flame_mask);
+      let intensity = mix(1.5, 5.5, heat01) * flicker * shape_intensity;
+      col = vec4<f32>(rgb * intensity, 1.0);
     }
     else if t == 50u // wood
     {
@@ -720,19 +898,24 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 9u
     {
-      col = vec4<f32>(0.0,0.4,0.0,0.8);
+      let a = clamp(0.16 + 0.12 * (noise_pixel * 0.5 + 0.5), 0.12, 0.30);
+      col = vec4<f32>(0.0, 0.4, 0.0, a);
     }
     else if t == 10u // gas
     {
-      col = vec4<f32>(0.2,0.8,0.2,0.4)*((tdnoise_fast+2.0)/3.0);
+      let k = clamp((tdnoise_fast + 2.0) / 3.0, 0.0, 1.0);
+      let a = clamp((0.08 + 0.22 * k) * (0.70 + 0.30 * (noise_pixel * 0.5 + 0.5)), 0.08, 0.35);
+      col = vec4<f32>(vec3<f32>(0.2, 0.8, 0.2) * k, a);
     }
     else if t == 11u // burning gas
     {
-      col = vec4<f32>(1.0,0.8,0.5,1.0) * 10.0 * tdnoise_fast;
+      // Emissive overlay: add over the wall in the composite pass below.
+      col = vec4<f32>(vec3<f32>(1.0, 0.8, 0.5) * 10.0 * tdnoise_fast, 1.0);
     }
     else if t == 12u // delute acid
     {
-      col = vec4<f32>(0.2,0.6,0.8,1.0);
+      let a = clamp(0.18 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.12, 0.30);
+      col = vec4<f32>(0.2, 0.6, 0.8, a);
     }
     else if t == 13u // salt
     {
@@ -744,16 +927,20 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 15u // salty water
     {
-      col = vec4<f32>(0.5,0.5,1.0,1.0);
+      let a = clamp(0.12 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.10, 0.25);
+      col = vec4<f32>(0.5, 0.5, 1.0, a);
     }
     else if t == 16u // base water
     {
-      col = vec4<f32>(1.0,0.5,1.0,1.0);
+      let a = clamp(0.12 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.10, 0.25);
+      col = vec4<f32>(1.0, 0.5, 1.0, a);
     }
     else if t == 17u // liquid gas
     {
-      // Cold bluish-green liquid with transparency
-      col = mix(vec4<f32>(0.3, 0.9, 0.7, 0.6) * 0.5, vec4<f32>(0.2, 0.8, 0.6, 0.8), tdnoise);
+      // Cold bluish-green liquid.
+      let lg = mix(vec4<f32>(0.3, 0.9, 0.7, 0.6) * 0.5, vec4<f32>(0.2, 0.8, 0.6, 0.8), tdnoise);
+      let a = clamp(lg.a * 0.35, 0.10, 0.28);
+      col = vec4<f32>(lg.rgb, a);
     }
     else if t == 70u // grass
     {
@@ -772,39 +959,40 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
     }
 
-    // Simple directional shadow cast by walls (stone) onto everything.
-    // This produces the expected "dark полосы" behind blocks on the background.
-    // 0..1 = normal strength, 1..2 = push towards pure black.
-    let shadow_strength = max(settings.shadow_strength, 0.0);
-    let shadow = compute_wall_shadow(cell_xy);
-    // Apply shadows only to the background to avoid "black copy of the map" look.
-    if (t == 0u) {
-        // Base shadow target is the per-cell multiplier color (shadow.rgb).
-        // If strength > 1.0, additionally push the shadow target towards black.
-        let extra_black = clamp(shadow_strength - 1.0, 0.0, 1.0);
-        var dark_rgb = col.rgb * shadow.rgb;
-        dark_rgb = mix(dark_rgb, vec3<f32>(0.0, 0.0, 0.0), extra_black);
-
-        // Final mix factor (clamped) – allows strength > 1.0 to reach full dark target.
-        let k = clamp(shadow.a * shadow_strength, 0.0, 1.0);
-        col = vec4<f32>(mix(col.rgb, dark_rgb, k), col.a);
+    // Composite translucent fluids/gases over the wall (so bricks are visible through them).
+    // Use additive-style compositing: keeps background fully visible and preserves bright/bloom colors.
+    if (is_translucent_fluid_or_gas(t)) {
+        let a = clamp(col.a, 0.0, 1.0);
+        col = vec4<f32>(wall_bg_shadowed + col.rgb * a, 1.0);
     }
 
     // Direct heat visualization in Normal render (NOT bloom):
-    // Saturated red -> orange -> yellow, with blurred temperature field.
-    // Keep it semi-transparent so it reads as "heat", not "paint".
+    // Blackbody-like heat tint driven by blurred temperature field.
+    // Keep it subtle so it reads as "heat", not "paint".
     let heat = clamp((temp_vis - 140.0) / (520.0 - 140.0), 0.0, 1.0);
     // NOTE: In Both mode we show the temperature map via `temp_col`,
     // so don't add the extra blurred heat overlay.
     if (heat > 0.0 && settings.display_mode < 1.5) {
-        let h_orange = smoothstep(0.15, 0.65, heat);
-        let h_yellow = smoothstep(0.70, 1.00, heat);
+        // Exponential response (more perceptual): keeps low heat subtle, ramps high heat faster.
+        let heat_e = 1.0 - exp(-2.6 * heat);
 
-        var heat_rgb = mix(vec3<f32>(0.95, 0.05, 0.00), vec3<f32>(1.00, 0.35, 0.00), h_orange);
-        heat_rgb = mix(heat_rgb, vec3<f32>(1.00, 0.90, 0.08), h_yellow);
+        // Small animated shimmer so the heat field isn't perfectly static.
+        // Keep the amplitude low to avoid "sparkly" look.
+        let shimmer = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
 
-        // Transparency/intensity of the overlay (0..~0.6 feels good).
-        let heat_intensity = heat * 0.2;
+        // Feed the same ramp as fire, but clamp the top end so normal-mode heat
+        // doesn't frequently go fully white.
+        var heat01 = clamp(pow(heat_e, 1.15) + (shimmer - 0.5) * 0.05, 0.0, 1.0);
+        heat01 = min(heat01, 0.78);
+
+        let heat_rgb = fire_color_ramp(heat01);
+
+        // Strength: make falloff steeper (less "washed out" blobs).
+        // We drive intensity with a stronger non-linearity than the color ramp:
+        // - keeps the hot core smaller
+        // - makes cooler outskirts fade exponentially faster
+        let heat_falloff = pow(heat_e, 2.35);
+        let heat_intensity = heat_falloff * mix(0.08, 0.18, shimmer);
         col = vec4<f32>(col.rgb + heat_rgb * heat_intensity, col.a);
     }
 
@@ -828,9 +1016,29 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         let rgb = col.rgb / max(1.0, maxc);
         out.albedo = vec4<f32>(rgb, col.a);
 
-        // Bloom mask based on how far above 1.0 the color went.
-        let k = smoothstep(1.0, 2.5, maxc);
-        out.bloom = vec4<f32>(rgb * k, 1.0);
+        // Bloom: make response less "linear" (faster near highlights, less uniform).
+        //
+        // Soft knee + exponential curve:
+        // - below threshold => 0
+        // - knee region ramps smoothly
+        // - above knee grows faster
+        let threshold: f32 = 1.05;
+        let knee: f32 = 0.65;
+        let strength: f32 = 1.35;
+        let gamma: f32 = 0.75; // <1 => more punch near threshold
+
+        let over = maxc - threshold;
+        let soft = clamp(over, 0.0, knee);
+        let hard = max(over - knee, 0.0);
+        let bloom_amt = (soft * soft) / max(1e-5, 2.0 * knee) + hard;
+
+        // Map to [0..1) with a strong non-linear ramp.
+        var k = 1.0 - exp(-strength * bloom_amt);
+        k = pow(k, gamma);
+
+        // Keep color energy proportional to highlight overshoot (helps "spread faster").
+        let energy = clamp(bloom_amt, 0.0, 6.0);
+        out.bloom = vec4<f32>(rgb * k * energy, 1.0);
     } else {
         out.albedo = col;
         out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
