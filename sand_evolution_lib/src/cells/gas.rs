@@ -62,6 +62,9 @@ impl CellTrait for Gas {
     fn den(&self) -> i8 {
         -1
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
     fn burnable(&self) -> CellType {
         // Disable "contact ignition" routes (neighbor rules that use burnable()).
         // Gas should ignite via temperature logic instead.

@@ -9,6 +9,9 @@ struct WorldSettings {
     _pad0: f32,
     _pad1: f32,
     _pad2: f32,
+    _pad3: f32,
+    _pad4: f32,
+    _pad5: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;

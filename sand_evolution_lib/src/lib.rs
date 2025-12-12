@@ -486,70 +486,80 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 if evolution_app.simulation_steps_per_second != 0 {
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
-                    if evolution_app.need_to_recompile {
-                        // First, find the entity
-                        let script_entity = game_context.find_entity_by_name(&evolution_app.selected_object_name);
-                        
-                        if let Some(script_entity) = script_entity {
-                            // Get rhai_resource separately
-                            let rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
-                            
-                            if let Some(rhai_resource) = rhai_resource_opt {
-                                if let Some(storage) = &mut rhai_resource.storage {
-                                    // Compile the script of the selected object
-                                    let script_text = evolution_app.get_script().to_owned();
-                                    let result = storage
-                                        .engine
-                                        .compile_with_scope(&mut storage.scope, script_text.as_str());
-                                    
-                                    match result {
-                                        Ok(value) => {
-                                            let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
-                                            if let Some(script) = scripts.get_mut(script_entity) {
-                                                script.ast = Some(value);
-                                                script.script = script_text;
-                                                script.raw = false;
-                                                // If this is a one-shot script, allow it to run again after edit/compile.
-                                                script.has_run = false;
-                                            }
-                                            evolution_app.script_error = "".to_owned();
+                }
+
+                if evolution_app.need_to_recompile {
+                    // First, find the entity
+                    let script_entity =
+                        game_context.find_entity_by_name(&evolution_app.selected_object_name);
+
+                    if let Some(script_entity) = script_entity {
+                        // Get rhai_resource separately
+                        let rhai_resource_opt = game_context.world.get_mut::<RhaiResource>();
+
+                        if let Some(rhai_resource) = rhai_resource_opt {
+                            if let Some(storage) = &mut rhai_resource.storage {
+                                // Compile the script of the selected object
+                                let script_text = evolution_app.get_script().to_owned();
+                                let result = storage
+                                    .engine
+                                    .compile_with_scope(&mut storage.scope, script_text.as_str());
+
+                                match result {
+                                    Ok(value) => {
+                                        let mut scripts = game_context
+                                            .world
+                                            .write_storage::<crate::ecs::components::Script>();
+                                        if let Some(script) = scripts.get_mut(script_entity) {
+                                            script.ast = Some(value);
+                                            script.script = script_text;
+                                            script.raw = false;
+                                            // If this is a one-shot script, allow it to run again after edit/compile.
+                                            script.has_run = false;
                                         }
-                                        Err(err) => {
-                                            let mut scripts = game_context.world.write_storage::<crate::ecs::components::Script>();
-                                            if let Some(script) = scripts.get_mut(script_entity) {
-                                                script.ast = None;
-                                                script.raw = true;
-                                                script.has_run = false;
-                                            }
-                                            evolution_app.script_error = err.to_string()
-                                        }
+                                        evolution_app.script_error = "".to_owned();
                                     }
-                                } else {
-                                    println!("Warning: RhaiResource.storage is None");
+                                    Err(err) => {
+                                        let mut scripts = game_context
+                                            .world
+                                            .write_storage::<crate::ecs::components::Script>();
+                                        if let Some(script) = scripts.get_mut(script_entity) {
+                                            script.ast = None;
+                                            script.raw = true;
+                                            script.has_run = false;
+                                        }
+                                        evolution_app.script_error = err.to_string()
+                                    }
                                 }
                             } else {
-                                println!("Warning: RhaiResource not found in the world");
+                                println!("Warning: RhaiResource.storage is None");
                             }
+                        } else {
+                            println!("Warning: RhaiResource not found in the world");
                         }
                     }
-                    let sim_steps = steps_per_this_frame as i32;
+                }
 
-                    ///
-                    /// UPDATE
-                    ///
-                    let upd_result = game_context.update(
-                        &queue,
-                        sim_steps,
-                        &mut evolution_app,
-                        &event_loop_shared_state,
-                        window.inner_size(),
-                        window.scale_factor(),
-                    );
-                    // dispatch() is now called inside update_tick on each simulation tick
-                    // Keep one call for cases when simulation is not running
-                    if evolution_app.simulation_steps_per_second == 0 {
-                        game_context.dispatch();
-                    }
+                let sim_steps = if evolution_app.simulation_steps_per_second == 0 {
+                    0
+                } else {
+                    steps_per_this_frame as i32
+                };
+
+                // UPDATE (also runs on pause with sim_steps=0, to keep uniforms/UI responsive)
+                let upd_result = game_context.update(
+                    &queue,
+                    sim_steps,
+                    &mut evolution_app,
+                    &event_loop_shared_state,
+                    window.inner_size(),
+                    window.scale_factor(),
+                );
+
+                // dispatch() is now called inside update_tick on each simulation tick
+                // Keep one call for cases when simulation is not running
+                if evolution_app.simulation_steps_per_second == 0 {
+                    game_context.dispatch();
                 }
 
                 _ = game_context.state.render(

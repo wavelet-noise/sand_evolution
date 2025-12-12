@@ -29,4 +29,7 @@ impl CellTrait for Void {
     fn name(&self) -> &str {
         "void"
     }
+    fn casts_shadow(&self) -> bool {
+        false
+    }
 }

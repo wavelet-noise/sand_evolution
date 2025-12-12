@@ -51,6 +51,8 @@ pub struct EvolutionApp {
     pub cursor_position: Option<PhysicalPosition<f64>>,
     pub pressed: bool,
     pub hovered: bool,
+    /// Info about the currently hovered simulation cell (if any).
+    pub hover_info: Option<HoverInfo>,
     script: String, // For backward compatibility - stores the script of the selected object
     pub selected_object_name: String, // Name of the selected object for editing
     last_loaded_object: String, // Last loaded object (for tracking changes)
@@ -63,8 +65,10 @@ pub struct EvolutionApp {
     pub win_files: bool,
     pub win_script_editor: bool,
     pub win_simulation: bool,
+    pub win_graphics: bool,
     pub win_templates: bool, // templates / projects window
     pub win_palette: bool, // palette window
+    pub win_hover: bool, // hover info window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -86,6 +90,14 @@ pub struct EvolutionApp {
     
     // Display mode: Normal or Temperature map
     pub display_mode: DisplayMode,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HoverInfo {
+    pub x: cs::PointType,
+    pub y: cs::PointType,
+    pub cell_id: u8,
+    pub temperature: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,6 +291,7 @@ impl EvolutionApp {
         let mut win_simulation: bool = self.win_simulation;
         let mut win_templates: bool = self.win_templates;
         let mut win_palette: bool = self.win_palette;
+        let mut win_hover: bool = self.win_hover;
         
         // Calculate panel layout only once at startup
         // Using typical screen size (1920x1080) for initial layout
@@ -350,8 +363,10 @@ impl EvolutionApp {
                 toggle_btn(ui, &mut win_script_editor, "📝 Script Editor");
                 toggle_btn(ui, &mut self.show_log_window, "📜 Script Log");
                 toggle_btn(ui, &mut win_simulation, "⏱ Simulation");
+                toggle_btn(ui, &mut self.win_graphics, "🎛 Graphics");
                 toggle_btn(ui, &mut win_templates, "🧩 Templates");
                 toggle_btn(ui, &mut win_palette, "🎨 Palette");
+                toggle_btn(ui, &mut win_hover, "🔎 Hover");
 
                 ui.separator();
 
@@ -388,6 +403,30 @@ impl EvolutionApp {
                         self.display_mode = DisplayMode::Both;
                     }
                 });
+            });
+
+        egui::Window::new("🔎 Hover")
+            .open(&mut win_hover)
+            .default_pos(egui::pos2(340.0, 440.0))
+            .resizable(false)
+            .show(context, |ui| {
+                ui.heading("Hovered cell");
+                ui.add_space(4.0);
+
+                if let Some(info) = self.hover_info {
+                    let cell_name = state
+                        .pal_container
+                        .pal
+                        .get(info.cell_id as usize)
+                        .map(|c| c.name())
+                        .unwrap_or("<unknown>");
+
+                    ui.label(format!("Pos: ({}, {})", info.x, info.y));
+                    ui.label(format!("Cell: {} (id {})", cell_name, info.cell_id));
+                    ui.label(format!("Temp: {:.1}°", info.temperature));
+                } else {
+                    ui.label("Move cursor over the simulation to inspect.");
+                }
             });
 
         egui::Window::new("📁 Files")
@@ -747,6 +786,27 @@ impl EvolutionApp {
                 }
 
                 ui.separator();
+                ui.heading("Day / Night");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut state.day_night.paused, "Pause cycle");
+                    if ui.button("Reset").clicked() {
+                        state.day_night.time_of_day_seconds = 0.0;
+                    }
+                });
+                ui.add(
+                    egui::Slider::new(&mut state.day_night.day_length_seconds, 5.0..=600.0)
+                        .text("Day length (s)"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut state.day_night.speed, 0.0..=20.0).text("Speed"),
+                );
+                ui.label(format!(
+                    "sim_time: {:.1}s | time_of_day: {:.1}s",
+                    state.sim_time_seconds,
+                    state.day_night.time_of_day_seconds
+                ));
+
+                ui.separator();
                 ui.label(format!(
                     "fps: {}",
                     compact_number_string(fps_meter.next() as f32)
@@ -807,6 +867,38 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         self.win_simulation = win_simulation;
+
+        // Graphics settings window
+        let mut win_graphics: bool = self.win_graphics;
+        egui::Window::new("🎛 Graphics")
+            .open(&mut win_graphics)
+            .default_pos(egui::pos2(300.0, 10.0))
+            .default_size(egui::vec2(320.0, 220.0))
+            .resizable(true)
+            .show(context, |ui| {
+                ui.heading("Shadows");
+                ui.add_space(6.0);
+
+                ui.add(
+                    // 0..1 = normal strength, 1..2 = push towards pure black.
+                    egui::Slider::new(&mut state.day_night.shadow_strength, 0.0..=2.0)
+                        .text("Strength"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.day_night.shadow_length_steps, 1.0..=64.0)
+                        .text("Length (steps)"),
+                );
+
+                ui.add(
+                    egui::Slider::new(&mut state.day_night.shadow_distance_falloff, 0.0..=4.0)
+                        .text("Distance falloff"),
+                );
+
+                ui.label("Tip: falloff=0 disables distance attenuation.");
+                *any_win_hovered |= context.is_pointer_over_area();
+            });
+        self.win_graphics = win_graphics;
         // Separate window for GitHub templates / projects
         egui::Window::new("🧩 Templates")
             .open(&mut win_templates)
@@ -1109,6 +1201,7 @@ impl EvolutionApp {
             });
         
         self.win_palette = win_palette;
+        self.win_hover = win_hover;
     }
     
     fn show_toasts(&mut self, ctx: &Context) {
@@ -1243,6 +1336,7 @@ impl EvolutionApp {
             cursor_position: None,
             pressed: false,
             hovered: false,
+            hover_info: None,
             executor,
             script: r"let a = 0; for i in 0..10 { a += i; };".to_owned(),
             selected_object_name: "World Script".to_owned(),
@@ -1254,8 +1348,10 @@ impl EvolutionApp {
             win_files: true,
             win_script_editor: false,
             win_simulation: false,
+            win_graphics: false,
             win_templates: false,
             win_palette: true, // Palette window open by default
+            win_hover: true,
 
             projects: crate::projects::demo_projects(),
             selected_project: None,

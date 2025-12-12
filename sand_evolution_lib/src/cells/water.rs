@@ -99,6 +99,12 @@ impl CellTrait for Water {
         1
     }
 
+    fn shadow_rgba(&self) -> [u8; 4] {
+        // Water should cast a softer, slightly bluish shadow (semi-transparent occluder).
+        // RGB is a multiplier (255 = no darkening), A controls how strongly it affects shadows.
+        [210, 225, 255, 255]
+    }
+
     fn name(&self) -> &str {
         "water"
     }

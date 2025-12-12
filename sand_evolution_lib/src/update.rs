@@ -9,9 +9,18 @@ use std::rc::Rc;
 use specs::RunNow;
 
 fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
-    let frame_start_time = (instant::now() - state.start_time) / 1000.0;
-
-    storage.scope.set_value("time", frame_start_time);
+    // Make `time` deterministic and tied to simulation time (starts from 0).
+    // If scripts need wall clock, they should derive it themselves.
+    let frame_time = state.sim_time_seconds as f32;
+    storage.scope.set_value("time", frame_time);
+    storage.scope
+        .set_value("sim_time", state.sim_time_seconds as f32);
+    storage
+        .scope
+        .set_value("time_of_day", state.day_night.time_of_day_seconds);
+    storage
+        .scope
+        .set_value("day_length", state.day_night.day_length_seconds);
     storage.scope.set_value("frame", state.frame);
     // Re-set GRID_WIDTH and GRID_HEIGHT after scope.clear() - scripts need these variables
     storage.scope.set_value("GRID_WIDTH", 1024i64);
@@ -52,12 +61,32 @@ pub fn update_tick(
     
     for _sim_update in 0..sim_steps {
         state.tick += 1;
+
+        // Advance simulation time + day/night cycle (simulation-time based).
+        state.sim_time_seconds += one_tick_delta;
+        let (sun_x, sun_y) = state.day_night.advance(one_tick_delta as f32);
+        state.world_settings._pad0 = sun_x;
+        state.world_settings._pad1 = sun_y;
+        // Shadow params for shader:
+        // - _pad2: strength (0..2), where >1 pushes shadows towards pure black
+        // - _pad3: length in raymarch steps (1..64)
+        // - _pad4: distance falloff exponent (0 disables distance attenuation)
+        state.world_settings._pad2 = state.day_night.shadow_strength.clamp(0.0, 2.0);
+        state.world_settings._pad3 = state.day_night.shadow_length_steps.clamp(1.0, 64.0);
+        state.world_settings._pad4 = state.day_night.shadow_distance_falloff.clamp(0.0, 4.0);
+
         if state.toggled {
             // Set the tick variable in scope and update state pointer
             {
                 if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
                     if let Some(storage) = &mut rhai_resource.storage {
                         storage.scope.set_value("tick", state.tick);
+                        storage
+                            .scope
+                            .set_value("sim_time", state.sim_time_seconds as f32);
+                        storage
+                            .scope
+                            .set_value("time_of_day", state.day_night.time_of_day_seconds);
                         // Update state pointer each tick to ensure it's valid
                         let state_ptr: *mut State = state;
                         storage.state_ptr.set(state_ptr);
