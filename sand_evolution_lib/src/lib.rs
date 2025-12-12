@@ -164,6 +164,70 @@ pub struct GameContext {
     pub state: State,
 }
 
+pub(crate) fn init_hardcoded_entities(world: &mut specs::World) {
+    // Create an object for the world script
+    world
+        .create_entity()
+        .with(Name {
+            name: "World Script".to_owned(),
+        })
+        .with(Script {
+            script: "".to_owned(),
+            ast: None,
+            raw: true,
+            script_type: ScriptType::World,
+            run_once: false,
+            has_run: false,
+        })
+        .build();
+
+    // Create a Dummy entity for testing
+    world
+        .create_entity()
+        .with(Name {
+            name: "Dummy".to_owned(),
+        })
+        .with(Position { x: 100.0, y: 200.0 })
+        .with(Velocity { x: 1.0, y: 0.0 })
+        .with(Script {
+            script: r#"// Dummy object script
+// This is a test entity with Position, Velocity and Script components
+"#
+            .to_owned(),
+            ast: None,
+            raw: true,
+            script_type: ScriptType::Entity,
+            run_once: false,
+            has_run: false,
+        })
+        .build();
+
+    // Create Cooler entity - cools the top row of cells every tick
+    world
+        .create_entity()
+        .with(Name {
+            name: "Cooler".to_owned(),
+        })
+        .with(Script {
+            script: r#"// Cooler object script - cools the top row of cells every tick
+let top_row_y = 511;
+let cool_temp = -10.0;
+
+// Cool all cells in the top row every tick
+for x in 0..GRID_WIDTH {
+    set_temperature(x, top_row_y, cool_temp);
+}
+"#
+            .to_owned(),
+            ast: None,
+            raw: true,
+            script_type: ScriptType::Entity,
+            run_once: false,
+            has_run: false,
+        })
+        .build();
+}
+
 impl GameContext {
     pub fn new(state: State) -> Self {
         let mut world = specs::World::new();
@@ -185,67 +249,7 @@ impl GameContext {
             .build();
         dispatcher.setup(&mut world);
 
-        // Create an object for the world script
-        world
-            .create_entity()
-            .with(Name {
-                name: "World Script".to_owned(),
-            })
-            .with(Script {
-                script: "".to_owned(),
-                ast: None,
-                raw: true,
-                script_type: ScriptType::World,
-                run_once: false,
-                has_run: false,
-            })
-            .build();
-
-        // Create a Dummy entity for testing
-        world
-            .create_entity()
-            .with(Name {
-                name: "Dummy".to_owned(),
-            })
-            .with(Position { x: 100.0, y: 200.0 })
-            .with(Velocity { x: 1.0, y: 0.0 })
-            .with(Script {
-                script: r#"// Dummy object script
-// This is a test entity with Position, Velocity and Script components
-"#
-                .to_owned(),
-                ast: None,
-                raw: true,
-                script_type: ScriptType::Entity,
-                run_once: false,
-                has_run: false,
-            })
-            .build();
-
-        // Create Cooler entity - cools the top row of cells every tick
-        world
-            .create_entity()
-            .with(Name {
-                name: "Cooler".to_owned(),
-            })
-            .with(Script {
-                script: r#"// Cooler object script - cools the top row of cells every tick
-let top_row_y = 511;
-let cool_temp = -10.0;
-
-// Cool all cells in the top row every tick
-for x in 0..GRID_WIDTH {
-    set_temperature(x, top_row_y, cool_temp);
-}
-"#
-                .to_owned(),
-                ast: None,
-                raw: true,
-                script_type: ScriptType::Entity,
-                run_once: false,
-                has_run: false,
-            })
-            .build();
+        init_hardcoded_entities(&mut world);
 
         GameContext {
             world,
@@ -710,6 +714,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                         }
                     }
                     evolution_app.project_loading = false;
+                }
+                UserEventInfo::ResetWorldEntitiesToHardcoded => {
+                    evolution_app.reset_world_entities_to_hardcoded(&mut game_context.world);
                 }
                 UserEventInfo::SceneImport(bytes) => {
                     match String::from_utf8(bytes) {
