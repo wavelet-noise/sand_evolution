@@ -52,7 +52,7 @@ impl CellTrait for Laser {
         }
 
         if prng.next() < 200 {
-            return
+            return;
         } else {
             container[cur] = Void::id();
         }

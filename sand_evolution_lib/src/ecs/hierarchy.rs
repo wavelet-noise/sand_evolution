@@ -88,4 +88,3 @@ pub fn delete_subtree(world: &mut World, root: Entity) -> Vec<Entity> {
 
     subtree
 }
-

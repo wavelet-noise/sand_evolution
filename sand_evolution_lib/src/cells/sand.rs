@@ -3,10 +3,8 @@ use crate::cells::salty_water::SaltyWater;
 use crate::cs::PointType;
 
 use super::{
-    CellRegistry,
-    CellTrait,
-    CellType,
-    gas::Gas, helper::sand_falling_helper, Prng, TemperatureContext,
+    gas::Gas, helper::sand_falling_helper, CellRegistry, CellTrait, CellType, Prng,
+    TemperatureContext,
 };
 
 pub struct Sand;

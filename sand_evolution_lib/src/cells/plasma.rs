@@ -52,7 +52,8 @@ impl CellTrait for Plasma {
             }
         }
 
-        if prng.next() > 200 && fluid_falling_helper(self.den(), i, j, container, _pal_container, cur, prng, 10)
+        if prng.next() > 200
+            && fluid_falling_helper(self.den(), i, j, container, _pal_container, cur, prng, 10)
         {
             return;
         }

@@ -1,15 +1,22 @@
 pub mod acid;
+mod base_water;
+pub mod black_hole;
 pub mod burning_coal;
 pub mod burning_gas;
 pub mod burning_wood;
 pub mod coal;
 pub mod crushed_ice;
+mod delute_acid;
+pub mod earth;
 pub mod electricity;
 pub mod fire;
 pub mod gas;
+mod grass;
+pub mod gravel;
 mod helper;
 pub mod ice;
 pub mod liquid_gas;
+mod salty_water;
 pub mod sand;
 pub mod snow;
 pub mod steam;
@@ -17,35 +24,33 @@ pub mod stone;
 pub mod void;
 pub mod water;
 pub mod wood;
-pub mod black_hole;
-mod base_water;
-mod salty_water;
-mod delute_acid;
-mod grass;
 
 mod laser;
 
 mod dry_grass;
 mod plasma;
 
-use crate::cells::electricity::Electricity;
-use std::collections::HashMap;
-use base_water::BaseWater;
-use delute_acid::DeluteAcid;
-use salty_water::SaltyWater;
 use crate::cells::dry_grass::DryGrass;
+use crate::cells::electricity::Electricity;
 use crate::cells::grass::Grass;
 use crate::cells::laser::Laser;
 use crate::cells::plasma::Plasma;
 use crate::cs::{self, PointType};
+use base_water::BaseWater;
+use delute_acid::DeluteAcid;
+use salty_water::SaltyWater;
+use std::collections::HashMap;
 
 use self::{
     acid::Acid,
+    black_hole::BlackHole,
     burning_coal::BurningCoal,
     burning_gas::BurningGas,
     coal::Coal,
     crushed_ice::CrushedIce,
+    earth::Earth,
     gas::Gas,
+    gravel::Gravel,
     helper::sand_falling_helper,
     ice::Ice,
     liquid_gas::LiquidGas,
@@ -55,7 +60,6 @@ use self::{
     void::Void,
     water::Water,
     wood::Wood,
-    black_hole::BlackHole,
 };
 pub type CellType = u8;
 
@@ -85,7 +89,11 @@ impl Prng {
 
     pub fn next(&mut self) -> u8 {
         self.rnd_next += 1;
-        self.rnd_next = if self.rnd_next >= 256 { 0 } else { self.rnd_next };
+        self.rnd_next = if self.rnd_next >= 256 {
+            0
+        } else {
+            self.rnd_next
+        };
         self.rnd[self.rnd_next]
     }
 
@@ -213,6 +221,8 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[15] = SaltyWater::boxed();
     cell_registry.pal[16] = BaseWater::boxed();
     cell_registry.pal[17] = LiquidGas::boxed();
+    cell_registry.pal[18] = Earth::boxed();
+    cell_registry.pal[19] = Gravel::boxed();
     cell_registry.pal[50] = Wood::boxed();
     cell_registry.pal[55] = Ice::boxed();
     cell_registry.pal[56] = CrushedIce::boxed();

@@ -1172,31 +1172,47 @@ impl State {
         // Tuned to avoid rapid global heat "flooding" from local sources (fire/wood).
         let diffusion_rate = 0.10;
         let cooling_rate = 0.998;
-        
+
         // Work directly with the reduced grid
         let width = (cs::SECTOR_SIZE.x / 4) as usize;
         let height = (cs::SECTOR_SIZE.y / 4) as usize;
-        
+
         // Create temporary buffer for new temperatures
         let mut new_temps = vec![0.0f32; width * height];
-        
+
         // Process all cells of the reduced grid
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
                 let current = self.cell_temperatures.get(idx).copied().unwrap_or(0.0);
-                
+
                 // Get temperatures of neighboring cells in the reduced grid
                 let top_idx = (ty + 1) * width + tx;
                 let bot_idx = (ty - 1) * width + tx;
                 let left_idx = ty * width + (tx - 1);
                 let right_idx = ty * width + (tx + 1);
-                
-                let top_temp = self.cell_temperatures.get(top_idx).copied().unwrap_or(current);
-                let bot_temp = self.cell_temperatures.get(bot_idx).copied().unwrap_or(current);
-                let left_temp = self.cell_temperatures.get(left_idx).copied().unwrap_or(current);
-                let right_temp = self.cell_temperatures.get(right_idx).copied().unwrap_or(current);
-                
+
+                let top_temp = self
+                    .cell_temperatures
+                    .get(top_idx)
+                    .copied()
+                    .unwrap_or(current);
+                let bot_temp = self
+                    .cell_temperatures
+                    .get(bot_idx)
+                    .copied()
+                    .unwrap_or(current);
+                let left_temp = self
+                    .cell_temperatures
+                    .get(left_idx)
+                    .copied()
+                    .unwrap_or(current);
+                let right_temp = self
+                    .cell_temperatures
+                    .get(right_idx)
+                    .copied()
+                    .unwrap_or(current);
+
                 // Simple diffusion: average with neighbors
                 let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
                 let diffused = current + (avg - current) * diffusion_rate;
@@ -1205,11 +1221,11 @@ impl State {
                 let eff = new_local + self.global_temperature;
                 let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
                 let new_temp = clamped - self.global_temperature;
-                
+
                 new_temps[idx] = new_temp;
             }
         }
-        
+
         // Apply new temperatures
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
@@ -1266,13 +1282,12 @@ impl State {
         shared_state: &Rc<RefCell<SharedState>>,
         size: PhysicalSize<u32>,
         scale_factor: f64,
-    ) -> UpdateResult
-    {
+    ) -> UpdateResult {
         let update_start_time = instant::now();
         // Shader time is simulation-time based (deterministic, starts at 0).
         // This makes time "fixed at start" and independent from wall clock.
         self.world_settings.time = self.sim_time_seconds as f32;
-        
+
         // Update display mode from evolution_app
         self.world_settings.display_mode = match evolution_app.display_mode {
             crate::evolution_app::DisplayMode::Normal => 0.0,
@@ -1394,17 +1409,17 @@ impl State {
             },
             texture_size,
         );
-        
+
         // Upload temperature data to GPU - write directly from the reduced grid
         let temp_width = dimensions.0 / 4;
         let temp_height = dimensions.1 / 4;
-        
+
         let temp_texture_size = wgpu::Extent3d {
             width: temp_width,
             height: temp_height,
             depth_or_array_layers: 1,
         };
-        
+
         queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.temperature_texture,
@@ -1420,7 +1435,7 @@ impl State {
             },
             temp_texture_size,
         );
-        
+
         UpdateResult {
             simulation_step_average_time,
             update_time: instant::now() - update_start_time,

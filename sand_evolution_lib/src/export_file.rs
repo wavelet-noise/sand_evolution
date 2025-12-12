@@ -48,10 +48,8 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     blob_parts.push(&buffer);
     let mut blob_options = BlobPropertyBag::new();
     blob_options.set_type("text/plain");
-    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
-        &blob_parts,
-        &blob_options,
-    ).map_err(|e| format!("Failed to create blob: {:?}", e))?;
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&blob_parts, &blob_options)
+        .map_err(|e| format!("Failed to create blob: {:?}", e))?;
 
     // Create object URL from blob
     let url = Url::create_object_url_with_blob(&blob)
@@ -78,10 +76,12 @@ pub fn code_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
         let _ = Url::revoke_object_url(&url_clone);
     }) as Box<dyn FnMut()>);
-    window.set_timeout_with_callback_and_timeout_and_arguments_0(
-        closure.as_ref().unchecked_ref(),
-        100,
-    ).map_err(|e| format!("Failed to set timeout: {:?}", e))?;
+    window
+        .set_timeout_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            100,
+        )
+        .map_err(|e| format!("Failed to set timeout: {:?}", e))?;
     closure.forget();
 
     Ok(())
@@ -102,11 +102,8 @@ pub fn scene_to_file(data: &str) -> Result<(), Box<dyn Error>> {
     blob_parts.push(&buffer);
     let mut blob_options = BlobPropertyBag::new();
     blob_options.set_type("text/plain");
-    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
-        &blob_parts,
-        &blob_options,
-    )
-    .map_err(|e| format!("Failed to create blob: {:?}", e))?;
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&blob_parts, &blob_options)
+        .map_err(|e| format!("Failed to create blob: {:?}", e))?;
 
     // Create object URL from blob
     let url = Url::create_object_url_with_blob(&blob)
@@ -163,12 +160,12 @@ pub fn write_to_file(
 pub fn write_to_file(
     data: &image::ImageBuffer<image::Luma<u8>, Vec<u8>>,
 ) -> Result<(), Box<dyn Error>> {
-    use std::io::Cursor;
     use js_sys::Uint8Array;
+    use std::io::Cursor;
 
     let mut buffer = Vec::new();
     let mut cursor = Cursor::new(&mut buffer);
-    
+
     // Convert ImageBuffer to DynamicImage and save as PNG
     let dynamic_image = image::DynamicImage::ImageLuma8(data.clone());
     dynamic_image.write_to(&mut cursor, image::ImageOutputFormat::Png)?;
@@ -185,10 +182,8 @@ pub fn write_to_file(
     blob_parts.push(&uint8_array);
     let mut blob_options = BlobPropertyBag::new();
     blob_options.set_type("image/png");
-    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
-        &blob_parts,
-        &blob_options,
-    ).map_err(|e| format!("Failed to create blob: {:?}", e))?;
+    let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&blob_parts, &blob_options)
+        .map_err(|e| format!("Failed to create blob: {:?}", e))?;
 
     // Create object URL from blob
     let url = Url::create_object_url_with_blob(&blob)
@@ -215,10 +210,12 @@ pub fn write_to_file(
     let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
         let _ = Url::revoke_object_url(&url_clone);
     }) as Box<dyn FnMut()>);
-    window.set_timeout_with_callback_and_timeout_and_arguments_0(
-        closure.as_ref().unchecked_ref(),
-        100,
-    ).map_err(|e| format!("Failed to set timeout: {:?}", e))?;
+    window
+        .set_timeout_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            100,
+        )
+        .map_err(|e| format!("Failed to set timeout: {:?}", e))?;
     closure.forget();
 
     Ok(())

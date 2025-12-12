@@ -1,5 +1,5 @@
-use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cells::helper::fluid_falling_helper;
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cs::PointType;
 
 pub struct SaltyWater;

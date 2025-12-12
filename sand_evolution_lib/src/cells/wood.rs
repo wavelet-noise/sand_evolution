@@ -2,7 +2,10 @@ use crate::cs::PointType;
 
 use crate::cs;
 
-use super::{{burning_wood, gas::Gas, void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
+use super::{
+    burning_wood, gas::Gas, steam::Steam, void::Void, CellRegistry, CellTrait, CellType, Prng,
+    TemperatureContext,
+};
 
 pub struct Wood;
 impl Wood {
@@ -48,10 +51,18 @@ impl CellTrait for Wood {
         // Wood can auto-ignite only when very hot (environment ignition).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // Keep auto-ignition high, and make it rare: otherwise it behaves like gunpowder.
             if temperature >= 320.0 && prng.next() > 200 && has_adjacent_air(i, j, container) {
                 container[cur] = burning_wood::id();
+                // When wood ignites into burning wood, it may release steam upward if there is space.
+                // Chance: 1/5.
+                if j + 1 < cs::SECTOR_SIZE.y {
+                    let top = cs::xy_to_index(i, j + 1);
+                    if container[top] == Void::id() && (prng.next() % 5) == 0 {
+                        container[top] = Steam::id();
+                    }
+                }
                 return;
             }
         }

@@ -110,7 +110,8 @@ mod github {
         }
 
         let text_js = JsFuture::from(toml_resp.text()?).await?;
-        let toml_text = text_js.as_string()
+        let toml_text = text_js
+            .as_string()
             .ok_or_else(|| JsValue::from_str("projects.toml is not a valid string"))?;
 
         let project_list: ProjectList = toml::from_str(&toml_text)
@@ -132,66 +133,51 @@ mod github {
         if let Some(image_url) = &project.image_url {
             // Image loading is optional - if it fails, we continue without it but report the error
             match JsFuture::from(window.fetch_with_str(image_url)).await {
-                Ok(resp_value) => {
-                    match resp_value.dyn_into::<web_sys::Response>() {
-                        Ok(resp) => {
-                            if resp.ok() {
-                                match resp.array_buffer() {
-                                    Ok(buffer_future) => {
-                                        match JsFuture::from(buffer_future).await {
-                                            Ok(buffer) => {
-                                                match buffer.dyn_into::<js_sys::ArrayBuffer>() {
-                                                    Ok(array_buffer) => {
-                                                        let array = js_sys::Uint8Array::new(&array_buffer);
-                                                        let mut bytes = vec![0u8; array.length() as usize];
-                                                        array.copy_to(&mut bytes[..]);
-                                                        image_bytes = Some(bytes);
-                                                    }
-                                                    Err(e) => {
-                                                        image_error = Some(format!(
-                                                            "Failed to convert image buffer: {:?}",
-                                                            e
-                                                        ));
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                image_error = Some(format!(
-                                                    "Failed to read image buffer: {:?}",
-                                                    e
-                                                ));
-                                            }
+                Ok(resp_value) => match resp_value.dyn_into::<web_sys::Response>() {
+                    Ok(resp) => {
+                        if resp.ok() {
+                            match resp.array_buffer() {
+                                Ok(buffer_future) => match JsFuture::from(buffer_future).await {
+                                    Ok(buffer) => match buffer.dyn_into::<js_sys::ArrayBuffer>() {
+                                        Ok(array_buffer) => {
+                                            let array = js_sys::Uint8Array::new(&array_buffer);
+                                            let mut bytes = vec![0u8; array.length() as usize];
+                                            array.copy_to(&mut bytes[..]);
+                                            image_bytes = Some(bytes);
                                         }
-                                    }
+                                        Err(e) => {
+                                            image_error = Some(format!(
+                                                "Failed to convert image buffer: {:?}",
+                                                e
+                                            ));
+                                        }
+                                    },
                                     Err(e) => {
-                                        image_error = Some(format!(
-                                            "Failed to get image array buffer: {:?}",
-                                            e
-                                        ));
+                                        image_error =
+                                            Some(format!("Failed to read image buffer: {:?}", e));
                                     }
+                                },
+                                Err(e) => {
+                                    image_error =
+                                        Some(format!("Failed to get image array buffer: {:?}", e));
                                 }
-                            } else {
-                                let status = resp.status();
-                                let status_text = resp.status_text();
-                                image_error = Some(format!(
-                                    "Image request failed: {} {} for URL: {}",
-                                    status, status_text, image_url
-                                ));
                             }
-                        }
-                        Err(e) => {
+                        } else {
+                            let status = resp.status();
+                            let status_text = resp.status_text();
                             image_error = Some(format!(
-                                "Failed to convert image response: {:?}",
-                                e
+                                "Image request failed: {} {} for URL: {}",
+                                status, status_text, image_url
                             ));
                         }
                     }
-                }
+                    Err(e) => {
+                        image_error = Some(format!("Failed to convert image response: {:?}", e));
+                    }
+                },
                 Err(e) => {
-                    image_error = Some(format!(
-                        "Failed to fetch image from {}: {:?}",
-                        image_url, e
-                    ));
+                    image_error =
+                        Some(format!("Failed to fetch image from {}: {:?}", image_url, e));
                 }
             }
         }
@@ -217,5 +203,3 @@ mod github {
 
 #[cfg(target_arch = "wasm32")]
 pub use github::{fetch_github_projects, fetch_project_assets};
-
-

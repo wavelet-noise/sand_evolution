@@ -1,4 +1,4 @@
-use super::{*, helper::fluid_falling_helper, TemperatureContext};
+use super::{helper::fluid_falling_helper, TemperatureContext, *};
 use crate::cs::PointType;
 
 pub struct LiquidGas;
@@ -28,7 +28,7 @@ impl CellTrait for LiquidGas {
         // Check temperature BEFORE falling
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // Liquid gas evaporates back to gas at temperature above -30
             // with probability to avoid instant evaporation
             if temperature > -5.0 && prng.next() < 30 {
@@ -42,7 +42,7 @@ impl CellTrait for LiquidGas {
                 return;
             }
         }
-        
+
         // Liquid gas behaves like a liquid
         fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 1);
     }

@@ -38,10 +38,20 @@ impl<'a> System<'a> for EntityScriptSystem {
         Write<'a, RhaiResource>,
     );
 
-    fn run(&mut self, (entities, mut scripts, positions, names, mut rhai_resource): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, mut scripts, positions, names, mut rhai_resource): Self::SystemData,
+    ) {
         if let Some(rhai) = &mut rhai_resource.storage {
             // Unified processing of all scripts
-            Self::compile_and_run_all_scripts(&entities, &mut scripts, &positions, &names, &rhai.engine, &mut rhai.scope);
+            Self::compile_and_run_all_scripts(
+                &entities,
+                &mut scripts,
+                &positions,
+                &names,
+                &rhai.engine,
+                &mut rhai.scope,
+            );
         }
     }
 }
@@ -86,7 +96,7 @@ impl EntityScriptSystem {
                 }
             }
         }
-        
+
         for (entity, script_text) in entities_to_compile {
             // Now we can get mutable access
             if let Some(script) = scripts.get_mut(entity) {

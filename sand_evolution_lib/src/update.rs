@@ -1,19 +1,20 @@
+use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::evolution_app::EvolutionApp;
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
+use crate::rhai_lib;
 use crate::shared_state::SharedState;
 use crate::{cs, State};
-use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
-use crate::rhai_lib;
+use specs::RunNow;
 use std::cell::RefCell;
 use std::rc::Rc;
-use specs::RunNow;
 
 fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
     // Make `time` deterministic and tied to simulation time (starts from 0).
     // If scripts need wall clock, they should derive it themselves.
     let frame_time = state.sim_time_seconds as f32;
     storage.scope.set_value("time", frame_time);
-    storage.scope
+    storage
+        .scope
         .set_value("sim_time", state.sim_time_seconds as f32);
     storage
         .scope
@@ -45,7 +46,7 @@ pub fn update_tick(
     _ = getrandom::getrandom(&mut buf);
 
     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-    
+
     // Set frame variables once before the loop
     if state.toggled {
         if let Some(rhai_resource) = world.get_mut::<RhaiResource>() {
@@ -58,7 +59,7 @@ pub fn update_tick(
             }
         }
     }
-    
+
     for _sim_update in 0..sim_steps {
         state.tick += 1;
 
@@ -72,8 +73,10 @@ pub fn update_tick(
         // - shadow_length_steps: length in raymarch steps (1..64)
         // - shadow_distance_falloff: distance falloff exponent (0 disables distance attenuation)
         state.world_settings.shadow_strength = state.day_night.shadow_strength.clamp(0.0, 2.0);
-        state.world_settings.shadow_length_steps = state.day_night.shadow_length_steps.clamp(1.0, 64.0);
-        state.world_settings.shadow_distance_falloff = state.day_night.shadow_distance_falloff.clamp(0.0, 4.0);
+        state.world_settings.shadow_length_steps =
+            state.day_night.shadow_length_steps.clamp(1.0, 64.0);
+        state.world_settings.shadow_distance_falloff =
+            state.day_night.shadow_distance_falloff.clamp(0.0, 4.0);
 
         if state.toggled {
             // Set the tick variable in scope and update state pointer
@@ -101,7 +104,7 @@ pub fn update_tick(
                     }
                 }
             }
-            
+
             // Execute ECS systems on each simulation tick
             // This includes EntityScriptSystem, which executes object scripts
             // Call systems after releasing the borrow of rhai_resource
@@ -110,17 +113,17 @@ pub fn update_tick(
                 let mut script_system = EntityScriptSystem;
                 script_system.run_now(world);
                 world.maintain();
-                
+
                 let mut gravity_system = GravitySystem;
                 gravity_system.run_now(world);
                 world.maintain();
-                
+
                 let mut move_system = MoveSystem;
                 move_system.run_now(world);
                 world.maintain();
             }
         }
-        
+
         for (p, c) in shared_state.borrow_mut().points.iter() {
             if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
                 && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
@@ -149,12 +152,14 @@ pub fn update_tick(
         // Use a pointer to work around borrowing issues
         let state_ptr: *mut State = state;
         let mut temp_context = crate::cells::TemperatureContext {
-            get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| {
-                unsafe { (*state_ptr).get_temperature(x, y) }
+            get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| unsafe {
+                (*state_ptr).get_temperature(x, y)
             }),
-            add_temp: Box::new(move |x: cs::PointType, y: cs::PointType, delta: f32| {
-                unsafe { (*state_ptr).add_temperature(x, y, delta); }
-            }),
+            add_temp: Box::new(
+                move |x: cs::PointType, y: cs::PointType, delta: f32| unsafe {
+                    (*state_ptr).add_temperature(x, y, delta);
+                },
+            ),
         };
 
         for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
@@ -177,11 +182,22 @@ pub fn update_tick(
                 // acid (9), gas (10), burning gas (11), diluted acid (12), liquid gas (17),
                 // wood (50), ice (55), crushed ice (56), snow (57)
                 // For other cells pass None for optimization
-                let needs_temp = cur_v == 2 || cur_v == 3 || cur_v == 4 || cur_v == 6 || 
-                                 cur_v == 7 || cur_v == 8 || cur_v == 9 || cur_v == 10 ||
-                                 cur_v == 11 || cur_v == 12 || cur_v == 17 || cur_v == 50 ||
-                                 cur_v == 55 || cur_v == 56 || cur_v == 57;
-                
+                let needs_temp = cur_v == 2
+                    || cur_v == 3
+                    || cur_v == 4
+                    || cur_v == 6
+                    || cur_v == 7
+                    || cur_v == 8
+                    || cur_v == 9
+                    || cur_v == 10
+                    || cur_v == 11
+                    || cur_v == 12
+                    || cur_v == 17
+                    || cur_v == 50
+                    || cur_v == 55
+                    || cur_v == 56
+                    || cur_v == 57;
+
                 state.pal_container.pal[cur_v as usize].update(
                     i,
                     j,
@@ -189,7 +205,11 @@ pub fn update_tick(
                     state.diffuse_rgba.as_mut(),
                     &state.pal_container,
                     &mut state.prng,
-                    if needs_temp { Some(&mut temp_context) } else { None },
+                    if needs_temp {
+                        Some(&mut temp_context)
+                    } else {
+                        None
+                    },
                 );
             }
         }

@@ -10,11 +10,12 @@ pub mod shared_state;
 pub mod state;
 pub mod update;
 
-pub mod resources;
 pub mod projects;
-pub mod rhai_lib;
 mod random;
+pub mod resources;
+pub mod rhai_lib;
 
+use crate::evolution_app::UserEventInfo;
 use ::egui::FontDefinitions;
 use chrono::Timelike;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
@@ -23,18 +24,17 @@ use evolution_app::EvolutionApp;
 use fps_meter::FpsMeter;
 use state::State;
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use winit::event::Event::*;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use crate::evolution_app::UserEventInfo;
 const INITIAL_WIDTH: u32 = 1920;
 const INITIAL_HEIGHT: u32 = 1080;
 
 #[derive(Debug)]
 struct CellTypeNotFound {
-    name: String
+    name: String,
 }
 
 impl Display for CellTypeNotFound {
@@ -93,9 +93,9 @@ const VERTICES: &[Vertex] = &[
 ];
 
 #[cfg(target_arch = "wasm32")]
-use web_sys::{Navigator, Window};
-#[cfg(target_arch = "wasm32")]
 use crate::export_file::code_to_file;
+#[cfg(target_arch = "wasm32")]
+use web_sys::{Navigator, Window};
 #[cfg(target_arch = "wasm32")]
 pub fn copy_text_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
     code_to_file(&text.to_owned())?;
@@ -113,20 +113,21 @@ pub async fn copy_text_from_clipboard_async() -> Result<String, Box<dyn std::err
     use wasm_bindgen::JsCast;
     use wasm_bindgen_futures::JsFuture;
     use web_sys::Clipboard;
-    
+
     let window = web_sys::window().ok_or("No window")?;
     let navigator = window.navigator();
     let clipboard_js = js_sys::Reflect::get(&navigator, &"clipboard".into())
         .map_err(|e| format!("Failed to get clipboard: {:?}", e))?;
-    let clipboard: Clipboard = clipboard_js.dyn_into()
+    let clipboard: Clipboard = clipboard_js
+        .dyn_into()
         .map_err(|e| format!("Failed to cast to Clipboard: {:?}", e))?;
-    
+
     let promise = clipboard.read_text();
     let js_value = JsFuture::from(promise)
         .await
         .map_err(|e| format!("Clipboard read error: {:?}", e))?;
     let text = js_value.as_string().ok_or("Failed to get text")?;
-    
+
     Ok(text)
 }
 
@@ -147,7 +148,9 @@ pub fn copy_text_from_clipboard() -> Result<String, Box<dyn std::error::Error>> 
     ctx.get_contents()
 }
 
-use crate::ecs::components::{Children, Name, Parent, Position, Script, ScriptType, Velocity, Rotation, Scale};
+use crate::ecs::components::{
+    Children, Name, Parent, Position, Rotation, Scale, Script, ScriptType, Velocity,
+};
 use crate::ecs::systems::{EntityScriptSystem, GravitySystem, MoveSystem};
 use crate::resources::rhai_resource::{RhaiResource, RhaiResourceStorage};
 use crate::state::UpdateResult;
@@ -164,7 +167,7 @@ pub struct GameContext {
 impl GameContext {
     pub fn new(state: State) -> Self {
         let mut world = specs::World::new();
-        
+
         // Register all components
         world.register::<Name>();
         world.register::<Script>();
@@ -174,7 +177,7 @@ impl GameContext {
         world.register::<Scale>();
         world.register::<Parent>();
         world.register::<Children>();
-        
+
         let mut dispatcher = specs::DispatcherBuilder::new()
             .with(EntityScriptSystem, "entity_script__system", &[])
             .with(GravitySystem, "gravity_system", &[])
@@ -204,18 +207,13 @@ impl GameContext {
             .with(Name {
                 name: "Dummy".to_owned(),
             })
-            .with(Position {
-                x: 100.0,
-                y: 200.0,
-            })
-            .with(Velocity {
-                x: 1.0,
-                y: 0.0,
-            })
+            .with(Position { x: 100.0, y: 200.0 })
+            .with(Velocity { x: 1.0, y: 0.0 })
             .with(Script {
                 script: r#"// Dummy object script
 // This is a test entity with Position, Velocity and Script components
-"#.to_owned(),
+"#
+                .to_owned(),
                 ast: None,
                 raw: true,
                 script_type: ScriptType::Entity,
@@ -239,7 +237,8 @@ let cool_temp = -10.0;
 for x in 0..GRID_WIDTH {
     set_temperature(x, top_row_y, cool_temp);
 }
-"#.to_owned(),
+"#
+                .to_owned(),
                 ast: None,
                 raw: true,
                 script_type: ScriptType::Entity,
@@ -247,7 +246,6 @@ for x in 0..GRID_WIDTH {
                 has_run: false,
             })
             .build();
-
 
         GameContext {
             world,
@@ -265,7 +263,7 @@ for x in 0..GRID_WIDTH {
         use specs::Join;
         let names = self.world.read_storage::<Name>();
         let entities = self.world.entities();
-        
+
         for (entity, name_comp) in (&entities, &names).join() {
             if name_comp.name == name {
                 return Some(entity);
@@ -411,11 +409,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     // Use VecDeque as a circular buffer with a limit of 30 entries
     use std::collections::VecDeque;
     let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
-    
+
     let mut evolution_app = EvolutionApp::new_with_log(script_log_rc.clone());
 
     evolution_app.set_script(script.as_str());
-    
+
     // Update the world script object with the initial script
     evolution_app.set_object_script(&mut game_context.world, "World Script", script.as_str());
 
@@ -433,8 +431,16 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         let mut rhai_scope = rhai::Scope::new();
 
         // Register functions
-        rhai_lib::register_rhai(&mut rhai, &mut rhai_scope, shared_state_rc.clone(), id_dict, None, script_log_rc.clone(), None);
-        
+        rhai_lib::register_rhai(
+            &mut rhai,
+            &mut rhai_scope,
+            shared_state_rc.clone(),
+            id_dict,
+            None,
+            script_log_rc.clone(),
+            None,
+        );
+
         game_context.world.insert(RhaiResource {
             storage: Some(RhaiResourceStorage {
                 engine: rhai,
@@ -509,7 +515,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                     Ok(value) => {
                                         let mut scripts = game_context
                                             .world
-                                            .write_storage::<crate::ecs::components::Script>();
+                                            .write_storage::<crate::ecs::components::Script>(
+                                        );
                                         if let Some(script) = scripts.get_mut(script_entity) {
                                             script.ast = Some(value);
                                             script.script = script_text;
@@ -522,7 +529,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                                     Err(err) => {
                                         let mut scripts = game_context
                                             .world
-                                            .write_storage::<crate::ecs::components::Script>();
+                                            .write_storage::<crate::ecs::components::Script>(
+                                        );
                                         if let Some(script) = scripts.get_mut(script_entity) {
                                             script.ast = None;
                                             script.raw = true;
@@ -562,11 +570,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     game_context.dispatch();
                 }
 
-                _ = game_context.state.render(
-                    &device,
-                    &queue,
-                    &output_view,
-                );
+                _ = game_context.state.render(&device, &queue, &output_view);
 
                 // Begin to draw the UI frame.
                 //
@@ -710,7 +714,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 UserEventInfo::SceneImport(bytes) => {
                     match String::from_utf8(bytes) {
                         Ok(text) => {
-                            match evolution_app.import_scene_from_toml(&mut game_context.world, &text) {
+                            match evolution_app
+                                .import_scene_from_toml(&mut game_context.world, &text)
+                            {
                                 Ok(()) => {
                                     evolution_app.editor_state.add_toast(
                                         "Scene imported".to_owned(),
@@ -755,4 +761,3 @@ pub fn seconds_since_midnight() -> f64 {
     let time = chrono::Local::now().time();
     time.num_seconds_from_midnight() as f64 + 1e-9 * (time.nanosecond() as f64)
 }
-

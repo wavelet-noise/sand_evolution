@@ -28,7 +28,7 @@ pub struct EditorState {
     pub is_dragging: bool,
     pub drag_start_pos: (f32, f32),
     pub drag_current_pos: (f32, f32),
-    
+
     // Viewport state
     pub viewport_zoom: f32,
     pub viewport_pan: (f32, f32),
@@ -36,19 +36,19 @@ pub struct EditorState {
     pub show_toolbar: bool,
     pub snap_to_grid: bool,
     pub grid_size: f32,
-    
+
     // Selection rectangle
     pub selection_rect: Option<(f32, f32, f32, f32)>, // (x1, y1, x2, y2)
-    
+
     // Panel layout (calculated once at startup)
     pub hierarchy_pos: Option<(f32, f32)>,
     pub hierarchy_size: Option<(f32, f32)>,
     pub inspector_pos: Option<(f32, f32)>,
     pub inspector_size: Option<(f32, f32)>,
-    
+
     // Toast notifications
     pub toasts: Vec<Toast>,
-    
+
     // Scripts window request
     pub open_scripts_for_object: Option<String>,
 }
@@ -91,7 +91,7 @@ impl EditorState {
             open_scripts_for_object: None,
         }
     }
-    
+
     pub fn select_entity(&mut self, entity: Entity, multi: bool) {
         if multi {
             if self.selected_entities.contains(&entity) {
@@ -104,11 +104,11 @@ impl EditorState {
             self.selected_entities.insert(entity);
         }
     }
-    
+
     pub fn clear_selection(&mut self) {
         self.selected_entities.clear();
     }
-    
+
     pub fn add_toast(&mut self, message: String, level: ToastLevel) {
         self.toasts.push(Toast {
             message,
@@ -116,14 +116,14 @@ impl EditorState {
             lifetime: 3.0, // 3 seconds default
         });
     }
-    
+
     pub fn update_toasts(&mut self, delta_time: f32) {
         self.toasts.retain_mut(|toast| {
             toast.lifetime -= delta_time;
             toast.lifetime > 0.0
         });
     }
-    
+
     pub fn snap_position(&self, x: f32, y: f32) -> (f32, f32) {
         if self.snap_to_grid {
             (

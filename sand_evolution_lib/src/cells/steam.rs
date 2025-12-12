@@ -1,4 +1,4 @@
-use super::{{helper::fluid_flying_helper, *, TemperatureContext}};
+use super::{helper::fluid_flying_helper, TemperatureContext, *};
 use crate::cs::PointType;
 
 pub struct Steam;
@@ -28,7 +28,7 @@ impl CellTrait for Steam {
         // Steam condenses into water at low temperature
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // Steam condenses into water at temperature below -10 degrees
             // with small probability to avoid instant condensation
             if temperature < 0.0 && prng.next() < 10 {
@@ -37,7 +37,7 @@ impl CellTrait for Steam {
                 return;
             }
         }
-        
+
         fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
 

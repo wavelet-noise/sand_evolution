@@ -1,20 +1,20 @@
 use cgmath::num_traits::clamp;
 use egui::{Color32, ComboBox, Context};
-use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::VecDeque;
+use std::rc::Rc;
+use winit::{dpi::PhysicalPosition, event_loop::EventLoopProxy};
 
 use crate::export_file::{code_to_file, scene_to_file};
-use crate::projects::{ProjectDescription};
+use crate::projects::ProjectDescription;
 use crate::resources::rhai_resource::RhaiResourceStorage;
 use crate::{
     cells::{stone::Stone, void::Void, wood::Wood},
     copy_text_to_clipboard, cs,
+    editor::{EditorHierarchy, EditorInspector, EditorState, UndoRedo},
     export_file::write_to_file,
     fps_meter::FpsMeter,
     state::{State, UpdateResult},
-    editor::{EditorState, EditorInspector, EditorHierarchy, UndoRedo},
 };
 use specs::WorldExt;
 
@@ -67,8 +67,8 @@ pub struct EvolutionApp {
     pub win_simulation: bool,
     pub win_graphics: bool,
     pub win_templates: bool, // templates / projects window
-    pub win_palette: bool, // palette window
-    pub win_hover: bool, // hover info window
+    pub win_palette: bool,   // palette window
+    pub win_hover: bool,     // hover info window
 
     // GitHub project support
     pub projects: Vec<ProjectDescription>,
@@ -79,15 +79,15 @@ pub struct EvolutionApp {
 
     // Last generated share URL for templates
     pub last_load_url: String,
-    
+
     // Editor state
     pub editor_state: EditorState,
     pub undo_redo: UndoRedo,
-    
+
     // Script log storage - circular buffer with a limit of 30 entries
     pub script_log: Rc<RefCell<VecDeque<String>>>,
     pub show_log_window: bool,
-    
+
     // Display mode: Normal or Temperature map
     pub display_mode: DisplayMode,
 }
@@ -151,13 +151,13 @@ impl EvolutionApp {
 
     /// Get object script by name from world
     pub fn get_object_script(&self, world: &specs::World, object_name: &str) -> Option<String> {
-        use specs::Join;
         use crate::ecs::components::{Name, Script};
-        
+        use specs::Join;
+
         let names = world.read_storage::<Name>();
         let scripts = world.read_storage::<Script>();
         let entities = world.entities();
-        
+
         for (entity, name_comp) in (&entities, &names).join() {
             if name_comp.name == object_name {
                 if let Some(script) = scripts.get(entity) {
@@ -170,13 +170,13 @@ impl EvolutionApp {
 
     /// Set object script by name in world
     pub fn set_object_script(&mut self, world: &mut specs::World, object_name: &str, script: &str) {
-        use specs::Join;
         use crate::ecs::components::{Name, Script};
-        
+        use specs::Join;
+
         let names = world.read_storage::<Name>();
         let mut scripts = world.write_storage::<Script>();
         let entities = world.entities();
-        
+
         for (entity, name_comp) in (&entities, &names).join() {
             if name_comp.name == object_name {
                 if let Some(script_comp) = scripts.get_mut(entity) {
@@ -280,8 +280,9 @@ impl EvolutionApp {
         world: &mut specs::World,
     ) {
         // Update editor toasts
-        self.editor_state.update_toasts(upd_result.update_time as f32 / 1000.0);
-        
+        self.editor_state
+            .update_toasts(upd_result.update_time as f32 / 1000.0);
+
         // Handle keyboard shortcuts for editor
         // TODO: Fix input handling for egui 0.19 - temporarily disabled
         // Keyboard shortcuts will be handled through other means
@@ -292,31 +293,31 @@ impl EvolutionApp {
         let mut win_templates: bool = self.win_templates;
         let mut win_palette: bool = self.win_palette;
         let mut win_hover: bool = self.win_hover;
-        
+
         // Calculate panel layout only once at startup
         // Using typical screen size (1920x1080) for initial layout
         if self.editor_state.hierarchy_pos.is_none() {
             // Typical viewport dimensions (will be adjusted if needed)
             let viewport_width = 1920.0;
             let viewport_height = 1080.0;
-            
+
             // Calculate panel dimensions based on viewport
             let panel_width = 350.0; // Moderate width, comfortable to use
             let panel_height = (viewport_height - 30.0) / 2.0; // Half height minus spacing
             let margin = 10.0;
-            
+
             // Calculate positions
             let right_x = viewport_width - panel_width - margin;
             let hierarchy_y = margin;
             let inspector_y = hierarchy_y + panel_height + margin;
-            
+
             // Store in state
             self.editor_state.hierarchy_pos = Some((right_x, hierarchy_y));
             self.editor_state.hierarchy_size = Some((panel_width, panel_height));
             self.editor_state.inspector_pos = Some((right_x, inspector_y));
             self.editor_state.inspector_size = Some((panel_width, panel_height));
         }
-        
+
         // Editor Hierarchy - right column, top half
         let (hierarchy_x, hierarchy_y) = self.editor_state.hierarchy_pos.unwrap_or((1560.0, 10.0));
         let (hierarchy_w, hierarchy_h) = self.editor_state.hierarchy_size.unwrap_or((350.0, 530.0));
@@ -326,7 +327,7 @@ impl EvolutionApp {
             .show(context, |ui| {
                 EditorHierarchy::ui(ui, &mut self.editor_state, world);
             });
-        
+
         // Editor Inspector - right column, bottom half
         let (inspector_x, inspector_y) = self.editor_state.inspector_pos.unwrap_or((1560.0, 550.0));
         let (inspector_w, inspector_h) = self.editor_state.inspector_size.unwrap_or((350.0, 530.0));
@@ -336,16 +337,16 @@ impl EvolutionApp {
             .show(context, |ui| {
                 EditorInspector::ui(ui, &mut self.editor_state, world);
             });
-        
+
         // Handle request to open scripts window for a specific object
         if let Some(object_name) = self.editor_state.open_scripts_for_object.take() {
             self.selected_object_name = object_name;
             win_script_editor = true;
         }
-        
+
         // Show toasts
         self.show_toasts(context);
-        
+
         egui::Window::new("🪟 Windows")
             .default_pos(egui::pos2(10.0, 10.0))
             .resizable(false)
@@ -520,21 +521,21 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area();
             });
         self.win_files = win_files;
-        
+
         // Limit the maximum size of Script Editor window to the application size
         let screen_height = context.available_rect().height();
         let max_window_height = screen_height * 0.95; // 95% of screen height with a small margin
-        // Fix the window size so it cannot become too large
+                                                      // Fix the window size so it cannot become too large
         let fixed_height = max_window_height.min(600.0);
-        
+
         egui::Window::new("📝 Script Editor")
             .open(&mut win_script_editor)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(600.0, fixed_height))
             .show(context, |ui| {
-                use specs::Join;
                 use crate::ecs::components::Name;
-                
+                use specs::Join;
+
                 // Get the list of all objects (first collect the data)
                 let mut object_names: Vec<String> = Vec::new();
                 {
@@ -545,7 +546,7 @@ impl EvolutionApp {
                     }
                 }
                 object_names.sort();
-                
+
                 // Top panel with object selection
                 ui.horizontal(|ui| {
                     ui.label("Object:");
@@ -554,15 +555,21 @@ impl EvolutionApp {
                         .selected_text(&self.selected_object_name)
                         .show_ui(ui, |ui| {
                             for name in &object_names {
-                                ui.selectable_value(&mut self.selected_object_name, name.clone(), name);
+                                ui.selectable_value(
+                                    &mut self.selected_object_name,
+                                    name.clone(),
+                                    name,
+                                );
                             }
                         });
                 });
-                
+
                 // Check for change in selected object and load script only on change
                 // Important: check must be AFTER rendering ComboBox so changes are detected in the same frame
                 if self.selected_object_name != self.last_loaded_object {
-                    if let Some(script_text) = self.get_object_script(world, &self.selected_object_name) {
+                    if let Some(script_text) =
+                        self.get_object_script(world, &self.selected_object_name)
+                    {
                         self.script = script_text;
                     } else {
                         self.script = "".to_owned();
@@ -572,9 +579,9 @@ impl EvolutionApp {
                     // Clear errors when switching objects
                     self.script_error.clear();
                 }
-                
+
                 ui.separator();
-                
+
                 // Toolbar
                 ui.horizontal(|ui| {
                     // Enable/disable script button
@@ -588,20 +595,20 @@ impl EvolutionApp {
                     {
                         state.toggled = !state.toggled;
                     }
-                    
+
                     ui.separator();
-                    
+
                     // Export/import buttons
                     if ui.button("📤 Export").clicked() {
                         code_to_file(self.script.as_str());
                     }
-                    
+
                     if ui.button("📥 Import").clicked() {
                         let dialog = rfd::AsyncFileDialog::new()
                             .add_filter("Text", &["txt"])
                             .add_filter("All", &["*"])
                             .pick_file();
-        
+
                         let event_loop_proxy = event_loop_proxy.clone();
                         self.executor.execute(async move {
                             if let Some(file) = dialog.await {
@@ -612,23 +619,24 @@ impl EvolutionApp {
                             }
                         });
                     }
-                    
+
                     ui.separator();
-                    
+
                     // Button to open log window
                     if ui.button("📋 Log").clicked() {
                         self.show_log_window = true;
                     }
                 });
-                
+
                 // Error display (always reserve space to avoid losing focus)
                 ui.separator();
                 // Always reserve a fixed height for the error area
                 // This prevents UI rebuild and loss of focus
                 let error_area_height = ui.text_style_height(&egui::TextStyle::Body) + 8.0;
                 let error_id = egui::Id::new(format!("script_error_{}", self.selected_object_name));
-                let (_id, error_rect) = ui.allocate_space(egui::vec2(ui.available_width(), error_area_height));
-                
+                let (_id, error_rect) =
+                    ui.allocate_space(egui::vec2(ui.available_width(), error_area_height));
+
                 // Show error only if it exists, using the reserved space
                 // Use a stable ID to prevent rebuild
                 // Don't call allocate_ui_at_rect when there's no error to avoid rebuild
@@ -636,22 +644,26 @@ impl EvolutionApp {
                     ui.allocate_ui_at_rect(error_rect, |ui| {
                         ui.push_id(error_id, |ui| {
                             ui.horizontal(|ui| {
-                                ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "⚠ Error:");
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(255, 100, 100),
+                                    "⚠ Error:",
+                                );
                                 ui.label(&self.script_error);
                             });
                         });
                     });
                 }
-                
+
                 ui.separator();
-                
+
                 // Code editor with improved interface
                 // Use a stable ID to prevent rebuild
-                let script_label_id = egui::Id::new(format!("script_label_{}", self.selected_object_name));
+                let script_label_id =
+                    egui::Id::new(format!("script_label_{}", self.selected_object_name));
                 ui.push_id(script_label_id, |ui| {
                     ui.label(format!("Script: {}", self.selected_object_name));
                 });
-                
+
                 // Improved editor with better size
                 // Use a stable ID to preserve focus
                 // Stretch the editor to full available height
@@ -663,54 +675,61 @@ impl EvolutionApp {
                     .max_height(available_height)
                     .show(ui, |ui| {
                         // Use a stable ID based on object name to preserve focus
-                        let text_edit_id = egui::Id::new(format!("script_editor_{}", self.selected_object_name));
+                        let text_edit_id =
+                            egui::Id::new(format!("script_editor_{}", self.selected_object_name));
                         // Allocate space for TextEdit so it stretches vertically
-                        let (_, text_edit_rect) = ui.allocate_space(egui::vec2(ui.available_width(), available_height));
+                        let (_, text_edit_rect) =
+                            ui.allocate_space(egui::vec2(ui.available_width(), available_height));
                         ui.allocate_ui_at_rect(text_edit_rect, |ui| {
-                        let text_edit = egui::TextEdit::multiline(&mut self.script)
+                            let text_edit = egui::TextEdit::multiline(&mut self.script)
                                 .id(text_edit_id)
-                            .font(egui::TextStyle::Monospace)
+                                .font(egui::TextStyle::Monospace)
                                 .desired_width(f32::INFINITY);
-                        
-                        let response = ui.add(text_edit);
-                        
-                        // Track changes
-                        if response.changed() {
-                            self.script_modified = true;
-                        }
-                        
-                        // Handle clipboard paste if TextEdit is focused
-                        if response.has_focus() {
-                            let modifiers = ui.input().modifiers;
-                            let paste_pressed = (modifiers.command || modifiers.ctrl) && ui.input().key_pressed(egui::Key::V);
-                            
-                            if paste_pressed {
-                                #[cfg(target_arch = "wasm32")]
-                                {
-                                    // In browser use async API
-                                    let event_loop_proxy = event_loop_proxy.clone();
-                                    self.executor.execute(async move {
-                                        if let Ok(text) = crate::copy_text_from_clipboard_async().await {
-                                            let _ = event_loop_proxy.send_event(UserEventInfo::TextImport(text.into_bytes()));
+
+                            let response = ui.add(text_edit);
+
+                            // Track changes
+                            if response.changed() {
+                                self.script_modified = true;
+                            }
+
+                            // Handle clipboard paste if TextEdit is focused
+                            if response.has_focus() {
+                                let modifiers = ui.input().modifiers;
+                                let paste_pressed = (modifiers.command || modifiers.ctrl)
+                                    && ui.input().key_pressed(egui::Key::V);
+
+                                if paste_pressed {
+                                    #[cfg(target_arch = "wasm32")]
+                                    {
+                                        // In browser use async API
+                                        let event_loop_proxy = event_loop_proxy.clone();
+                                        self.executor.execute(async move {
+                                            if let Ok(text) =
+                                                crate::copy_text_from_clipboard_async().await
+                                            {
+                                                let _ = event_loop_proxy.send_event(
+                                                    UserEventInfo::TextImport(text.into_bytes()),
+                                                );
+                                            }
+                                        });
+                                    }
+
+                                    #[cfg(not(target_arch = "wasm32"))]
+                                    {
+                                        // On desktop use synchronous API
+                                        if let Ok(text) = crate::copy_text_from_clipboard() {
+                                            // Insert text at current cursor position or at the end
+                                            // For simplicity, insert at the end, as getting cursor position is difficult
+                                            self.script.push_str(&text);
+                                            self.script_modified = true;
                                         }
-                                    });
-                                }
-                                
-                                #[cfg(not(target_arch = "wasm32"))]
-                                {
-                                    // On desktop use synchronous API
-                                    if let Ok(text) = crate::copy_text_from_clipboard() {
-                                        // Insert text at current cursor position or at the end
-                                        // For simplicity, insert at the end, as getting cursor position is difficult
-                                        self.script.push_str(&text);
-                                        self.script_modified = true;
                                     }
                                 }
                             }
-                        }
                         });
                     });
-                
+
                 // Script information (use a stable ID to prevent rebuild)
                 ui.separator();
                 let stats_id = egui::Id::new(format!("script_stats_{}", self.selected_object_name));
@@ -718,15 +737,17 @@ impl EvolutionApp {
                     ui.horizontal(|ui| {
                         let line_count = self.script.lines().count();
                         let char_count = self.script.chars().count();
-                        ui.label(format!("Lines: {} | Characters: {}", line_count, char_count));
+                        ui.label(format!(
+                            "Lines: {} | Characters: {}",
+                            line_count, char_count
+                        ));
                     });
                 });
-                
-        
+
                 *any_win_hovered |= context.is_pointer_over_area()
             });
         self.win_script_editor = win_script_editor;
-        
+
         // Script Log Window
         egui::Window::new("Script Log")
             .open(&mut self.show_log_window)
@@ -739,9 +760,9 @@ impl EvolutionApp {
                     }
                     ui.label(format!("Messages: {}", self.script_log.borrow().len()));
                 });
-                
+
                 ui.separator();
-                
+
                 // Display logs (last 30 entries from circular buffer)
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
@@ -755,10 +776,10 @@ impl EvolutionApp {
                             });
                         }
                     });
-                
+
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        
+
         egui::Window::new("⏱ Simulation")
             .open(&mut win_simulation)
             .default_pos(egui::pos2(5.0, 5.0))
@@ -809,8 +830,7 @@ impl EvolutionApp {
                 );
                 ui.label(format!(
                     "sim_time: {:.1}s | time_of_day: {:.1}s",
-                    state.sim_time_seconds,
-                    state.day_night.time_of_day_seconds
+                    state.sim_time_seconds, state.day_night.time_of_day_seconds
                 ));
 
                 ui.separator();
@@ -987,10 +1007,7 @@ impl EvolutionApp {
                             let project = self.projects[idx].clone();
 
                             right.heading("Selected template");
-                            right.label(
-                                egui::RichText::new(&project.display_name)
-                                    .strong(),
-                            );
+                            right.label(egui::RichText::new(&project.display_name).strong());
 
                             right.add_space(4.0);
                             right.label("Script URL:");
@@ -1016,9 +1033,7 @@ impl EvolutionApp {
                                 }
                                 None => {
                                     right.label(
-                                        egui::RichText::new("Background: none")
-                                            .small()
-                                            .italics(),
+                                        egui::RichText::new("Background: none").small().italics(),
                                     );
                                 }
                             }
@@ -1088,14 +1103,14 @@ impl EvolutionApp {
 
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        
+
         // Auto-fetch projects when window is open but projects haven't been fetched yet
         if win_templates && !self.projects_fetched && !self.project_loading {
             self.start_fetch_github_projects(event_loop_proxy);
         }
-        
+
         self.win_templates = win_templates;
-        
+
         // Floating palette window (movable, positioned at bottom by default)
         let input_rect = context.input().screen_rect;
         let palette_y = (input_rect.height() - 70.0).max(50.0);
@@ -1110,6 +1125,8 @@ impl EvolutionApp {
                 // Cell type data: (name for dict, display name, color RGB)
                 let cell_types: Vec<(&str, &str, [u8; 3])> = vec![
                     ("sand", "Sand", [204, 204, 26]),
+                    ("earth", "Earth", [120, 72, 35]),
+                    ("gravel", "Gravel", [140, 140, 150]),
                     ("water", "Water", [26, 38, 255]),
                     ("steam", "Steam", [128, 128, 128]),
                     ("fire", "Fire", [255, 128, 0]),
@@ -1134,7 +1151,7 @@ impl EvolutionApp {
                     ("black_hole", "Black Hole", [89, 0, 89]),
                     ("stone", "Stone", [200, 200, 200]),
                 ];
-                
+
                 ui.horizontal(|ui| {
                     // Brush size slider
                     ui.spacing_mut().slider_width = 100.0;
@@ -1142,80 +1159,85 @@ impl EvolutionApp {
                         egui::Slider::new(&mut self.number_of_cells_to_add, 1..=2000)
                             .clamp_to_range(false)
                             .show_value(true)
-                            .text("🖌")
+                            .text("🖌"),
                     );
-                    
+
                     ui.separator();
-                    
+
                     // Scrollable horizontal palette
                     egui::ScrollArea::horizontal()
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
-                                
+
                                 for (dict_name, display_name, color) in &cell_types {
                                     let color32 = Color32::from_rgb(color[0], color[1], color[2]);
                                     let is_selected = self.selected_option == *dict_name;
-                                    
+
                                     // Button with color square and name
-                                    let button_response = ui.allocate_ui(egui::vec2(90.0, 28.0), |ui| {
-                                        let (rect, response) = ui.allocate_exact_size(
-                                            egui::vec2(90.0, 28.0),
-                                            egui::Sense::click()
-                                        );
-                                        
-                                        if ui.is_rect_visible(rect) {
-                                            let painter = ui.painter();
-                                            
-                                            // Background
-                                            let bg_color = if is_selected {
-                                                Color32::from_rgb(70, 90, 120)
-                                            } else if response.hovered() {
-                                                Color32::from_rgb(55, 55, 65)
-                                            } else {
-                                                Color32::from_rgb(45, 45, 55)
-                                            };
-                                            
-                                            painter.rect_filled(
-                                                rect,
-                                                egui::Rounding::same(4.0),
-                                                bg_color
+                                    let button_response =
+                                        ui.allocate_ui(egui::vec2(90.0, 28.0), |ui| {
+                                            let (rect, response) = ui.allocate_exact_size(
+                                                egui::vec2(90.0, 28.0),
+                                                egui::Sense::click(),
                                             );
-                                            
-                                            // Border for selected
-                                            if is_selected {
-                                                painter.rect_stroke(
+
+                                            if ui.is_rect_visible(rect) {
+                                                let painter = ui.painter();
+
+                                                // Background
+                                                let bg_color = if is_selected {
+                                                    Color32::from_rgb(70, 90, 120)
+                                                } else if response.hovered() {
+                                                    Color32::from_rgb(55, 55, 65)
+                                                } else {
+                                                    Color32::from_rgb(45, 45, 55)
+                                                };
+
+                                                painter.rect_filled(
                                                     rect,
                                                     egui::Rounding::same(4.0),
-                                                    egui::Stroke::new(2.0, Color32::from_rgb(100, 180, 255))
+                                                    bg_color,
+                                                );
+
+                                                // Border for selected
+                                                if is_selected {
+                                                    painter.rect_stroke(
+                                                        rect,
+                                                        egui::Rounding::same(4.0),
+                                                        egui::Stroke::new(
+                                                            2.0,
+                                                            Color32::from_rgb(100, 180, 255),
+                                                        ),
+                                                    );
+                                                }
+
+                                                // Color square (left side)
+                                                let color_rect = egui::Rect::from_min_size(
+                                                    rect.min + egui::vec2(4.0, 4.0),
+                                                    egui::vec2(20.0, 20.0),
+                                                );
+                                                painter.rect_filled(
+                                                    color_rect,
+                                                    egui::Rounding::same(3.0),
+                                                    color32,
+                                                );
+
+                                                // Text (right of color)
+                                                painter.text(
+                                                    rect.min
+                                                        + egui::vec2(28.0, rect.height() / 2.0),
+                                                    egui::Align2::LEFT_CENTER,
+                                                    *display_name,
+                                                    egui::FontId::proportional(11.0),
+                                                    Color32::WHITE,
                                                 );
                                             }
-                                            
-                                            // Color square (left side)
-                                            let color_rect = egui::Rect::from_min_size(
-                                                rect.min + egui::vec2(4.0, 4.0),
-                                                egui::vec2(20.0, 20.0)
-                                            );
-                                            painter.rect_filled(
-                                                color_rect,
-                                                egui::Rounding::same(3.0),
-                                                color32
-                                            );
-                                            
-                                            // Text (right of color)
-                                            painter.text(
-                                                rect.min + egui::vec2(28.0, rect.height() / 2.0),
-                                                egui::Align2::LEFT_CENTER,
-                                                *display_name,
-                                                egui::FontId::proportional(11.0),
-                                                Color32::WHITE
-                                            );
-                                        }
-                                        
-                                        response
-                                    });
-                                    
+
+                                            response
+                                        });
+
                                     if button_response.inner.clicked() {
                                         self.selected_option = dict_name.to_string();
                                     }
@@ -1223,27 +1245,27 @@ impl EvolutionApp {
                             });
                         });
                 });
-                
+
                 *any_win_hovered |= context.is_pointer_over_area()
             });
-        
+
         self.win_palette = win_palette;
         self.win_hover = win_hover;
     }
-    
+
     fn show_toasts(&mut self, ctx: &Context) {
         use egui::Color32;
-        
+
         let mut remaining_toasts = Vec::new();
         std::mem::swap(&mut remaining_toasts, &mut self.editor_state.toasts);
-        
+
         for (i, toast) in remaining_toasts.iter().enumerate() {
             let color = match toast.level {
                 crate::editor::state::ToastLevel::Info => Color32::from_rgb(100, 150, 255),
                 crate::editor::state::ToastLevel::Warning => Color32::from_rgb(255, 200, 100),
                 crate::editor::state::ToastLevel::Error => Color32::from_rgb(255, 50, 50),
             };
-            
+
             egui::Window::new("")
                 .title_bar(false)
                 .resizable(false)
@@ -1252,7 +1274,7 @@ impl EvolutionApp {
                     ui.colored_label(color, &toast.message);
                 });
         }
-        
+
         std::mem::swap(&mut remaining_toasts, &mut self.editor_state.toasts);
     }
 
@@ -1347,7 +1369,7 @@ impl EvolutionApp {
     pub fn new() -> Self {
         Self::new_with_log(Rc::new(RefCell::new(VecDeque::with_capacity(30))))
     }
-    
+
     pub fn new_with_log(script_log: Rc<RefCell<VecDeque<String>>>) -> Self {
         let number_of_cells_to_add = 500;
         let number_of_structures_to_add = 100;
@@ -1387,13 +1409,13 @@ impl EvolutionApp {
             projects_fetched: false,
 
             last_load_url: String::new(),
-            
+
             editor_state: EditorState::new(),
             undo_redo: UndoRedo::new(),
-            
+
             script_log,
             show_log_window: false,
-            
+
             display_mode: DisplayMode::Normal,
         }
     }
@@ -1448,8 +1470,8 @@ struct ScriptToml {
 
 impl EvolutionApp {
     pub fn export_scene_to_toml(&self, world: &specs::World) -> String {
+        use crate::ecs::components::{Name, Position, Rotation, Scale, Script, Velocity};
         use specs::Join;
-        use crate::ecs::components::{Name, Position, Rotation, Scale, Velocity, Script};
 
         let entities = world.entities();
         let names = world.read_storage::<Name>();
@@ -1486,7 +1508,10 @@ impl EvolutionApp {
 
         out.sort_by(|a, b| a.name.cmp(&b.name));
 
-        let scene = SceneToml { version: 1, entity: out };
+        let scene = SceneToml {
+            version: 1,
+            entity: out,
+        };
         toml::to_string_pretty(&scene).unwrap_or_else(|_| String::new())
     }
 
@@ -1495,8 +1520,10 @@ impl EvolutionApp {
         world: &mut specs::World,
         toml_text: &str,
     ) -> Result<(), String> {
+        use crate::ecs::components::{
+            Name, Position, Rotation, Scale, Script, ScriptType, Velocity,
+        };
         use specs::{Builder, Join, WorldExt};
-        use crate::ecs::components::{Name, Position, Rotation, Scale, Velocity, Script, ScriptType};
 
         let parsed: SceneToml = toml::from_str(toml_text).map_err(|e| e.to_string())?;
 
@@ -1519,7 +1546,9 @@ impl EvolutionApp {
                 has_world_script = true;
             }
 
-            let mut builder = world.create_entity().with(Name { name: e.name.clone() });
+            let mut builder = world.create_entity().with(Name {
+                name: e.name.clone(),
+            });
 
             if let Some(p) = e.position {
                 builder = builder.with(Position { x: p.x, y: p.y });

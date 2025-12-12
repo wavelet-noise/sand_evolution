@@ -29,7 +29,7 @@ impl CellTrait for Ice {
         // Important: make it probabilistic to avoid instant melting at mild temperatures (e.g. +20°C).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // If temperature is above 0 degrees, ice can melt with probability depending on temperature.
             // Design target: at +20°C => ~10% chance per tick.
             // We scale linearly: p(20)=26/256≈10.16%; p grows with temperature and clamps to [0..255].
