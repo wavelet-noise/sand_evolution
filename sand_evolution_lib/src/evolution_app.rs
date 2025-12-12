@@ -769,6 +769,8 @@ impl EvolutionApp {
                 ui.heading("Pause or simulation speed");
                 ui.add(
                     egui::Slider::new(&mut self.simulation_steps_per_second, 0..=480)
+                        // Keep slider limited, but don't clamp the value when it's typed/edited.
+                        .clamp_to_range(false)
                         .text("Simulation steps per second"),
                 );
 
@@ -779,6 +781,8 @@ impl EvolutionApp {
                         &mut state.global_temperature,
                         crate::state::TEMP_MIN..=crate::state::TEMP_MAX,
                     )
+                    // Keep slider limited, but allow any numeric input via the slider's value editor.
+                    .clamp_to_range(false)
                     .text("Global temperature (°)"),
                 );
                 if ui.button("Reset global temperature").clicked() {
@@ -795,10 +799,13 @@ impl EvolutionApp {
                 });
                 ui.add(
                     egui::Slider::new(&mut state.day_night.day_length_seconds, 5.0..=600.0)
+                        .clamp_to_range(false)
                         .text("Day length (s)"),
                 );
                 ui.add(
-                    egui::Slider::new(&mut state.day_night.speed, 0.0..=20.0).text("Speed"),
+                    egui::Slider::new(&mut state.day_night.speed, 0.0..=20.0)
+                        .clamp_to_range(false)
+                        .text("Speed"),
                 );
                 ui.label(format!(
                     "sim_time: {:.1}s | time_of_day: {:.1}s",
@@ -852,6 +859,7 @@ impl EvolutionApp {
                 ui.heading("Structure Spawning");
                 ui.add(
                     egui::Slider::new(&mut self.number_of_structures_to_add, 0..=10000)
+                        .clamp_to_range(false)
                         .text("Number of structures to add"),
                 );
                 ui.label("Click to add");
@@ -882,20 +890,38 @@ impl EvolutionApp {
                 ui.add(
                     // 0..1 = normal strength, 1..2 = push towards pure black.
                     egui::Slider::new(&mut state.day_night.shadow_strength, 0.0..=2.0)
+                        .clamp_to_range(false)
                         .text("Strength"),
                 );
 
                 ui.add(
                     egui::Slider::new(&mut state.day_night.shadow_length_steps, 1.0..=64.0)
+                        .clamp_to_range(false)
                         .text("Length (steps)"),
                 );
 
                 ui.add(
                     egui::Slider::new(&mut state.day_night.shadow_distance_falloff, 0.0..=4.0)
+                        .clamp_to_range(false)
                         .text("Distance falloff"),
                 );
 
                 ui.label("Tip: falloff=0 disables distance attenuation.");
+
+                ui.separator();
+                ui.heading("Background");
+                ui.add_space(6.0);
+                ui.add(
+                    egui::Slider::new(&mut state.world_settings.bg_saturation, 0.0..=1.0)
+                        .clamp_to_range(false)
+                        .text("Saturation"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut state.world_settings.bg_brightness, 0.0..=5.0)
+                        .clamp_to_range(false)
+                        .text("Brightness"),
+                );
+                ui.label("0 = grayscale, 1 = full color.");
                 *any_win_hovered |= context.is_pointer_over_area();
             });
         self.win_graphics = win_graphics;
@@ -1114,6 +1140,7 @@ impl EvolutionApp {
                     ui.spacing_mut().slider_width = 100.0;
                     ui.add(
                         egui::Slider::new(&mut self.number_of_cells_to_add, 1..=2000)
+                            .clamp_to_range(false)
                             .show_value(true)
                             .text("🖌")
                     );

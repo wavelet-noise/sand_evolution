@@ -65,15 +65,15 @@ pub fn update_tick(
         // Advance simulation time + day/night cycle (simulation-time based).
         state.sim_time_seconds += one_tick_delta;
         let (sun_x, sun_y) = state.day_night.advance(one_tick_delta as f32);
-        state.world_settings._pad0 = sun_x;
-        state.world_settings._pad1 = sun_y;
+        state.world_settings.sun_dir_x = sun_x;
+        state.world_settings.sun_dir_y = sun_y;
         // Shadow params for shader:
-        // - _pad2: strength (0..2), where >1 pushes shadows towards pure black
-        // - _pad3: length in raymarch steps (1..64)
-        // - _pad4: distance falloff exponent (0 disables distance attenuation)
-        state.world_settings._pad2 = state.day_night.shadow_strength.clamp(0.0, 2.0);
-        state.world_settings._pad3 = state.day_night.shadow_length_steps.clamp(1.0, 64.0);
-        state.world_settings._pad4 = state.day_night.shadow_distance_falloff.clamp(0.0, 4.0);
+        // - shadow_strength: strength (0..2), where >1 pushes shadows towards pure black
+        // - shadow_length_steps: length in raymarch steps (1..64)
+        // - shadow_distance_falloff: distance falloff exponent (0 disables distance attenuation)
+        state.world_settings.shadow_strength = state.day_night.shadow_strength.clamp(0.0, 2.0);
+        state.world_settings.shadow_length_steps = state.day_night.shadow_length_steps.clamp(1.0, 64.0);
+        state.world_settings.shadow_distance_falloff = state.day_night.shadow_distance_falloff.clamp(0.0, 4.0);
 
         if state.toggled {
             // Set the tick variable in scope and update state pointer

@@ -6,12 +6,16 @@ struct WorldSettings {
     res_y: f32,
     display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
     global_temperature: f32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
-    _pad4: f32,
-    _pad5: f32,
+    // Directional light direction in texel space.
+    sun_dir_x: f32,
+    sun_dir_y: f32,
+    // Shadows.
+    shadow_strength: f32,          // 0..2 (values > 1 push towards pure black)
+    shadow_length_steps: f32,      // 1..64
+    shadow_distance_falloff: f32,  // 0..4 (0 disables distance attenuation)
+    // Background.
+    bg_saturation: f32,            // 0..1
+    bg_brightness: f32,            // 0.1..5
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -350,7 +354,7 @@ fn sample_temperature_bilinear(uv: vec2<f32>, dims_i: vec2<i32>, dims_f: vec2<f3
 fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
     // Directional light direction in texel space (x,y), provided via padding fields.
     // If not set, fall back to a sensible default.
-    var dir = vec2<f32>(settings._pad0, settings._pad1);
+    var dir = vec2<f32>(settings.sun_dir_x, settings.sun_dir_y);
     if dot(dir, dir) < 1e-6 {
         // Almost strictly down.
         dir = vec2<f32>(0.03, -1.0);
@@ -365,7 +369,7 @@ fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
     // Raymarch budget (texel steps).
     // Use a fixed upper bound for predictable shader compilation.
     let MAX_STEPS: i32 = 64;
-    let max_steps: i32 = clamp(i32(round(settings._pad3)), 1, MAX_STEPS);
+    let max_steps: i32 = clamp(i32(round(settings.shadow_length_steps)), 1, MAX_STEPS);
 
     // Soft shadow: cast a few slightly offset rays (cheap penumbra) and
     // attenuate darkness by hit distance (near occluders = darker).
@@ -403,7 +407,7 @@ fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
                 if (sp.a > 0.001) {
                     // Fade with distance: closer occluder => stronger.
                     let dist_base = max(0.0, 1.0 - (f32(i) / f32(max_steps)));
-                    let falloff = max(settings._pad4, 0.0);
+                    let falloff = max(settings.shadow_distance_falloff, 0.0);
                     let dist_k = select(pow(dist_base, falloff), 1.0, falloff < 1e-3);
                     hit_strength = dist_k * sp.a;
                     hit_mult_rgb = sp.rgb;
@@ -425,13 +429,109 @@ fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
     return vec4<f32>(mult_rgb, strength);
 }
 
+fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
+    // Procedural "test room wall" background:
+    // brick pattern + mortar + subtle plaster/grime, stable in cell-space.
+    let p = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
+
+    // Brick dimensions in cells (tweak for scale).
+    let brick_size = vec2<f32>(16.0, 8.0);
+    var b = p / brick_size;
+
+    // Offset every other row by half a brick.
+    let row_i: i32 = i32(floor(b.y));
+    let row_odd: bool = (row_i & 1) == 1;
+    let x_off = select(0.0, 0.5, row_odd);
+    b = vec2<f32>(b.x + x_off, b.y);
+
+    let brick_id = floor(b);
+    let f = fract(b);
+
+    // Mortar thickness (fraction of brick tile).
+    // Add slight edge roughness so bricks aren't perfect rectangles.
+    let mortar = 0.075;
+    let edge0 = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+    // Only affect pixels close to mortar lines; keep brick interiors stable.
+    let rough_n = clamp(fbm_simplex_2d(p * 0.35 + brick_id * 1.7, 2, 2.0, 0.5) * 0.5 + 0.5, 0.0, 1.0);
+    let rough = (rough_n - 0.5) * 0.028; // +/- ~0.014
+    let edge = edge0 + rough * smoothstep(0.18, 0.0, edge0);
+    let mortar_mask = smoothstep(mortar, 0.0, edge); // 1 at edges (mortar), 0 inside brick
+
+    // Brick color / wear variation per-brick (stable).
+    let hh = hash23(brick_id);
+    let h = hh.x;
+    let h2 = hh.y;
+    let base_a = vec3<f32>(0.48, 0.27, 0.22);
+    let base_b = vec3<f32>(0.66, 0.41, 0.32);
+    var brick = mix(base_a, base_b, h);
+
+    // Add gentle within-brick variation + pores.
+    let fine = fbm_simplex_2d(p * 0.08, 3, 2.0, 0.5) * 0.5 + 0.5;
+    let pores = voroNoise2(p * 0.12, 0.65, 0.8);
+    brick *= 0.88 + 0.18 * fine;
+    brick *= 0.92 + 0.10 * pores;
+
+    // Make some bricks noticeably darker (stable per brick_id).
+    // ~40% bricks will be darkened, with varying strength.
+    let dark_sel = smoothstep(0.60, 0.92, h2);
+    brick *= 1.0 - 0.42 * dark_sel;
+
+    // Some bricks are more worn. Use a per-brick mask so only a subset gets affected.
+    let worn_brick = smoothstep(0.55, 0.85, h);
+    // Wear is stronger near edges + patchy in the middle.
+    let edge_wear = smoothstep(0.55, 0.05, edge); // 1 near edges
+    let wear_patch = clamp(fbm_simplex_2d(p * 0.16 + brick_id * 7.3, 3, 2.1, 0.55) * 0.5 + 0.5, 0.0, 1.0);
+    let wear_k = worn_brick * clamp(0.55 * edge_wear + 0.45 * smoothstep(0.55, 0.92, wear_patch), 0.0, 1.0);
+    // Desaturate + lighten slightly (dust/plaster) on worn areas.
+    let brick_luma = dot(brick, vec3<f32>(0.299, 0.587, 0.114));
+    let dusty = mix(brick, vec3<f32>(brick_luma), 0.55);
+    brick = mix(brick, dusty * vec3<f32>(1.05, 1.05, 1.06), wear_k * 0.85);
+    // Small chips: a few bright specks on worn bricks.
+    let chips = smoothstep(0.72, 0.93, voroNoise2(p * 0.28 + brick_id * 3.1, 0.55, 0.9));
+    brick = mix(brick, brick * vec3<f32>(1.14, 1.14, 1.14), chips * wear_k * 0.28);
+
+    // Mortar (cooler, slightly noisy).
+    // Make it warm dark-gray (avoid green/cyan tint) and low-contrast.
+    var grout = vec3<f32>(0.12, 0.12, 0.125);
+    let grout_n = fbm_simplex_2d(p * 0.16 + vec2<f32>(13.1, 7.7), 2, 2.2, 0.55) * 0.5 + 0.5;
+    grout *= 0.92 + 0.08 * grout_n;
+
+    // Subtle stains and plaster overlay.
+    let stains = clamp(fbm_simplex_2d(p * 0.02 + vec2<f32>(91.0, 17.0), 4, 1.9, 0.55) * 0.5 + 0.5, 0.0, 1.0);
+    let stain_mask = smoothstep(0.55, 0.90, stains) * 0.25;
+    brick = mix(brick, brick * vec3<f32>(0.82, 0.86, 0.90), stain_mask);
+    // Keep grout neutral; only slightly lighten on stains.
+    grout = mix(grout, grout * vec3<f32>(0.92, 0.92, 0.93), stain_mask * 0.6);
+
+    // Lighting: mild vignette + top lift so it reads as a "room".
+    let v = 1.0 - smoothstep(0.62, 1.05, distance(uv, vec2<f32>(0.5, 0.5)));
+    let top = 0.92 + 0.10 * (1.0 - uv.y);
+    let light = (0.78 + 0.22 * v) * top;
+
+    var out_rgb = mix(brick, grout, mortar_mask) * light;
+
+    // User-controlled brightness for background only.
+    let bg_brightness = clamp(settings.bg_brightness, 0.0, 5.0);
+    out_rgb *= bg_brightness;
+
+    // User-controlled saturation for background only.
+    let sat = clamp(settings.bg_saturation, 0.0, 1.0);
+    let luma = dot(out_rgb, vec3<f32>(0.299, 0.587, 0.114));
+    out_rgb = mix(vec3<f32>(luma), out_rgb, sat);
+
+    // Allow values > 1.0 (brightness) but keep them bounded.
+    return clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(8.0));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let uv = in.uv;
 
-    // Temperature texture is lower-res (res/4). In Temperature-only mode we keep the
-    // "cell-accurate" point sampling (blocky on purpose). In Normal/Both we smooth it
-    // with manual bilinear interpolation (works even if the texture is not filterable).
+    // Temperature texture is lower-res (res/4).
+    // In Temperature-only AND Both modes we keep the "cell-accurate" point sampling
+    // (blocky on purpose) so it matches the underlying temp map data.
+    // In Normal we smooth it with manual bilinear interpolation
+    // (works even if the texture is not filterable).
     let temp_dims_i = vec2<i32>(
         max(1, i32(settings.res_x / 4.0)),
         max(1, i32(settings.res_y / 4.0)),
@@ -445,12 +545,18 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let temp_point = textureLoad(t_temperature, tex_coord_point, 0).r;
     let temp_smooth = sample_temperature_bilinear(uv, temp_dims_i, temp_dims_f);
 
-    let is_temp_only = (settings.display_mode > 0.5) && (settings.display_mode < 1.5);
-    let temp_value = (select(temp_smooth, temp_point, is_temp_only)) + settings.global_temperature;
+    let is_temp_point_sampling = (settings.display_mode > 0.5);
+    let temp_value = (select(temp_smooth, temp_point, is_temp_point_sampling)) + settings.global_temperature;
 
-    // Soft glow from hot cells in normal render:
-    // Use only the smoothed temperature (no extra averaging/blur here).
-    let hot_glow = smoothstep(220.0, 420.0, temp_smooth + settings.global_temperature);
+    // Extra smoothing for heat visualization in Normal render (more "blurry heat").
+    // Temperature grid is already low-res (res/4), so a few taps are cheap.
+    let texel_uv = vec2<f32>(1.0, 1.0) / temp_dims_f;
+    let t0 = temp_smooth;
+    let t1 = sample_temperature_bilinear(uv + vec2<f32>( texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
+    let t2 = sample_temperature_bilinear(uv + vec2<f32>(-texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
+    let t3 = sample_temperature_bilinear(uv + vec2<f32>(0.0,  texel_uv.y), temp_dims_i, temp_dims_f);
+    let t4 = sample_temperature_bilinear(uv + vec2<f32>(0.0, -texel_uv.y), temp_dims_i, temp_dims_f);
+    let temp_vis = (t0 + t1 + t2 + t3 + t4) * 0.2 + settings.global_temperature;
     
     // Map temperature (degrees) to color: cold (blue) -> neutral (black) -> hot (red/yellow).
     //
@@ -517,8 +623,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 0u
     {
-      // Standard background: flat gray.
-      col = vec4<f32>(0.35, 0.35, 0.35, 1.0);
+      // Background: procedural "test room wall" instead of flat gray.
+      col = vec4<f32>(wall_background_albedo(uv, cell_xy), 1.0);
     }
     else if t == 1u
     {
@@ -669,7 +775,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     // Simple directional shadow cast by walls (stone) onto everything.
     // This produces the expected "dark полосы" behind blocks on the background.
     // 0..1 = normal strength, 1..2 = push towards pure black.
-    let shadow_strength = max(settings._pad2, 0.0);
+    let shadow_strength = max(settings.shadow_strength, 0.0);
     let shadow = compute_wall_shadow(cell_xy);
     // Apply shadows only to the background to avoid "black copy of the map" look.
     if (t == 0u) {
@@ -684,11 +790,22 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         col = vec4<f32>(mix(col.rgb, dark_rgb, k), col.a);
     }
 
-    // Add subtle temperature-based emissive glow to the normal render.
-    // Works best together with bloom (values slightly > 1.0 are allowed).
-    if (hot_glow > 0.0) {
-        let glow_col = mix(vec3<f32>(1.15, 0.22, 0.04), vec3<f32>(1.85, 1.05, 0.55), hot_glow);
-        col = vec4<f32>(col.rgb + glow_col * hot_glow * 0.18, col.a);
+    // Direct heat visualization in Normal render (NOT bloom):
+    // Saturated red -> orange -> yellow, with blurred temperature field.
+    // Keep it semi-transparent so it reads as "heat", not "paint".
+    let heat = clamp((temp_vis - 140.0) / (520.0 - 140.0), 0.0, 1.0);
+    // NOTE: In Both mode we show the temperature map via `temp_col`,
+    // so don't add the extra blurred heat overlay.
+    if (heat > 0.0 && settings.display_mode < 1.5) {
+        let h_orange = smoothstep(0.15, 0.65, heat);
+        let h_yellow = smoothstep(0.70, 1.00, heat);
+
+        var heat_rgb = mix(vec3<f32>(0.95, 0.05, 0.00), vec3<f32>(1.00, 0.35, 0.00), h_orange);
+        heat_rgb = mix(heat_rgb, vec3<f32>(1.00, 0.90, 0.08), h_yellow);
+
+        // Transparency/intensity of the overlay (0..~0.6 feels good).
+        let heat_intensity = heat * 0.2;
+        col = vec4<f32>(col.rgb + heat_rgb * heat_intensity, col.a);
     }
 
     // If in Both mode, blend temperature overlay with cell colors
@@ -705,8 +822,15 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     
     // Calculate bloom before clamping (bloom needs values > 1.0)
     if (col.r > 1.0 || col.g > 1.0 || col.b > 1.0) {
-        out.albedo = normalize(col);
-        out.bloom = out.albedo * out.albedo;
+        // NOTE: normalize(vec4) makes bright colors look washed out (and also shrinks alpha).
+        // Use max-component normalization instead: preserves hue/saturation.
+        let maxc = max(col.r, max(col.g, col.b));
+        let rgb = col.rgb / max(1.0, maxc);
+        out.albedo = vec4<f32>(rgb, col.a);
+
+        // Bloom mask based on how far above 1.0 the color went.
+        let k = smoothstep(1.0, 2.5, maxc);
+        out.bloom = vec4<f32>(rgb * k, 1.0);
     } else {
         out.albedo = col;
         out.bloom = vec4<f32>(0.0, 0.0, 0.0, 1.0);
