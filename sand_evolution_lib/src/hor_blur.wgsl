@@ -4,14 +4,18 @@ struct WorldSettings {
     time: f32,
     res_x: f32,
     res_y: f32,
-    display_mode: f32,
+    display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
     global_temperature: f32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
-    _pad4: f32,
-    _pad5: f32,
+    // Directional light direction in texel space.
+    sun_dir_x: f32,
+    sun_dir_y: f32,
+    // Shadows.
+    shadow_strength: f32,          // 0..2
+    shadow_length_steps: f32,      // 1..64
+    shadow_distance_falloff: f32,  // 0..4
+    // Background.
+    bg_saturation: f32,            // 0..1
+    bg_brightness: f32,            // 0..5
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
