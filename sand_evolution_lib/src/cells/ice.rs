@@ -38,6 +38,14 @@ impl CellTrait for Ice {
                 let chance = chance_f as u8;
                 if prng.next() < chance {
                     container[cur] = Water::id();
+                    // Latent heat of fusion: melting consumes heat, so the local area should cool down.
+                    // Calibrated relative to water evaporation cooling (see `water.rs`).
+                    const MELT_COOLING: f32 = 5.0;
+                    (temp_ctx.add_temp)(i, j, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i, j - 1, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i + 1, j, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i - 1, j, -MELT_COOLING);
                     return;
                 }
             }
