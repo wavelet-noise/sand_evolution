@@ -22,13 +22,21 @@ pub struct WorldSettings {
     display_mode: f32, // 0.0 = Normal, 1.0 = Temperature, 2.0 = Both
     /// Global temperature offset (degrees). Effective temperature = layer + global_temperature.
     global_temperature: f32,
+    // NOTE: the WGSL uniform layout is mirrored in `shader.wgsl` (WorldSettings).
     // Keep uniform size a multiple of 16 bytes.
-    pub(crate) _pad0: f32,
-    pub(crate) _pad1: f32,
-    pub(crate) _pad2: f32,
-    pub(crate) _pad3: f32,
-    pub(crate) _pad4: f32,
-    pub(crate) _pad5: f32,
+    /// Directional light direction in texel space (x,y).
+    pub(crate) sun_dir_x: f32,
+    pub(crate) sun_dir_y: f32,
+    /// Shadow strength (0..2). Values > 1 push shadow target towards pure black.
+    pub(crate) shadow_strength: f32,
+    /// Shadow length in raymarch steps (1..64).
+    pub(crate) shadow_length_steps: f32,
+    /// Distance falloff exponent (0 disables distance attenuation).
+    pub(crate) shadow_distance_falloff: f32,
+    /// Background wall saturation (0 = grayscale, 1 = full color).
+    pub(crate) bg_saturation: f32,
+    /// Background wall brightness multiplier (0..5.0).
+    pub(crate) bg_brightness: f32,
 }
 #[derive(Default)]
 pub struct UpdateResult {
@@ -435,16 +443,19 @@ impl State {
             display_mode: 0.0, // Normal mode by default
             global_temperature: 21.0,
             // Directional light/shadows (used by shader.wgsl):
-            // _pad0/_pad1 = sun direction (texel space)
-            // _pad2 = shadow strength [0..2]
-            // _pad3 = shadow length in steps [1..64]
-            // _pad4 = distance falloff exponent [0..4]
-            _pad0: sun_x,
-            _pad1: sun_y,
-            _pad2: day_night.shadow_strength,
-            _pad3: day_night.shadow_length_steps,
-            _pad4: day_night.shadow_distance_falloff,
-            _pad5: 0.0,
+            // sun_dir_x/sun_dir_y = sun direction (texel space)
+            // shadow_strength = shadow strength [0..2]
+            // shadow_length_steps = shadow length in steps [1..64]
+            // shadow_distance_falloff = distance falloff exponent [0..4]
+            // bg_saturation = background saturation [0..1]
+            // bg_brightness = background brightness [0..5]
+            sun_dir_x: sun_x,
+            sun_dir_y: sun_y,
+            shadow_strength: day_night.shadow_strength,
+            shadow_length_steps: day_night.shadow_length_steps,
+            shadow_distance_falloff: day_night.shadow_distance_falloff,
+            bg_saturation: 0.5,
+            bg_brightness: 0.04,
         };
 
         let raw_ptr = &world_settings as *const WorldSettings;
@@ -770,6 +781,12 @@ impl State {
                 push_constant_ranges: &[],
             });
 
+        // Apply gamma correction only if the swapchain is NOT sRGB (to avoid double-gamma).
+        let bloom_fs_entry_point = match config.format {
+            wgpu::TextureFormat::Bgra8UnormSrgb | wgpu::TextureFormat::Rgba8UnormSrgb => "fs_main",
+            _ => "fs_main_gamma",
+        };
+
         let bloom_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Bloom Render Pipeline"),
@@ -781,7 +798,7 @@ impl State {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &bloom_shader,
-                    entry_point: "fs_main",
+                    entry_point: bloom_fs_entry_point,
                     targets: &[Some(wgpu::ColorTargetState {
                         format: config.format,
                         blend: Some(wgpu::BlendState {

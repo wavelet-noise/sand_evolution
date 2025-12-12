@@ -66,7 +66,7 @@ fn gaussian(x: f32, sigma: f32) -> f32 {
 }
 
 fn getWeight(index: u32) -> f32 {
-    let sigma: f32 = 1.5;
+    let sigma: f32 = 2.5;
     let x: f32 = f32(index) - 5.0; // Assuming the kernel size is 11 and the middle is at 5
     return gaussian(x, sigma);
 }
