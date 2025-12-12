@@ -65,19 +65,40 @@ impl CellTrait for Cell {
         }
         // Spawn "little fire" sparks independently from burn progression.
         // (My previous change accidentally made sparks rarer by gating this under progress.)
-        if prng.next() <= 150 {
-            let top = cs::xy_to_index(i, j + 1);
-            let topl = cs::xy_to_index(i - 1, j + 1);
-            let topr = cs::xy_to_index(i + 1, j + 1);
+        {
+            // More "little fires" from burning wood, but still probabilistic
+            // to avoid runaway spread.
+            const SPARK_TRIES_PER_TICK: u8 = 2;
+            const SPARK_ATTEMPT_THRESHOLD: u8 = 210; // ~82% chance to attempt each try
+            const SPARK_IGNITE_THRESHOLD: u8 = 170; // ~33% chance to ignite on attempt
 
-            let arr = [top, topl, topr];
-            let cc = arr[(prng.next() % 3) as usize];
-            let top_v = container[cc];
+            // Candidate cells above the burning wood: top, top-left, top-right.
+            // Keep bounds checks to avoid u16 underflow/overflow at borders.
+            let mut candidates: [usize; 3] = [0; 3];
+            let mut n = 0usize;
 
-            if top_v == Void::id() {
-                // Don't spawn fire every time: avoid runaway spread.
-                if prng.next() > 210 {
-                    container[cc] = fire::id();
+            if j + 1 < cs::SECTOR_SIZE.y {
+                candidates[n] = cs::xy_to_index(i, j + 1);
+                n += 1;
+                if i > 0 {
+                    candidates[n] = cs::xy_to_index(i - 1, j + 1);
+                    n += 1;
+                }
+                if i + 1 < cs::SECTOR_SIZE.x {
+                    candidates[n] = cs::xy_to_index(i + 1, j + 1);
+                    n += 1;
+                }
+            }
+
+            if n != 0 {
+                for _ in 0..SPARK_TRIES_PER_TICK {
+                    if prng.next() > SPARK_ATTEMPT_THRESHOLD {
+                        continue;
+                    }
+                    let cc = candidates[(prng.next() as usize) % n];
+                    if container[cc] == Void::id() && prng.next() > SPARK_IGNITE_THRESHOLD {
+                        container[cc] = fire::id();
+                    }
                 }
             }
         }

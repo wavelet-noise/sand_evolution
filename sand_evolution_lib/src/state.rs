@@ -1171,13 +1171,18 @@ impl State {
     pub fn diffuse_temperature_fast(&mut self) {
         // Tuned to avoid rapid global heat "flooding" from local sources (fire/wood).
         let diffusion_rate = 0.10;
+        // Slower cooling so heat persists longer.
         let cooling_rate = 0.998;
+        // Weak buoyancy: a small fraction of *positive* heat drifts upward each step.
+        // (Reduced grid, so keep it small to avoid visible "staircase" artifacts.)
+        // 2x faster upward drift.
+        let rise_rate = 0.016;
 
         // Work directly with the reduced grid
         let width = (cs::SECTOR_SIZE.x / 4) as usize;
         let height = (cs::SECTOR_SIZE.y / 4) as usize;
 
-        // Create temporary buffer for new temperatures
+        // Temporary buffer for new local temperatures (delta from global_temperature).
         let mut new_temps = vec![0.0f32; width * height];
 
         // Process all cells of the reduced grid
@@ -1216,21 +1221,35 @@ impl State {
                 // Simple diffusion: average with neighbors
                 let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
                 let diffused = current + (avg - current) * diffusion_rate;
-                // Temperatures are stored as local delta; clamp effective temperature.
-                let new_local = diffused * cooling_rate;
-                let eff = new_local + self.global_temperature;
-                let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
-                let new_temp = clamped - self.global_temperature;
-
-                new_temps[idx] = new_temp;
+                // Temperatures are stored as local delta.
+                new_temps[idx] = diffused * cooling_rate;
             }
         }
 
-        // Apply new temperatures
+        // Weak upward drift: move a small fraction of positive heat into the cell above.
+        // Note: in this reduced grid, "top" is (ty + 1).
+        if rise_rate > 0.0 {
+            for ty in 1..(height - 2) {
+                for tx in 1..(width - 1) {
+                    let idx = ty * width + tx;
+                    let top_idx = (ty + 1) * width + tx;
+                    let v = new_temps[idx];
+                    if v > 0.0 {
+                        let amount = v * rise_rate;
+                        new_temps[idx] -= amount;
+                        new_temps[top_idx] += amount;
+                    }
+                }
+            }
+        }
+
+        // Apply new temperatures with clamping in effective (global + local) domain.
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
-                self.cell_temperatures[idx] = new_temps[idx];
+                let eff = new_temps[idx] + self.global_temperature;
+                let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+                self.cell_temperatures[idx] = clamped - self.global_temperature;
             }
         }
     }
