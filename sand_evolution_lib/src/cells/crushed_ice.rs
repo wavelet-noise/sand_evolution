@@ -36,6 +36,13 @@ impl CellTrait for CrushedIce {
             if prng.next() > 200 {
                 if temperature > 0.0 {
                     container[cur] = Water::id();
+                    // Latent heat of fusion (smaller than solid ice due to lower "mass"/packing).
+                    const MELT_COOLING: f32 = 3.0;
+                    (temp_ctx.add_temp)(i, j, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i, j - 1, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i + 1, j, -MELT_COOLING);
+                    (temp_ctx.add_temp)(i - 1, j, -MELT_COOLING);
                     return;
                 }
             }

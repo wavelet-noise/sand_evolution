@@ -34,6 +34,13 @@ impl CellTrait for Snow {
             // If temperature is above 0 degrees, snow melts
             if temperature > 0.0 {
                 container[cur] = Water::id();
+                // Latent heat of fusion: melting snow should also cool (a bit weaker than ice).
+                const MELT_COOLING: f32 = 2.0;
+                (temp_ctx.add_temp)(i, j, -MELT_COOLING);
+                (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
+                (temp_ctx.add_temp)(i, j - 1, -MELT_COOLING);
+                (temp_ctx.add_temp)(i + 1, j, -MELT_COOLING);
+                (temp_ctx.add_temp)(i - 1, j, -MELT_COOLING);
                 return;
             }
         }
