@@ -42,8 +42,8 @@ impl Component for Velocity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptType {
-    World,   // World script
-    Entity,  // Object script
+    World,  // World script
+    Entity, // Object script
 }
 
 #[derive(Debug)]

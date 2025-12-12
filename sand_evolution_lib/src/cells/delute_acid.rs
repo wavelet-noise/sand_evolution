@@ -1,7 +1,7 @@
-use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cells::helper::fluid_falling_helper;
 use crate::cells::void::Void;
 use crate::cells::water::Water;
+use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 use crate::cs;
 use crate::cs::PointType;
 

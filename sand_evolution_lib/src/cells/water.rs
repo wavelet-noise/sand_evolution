@@ -1,4 +1,4 @@
-use super::{*, helper::fluid_falling_helper, TemperatureContext};
+use super::{helper::fluid_falling_helper, TemperatureContext, *};
 use crate::cs::PointType;
 pub struct Water;
 impl Water {
@@ -27,7 +27,7 @@ impl CellTrait for Water {
         // If checked after swap, cur no longer contains water!
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // Water evaporates into steam at high temperature
             // NOTE: Probability depends on temperature only at the boiling point.
             // At T >= 100, evaporate roughly in ~half of ticks.
@@ -47,7 +47,7 @@ impl CellTrait for Water {
                     return;
                 }
             }
-            
+
             // Water freezes at low temperature
             if temperature < -3.0 {
                 // Crystallization releases heat (we only model latent heat on phase change).
@@ -61,18 +61,23 @@ impl CellTrait for Water {
                 // NOTE: tweak probabilities here if desired.
                 use super::{crushed_ice::CrushedIce, snow::Snow};
                 let roll = dim.next();
-                container[cur] = if roll < 128 { CrushedIce::id() } else { Snow::id() };
+                container[cur] = if roll < 128 {
+                    CrushedIce::id()
+                } else {
+                    Snow::id()
+                };
                 return;
             }
         }
-        
+
         // Now try to fall (after temperature check)
-        let is_falling = fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1);
-        
+        let is_falling =
+            fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1);
+
         if is_falling {
             return;
         }
-        
+
         // When water is not falling, check for dissolution
         let top = cs::xy_to_index(i, j + 1);
         let down = cs::xy_to_index(i, j - 1);

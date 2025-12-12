@@ -1,4 +1,4 @@
-use super::{*, TemperatureContext};
+use super::{TemperatureContext, *};
 use crate::cs::{self, PointType};
 
 pub const fn new() -> Cell {

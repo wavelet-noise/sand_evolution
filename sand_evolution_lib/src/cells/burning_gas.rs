@@ -1,7 +1,8 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    fire, helper::fluid_flying_helper, void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
+    fire, helper::fluid_flying_helper, void::Void, CellRegistry, CellTrait, CellType, Prng,
+    TemperatureContext,
 };
 
 pub struct BurningGas;

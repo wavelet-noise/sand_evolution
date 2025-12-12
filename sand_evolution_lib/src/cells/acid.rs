@@ -1,4 +1,4 @@
-use super::{*, helper::fluid_falling_helper, TemperatureContext};
+use super::{helper::fluid_falling_helper, TemperatureContext, *};
 use crate::cs::PointType;
 
 pub struct Acid;

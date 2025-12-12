@@ -1,7 +1,8 @@
 use crate::cs::{self, PointType};
 
 use super::{
-    helper::fluid_falling_helper, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
+    helper::fluid_falling_helper, water::Water, CellRegistry, CellTrait, CellType, Prng,
+    TemperatureContext,
 };
 
 pub struct Snow;
@@ -30,7 +31,7 @@ impl CellTrait for Snow {
         // Snow melts only based on temperature - if temperature > 0, it melts.
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // If temperature is above 0 degrees, snow melts
             if temperature > 0.0 {
                 container[cur] = Water::id();
@@ -44,8 +45,9 @@ impl CellTrait for Snow {
                 return;
             }
         }
-        
-        if prng.next() > 128 && fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 10)
+
+        if prng.next() > 128
+            && fluid_falling_helper(self.den(), i, j, container, pal_container, cur, prng, 10)
         {
             return;
         }

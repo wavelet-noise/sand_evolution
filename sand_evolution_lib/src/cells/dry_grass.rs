@@ -1,6 +1,9 @@
 use crate::cs::{self, PointType};
 
-use super::{burning_wood, grass::Grass, water::Water, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
+use super::{
+    burning_wood, grass::Grass, water::Water, CellRegistry, CellTrait, CellType, Prng,
+    TemperatureContext,
+};
 
 pub struct DryGrass;
 impl DryGrass {
@@ -39,8 +42,11 @@ impl CellTrait for DryGrass {
             let l_v = container[l];
 
             // If there's water nearby, dry grass turns into grass
-            if top_v == Water::id() || down_v == Water::id() ||
-               r_v == Water::id() || l_v == Water::id() {
+            if top_v == Water::id()
+                || down_v == Water::id()
+                || r_v == Water::id()
+                || l_v == Water::id()
+            {
                 container[cur] = Grass::id();
                 return;
             }
@@ -59,8 +65,11 @@ impl CellTrait for DryGrass {
             let l_v = container[l];
 
             // If there's green grass nearby, dry grass slowly turns into green
-            if top_v == Grass::id() || down_v == Grass::id() ||
-               r_v == Grass::id() || l_v == Grass::id() {
+            if top_v == Grass::id()
+                || down_v == Grass::id()
+                || r_v == Grass::id()
+                || l_v == Grass::id()
+            {
                 // With very low probability, dry grass turns green
                 if prng.next() > 250 {
                     container[cur] = Grass::id();

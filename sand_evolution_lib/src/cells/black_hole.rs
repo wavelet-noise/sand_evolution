@@ -1,6 +1,6 @@
 use crate::cs::{self, PointType};
 
-use super::{{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
+use super::{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct BlackHole;
 
@@ -33,7 +33,7 @@ impl CellTrait for BlackHole {
             cs::xy_to_index(i, j + 1),
             cs::xy_to_index(i, j - 1),
             cs::xy_to_index(i + 1, j),
-            cs::xy_to_index(i - 1, j)
+            cs::xy_to_index(i - 1, j),
         ];
 
         for &idx in &neighbors {
@@ -59,4 +59,3 @@ impl CellTrait for BlackHole {
         Self::id()
     }
 }
-

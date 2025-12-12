@@ -32,14 +32,14 @@ impl CellTrait for Coal {
         // Coal can ignite at high temperature (varies by type/particle size).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-            
+
             // A rough baseline: ~450°C for ignition in this simulation.
             if temperature >= 450.0 && dim.next() > 235 {
                 container[cur] = BurningCoal::id();
                 return;
             }
         }
-        
+
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, dim);
     }
 

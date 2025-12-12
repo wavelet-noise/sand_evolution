@@ -1,7 +1,7 @@
-use egui::Ui;
-use specs::{World, WorldExt, Join, Entity};
 use crate::ecs::components::{Children, Name, Parent, Position};
 use crate::editor::state::EditorState;
+use egui::Ui;
+use specs::{Entity, Join, World, WorldExt};
 use std::collections::HashMap;
 
 pub struct EditorHierarchy;
@@ -9,15 +9,15 @@ pub struct EditorHierarchy;
 impl EditorHierarchy {
     pub fn ui(ui: &mut Ui, editor_state: &mut EditorState, world: &mut World) {
         ui.heading("Hierarchy");
-        
+
         // Search box with unique ID
         let mut search_text = String::new();
         ui.push_id("hierarchy_search", |ui| {
             ui.text_edit_singleline(&mut search_text);
         });
-        
+
         ui.separator();
-        
+
         // Scene root
         ui.collapsing("Scene", |ui| {
             // Build snapshots first (immutable borrows only), so we can freely mutate the world
@@ -77,7 +77,15 @@ impl EditorHierarchy {
             };
 
             for entity in roots {
-                Self::draw_entity_node(ui, editor_state, world, entity, &name_map, &children_map, &search_text);
+                Self::draw_entity_node(
+                    ui,
+                    editor_state,
+                    world,
+                    entity,
+                    &name_map,
+                    &children_map,
+                    &search_text,
+                );
             }
 
             if !search_text.is_empty() && !any_matches.is_empty() {
@@ -88,7 +96,7 @@ impl EditorHierarchy {
                 }
             }
         });
-        
+
         // Add object button
         ui.separator();
         if ui.button("+ Add Object").clicked() {
@@ -130,7 +138,15 @@ impl EditorHierarchy {
                 .default_open(true)
                 .show(ui, |ui| {
                     for ch in child_list {
-                        Self::draw_entity_node(ui, editor_state, world, ch, name_map, children_map, search_text);
+                        Self::draw_entity_node(
+                            ui,
+                            editor_state,
+                            world,
+                            ch,
+                            name_map,
+                            children_map,
+                            search_text,
+                        );
                     }
                 });
 
@@ -185,10 +201,10 @@ impl EditorHierarchy {
             });
         });
     }
-    
+
     fn add_new_object(world: &mut World, editor_state: &mut EditorState) {
         use specs::{Builder, Join};
-        
+
         // Check existing names first
         let mut counter = 1;
         let mut name = format!("Object {}", counter);
@@ -198,22 +214,26 @@ impl EditorHierarchy {
                 let entities = world.entities();
                 (&entities, &names).join().any(|(_, n)| n.name == name)
             };
-            
+
             if !name_exists {
                 break;
             }
             counter += 1;
             name = format!("Object {}", counter);
         }
-        
-        let entity = world.create_entity()
+
+        let entity = world
+            .create_entity()
             .with(Name { name: name.clone() })
             .with(Position { x: 0.0, y: 0.0 })
             .with(crate::ecs::components::Rotation::default())
             .with(crate::ecs::components::Scale::default())
             .build();
-        
+
         editor_state.select_entity(entity, false);
-        editor_state.add_toast(format!("Created: {}", name), crate::editor::state::ToastLevel::Info);
+        editor_state.add_toast(
+            format!("Created: {}", name),
+            crate::editor::state::ToastLevel::Info,
+        );
     }
 }

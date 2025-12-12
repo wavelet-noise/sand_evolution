@@ -1,6 +1,6 @@
 use crate::cs::{self, PointType};
 
-use super::{{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
+use super::{void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
 
 pub struct Electricity;
 impl Electricity {

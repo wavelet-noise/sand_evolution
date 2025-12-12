@@ -1,4 +1,4 @@
-use super::{{helper::fluid_flying_helper, *, TemperatureContext}};
+use super::{helper::fluid_flying_helper, TemperatureContext, *};
 use crate::cs::PointType;
 
 pub struct Gas;
@@ -55,7 +55,7 @@ impl CellTrait for Gas {
                 return;
             }
         }
-        
+
         fluid_flying_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
 
