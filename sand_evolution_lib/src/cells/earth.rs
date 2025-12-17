@@ -48,3 +48,4 @@ impl CellTrait for Earth {
         Self::id()
     }
 }
+
