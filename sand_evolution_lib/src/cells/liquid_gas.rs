@@ -25,16 +25,12 @@ impl CellTrait for LiquidGas {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Check temperature BEFORE falling
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // Liquid gas evaporates back to gas at temperature above -30
-            // with probability to avoid instant evaporation
             if temperature > -5.0 && prng.next() < 30 {
                 use super::gas::Gas;
                 container[cur] = Gas::id();
-                // Heat is absorbed during evaporation
                 (temp_ctx.add_temp)(i, j + 1, -3.0);
                 (temp_ctx.add_temp)(i, j - 1, -3.0);
                 (temp_ctx.add_temp)(i + 1, j, -3.0);
@@ -48,19 +44,14 @@ impl CellTrait for LiquidGas {
     }
 
     fn den(&self) -> i8 {
-        // Lighter than water, but still a liquid
         1
     }
 
     fn burnable(&self) -> CellType {
-        // Disable "contact ignition" (neighbor rules that use burnable()).
-        // Liquid gas should first evaporate to gas by temperature,
-        // and gas ignition is handled via temperature logic.
         Void::id()
     }
 
     fn heatable(&self) -> CellType {
-        // When heated becomes gas (and then can ignite)
         Gas::id()
     }
 
@@ -70,5 +61,8 @@ impl CellTrait for LiquidGas {
 
     fn id(&self) -> CellType {
         17
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [77, 230, 179]
     }
 }

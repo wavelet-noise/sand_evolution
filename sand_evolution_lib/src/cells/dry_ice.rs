@@ -41,9 +41,6 @@ impl CellTrait for DryIce {
         let bot = cs::xy_to_index(i, j - 1);
         let left = cs::xy_to_index(i + 1, j);
         let right = cs::xy_to_index(i - 1, j);
-
-        // Dry ice should not turn into water on contact
-        // Only melting at temperature (if temperature system is added)
     }
 
     fn stat(&self) -> bool {

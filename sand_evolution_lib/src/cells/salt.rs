@@ -1,27 +1,23 @@
+use crate::cells::salty_water::SaltyWater;
 use crate::cs::PointType;
 
 use super::{
     helper::sand_falling_helper, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
-/// Gravel — сыпучий материал, тяжелее песка/земли.
-pub struct Gravel;
-
-impl Gravel {
+pub struct Salt;
+impl Salt {
     pub const fn new() -> Self {
         Self
     }
-
     pub fn boxed() -> Box<Self> {
         Box::new(Self::new())
     }
-
     pub fn id() -> CellType {
-        19
+        13
     }
 }
-
-impl CellTrait for Gravel {
+impl CellTrait for Salt {
     fn update(
         &self,
         i: PointType,
@@ -34,25 +30,24 @@ impl CellTrait for Gravel {
     ) {
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
-
     fn den(&self) -> i8 {
         10
     }
-
-    fn name(&self) -> &str {
-        "gravel"
+    fn dissolve(&self) -> CellType {
+        SaltyWater::id()
     }
-
-    fn id(&self) -> CellType {
-        Self::id()
-    }
-    /// Гравий — сыпучий и довольно хорошо проводит тепло за счёт плотных контактов.
+    /// Кристаллическая соль чуть лучше проводит тепло, чем песок.
     fn thermal_conductivity(&self) -> f32 {
-        0.9
+        0.7
+    }
+    fn id(&self) -> CellType {
+        13
+    }
+    fn name(&self) -> &str {
+        "salt"
     }
     fn display_color(&self) -> [u8; 3] {
-        [140, 140, 150]
+        [204, 204, 204]
     }
 }
-
 

@@ -87,4 +87,7 @@ impl CellTrait for Plasma {
     fn id(&self) -> CellType {
         Self::id()
     }
+    fn display_color(&self) -> [u8; 3] {
+        [153, 77, 255]
+    }
 }

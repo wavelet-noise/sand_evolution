@@ -23,23 +23,14 @@ impl CellTrait for Water {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // IMPORTANT: Check temperature BEFORE falling to avoid duplicates
-        // If checked after swap, cur no longer contains water!
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // Water evaporates into steam at high temperature
-            // NOTE: Probability depends on temperature only at the boiling point.
-            // At T >= 100, evaporate roughly in ~half of ticks.
             if temperature >= 100.0 {
-                // 120 / 256 ~= 0.469 (almost half the ticks)
                 if dim.next() < 120 {
                     use super::steam::Steam;
                     container[cur] = Steam::id();
-                    // Heat is absorbed during evaporation (latent heat): should strongly cool the area,
-                    // so fire can't sustain at low temperature.
-                    const EVAP_COOLING: f32 = 25.0;
-                    (temp_ctx.add_temp)(i, j, -EVAP_COOLING);
+                    const EVAP_COOLING: f32 = 45.0;
                     (temp_ctx.add_temp)(i, j + 1, -EVAP_COOLING);
                     (temp_ctx.add_temp)(i, j - 1, -EVAP_COOLING);
                     (temp_ctx.add_temp)(i + 1, j, -EVAP_COOLING);
@@ -48,17 +39,12 @@ impl CellTrait for Water {
                 }
             }
 
-            // Water freezes at low temperature
             if temperature < -3.0 {
-                // Crystallization releases heat (we only model latent heat on phase change).
-                // Warm neighbors a bit to avoid "cold flicker" feedback loops.
                 (temp_ctx.add_temp)(i, j + 1, 3.0);
                 (temp_ctx.add_temp)(i, j - 1, 3.0);
                 (temp_ctx.add_temp)(i + 1, j, 3.0);
                 (temp_ctx.add_temp)(i - 1, j, 3.0);
 
-                // Freeze into crushed ice OR snow randomly.
-                // NOTE: tweak probabilities here if desired.
                 use super::{crushed_ice::CrushedIce, snow::Snow};
                 let roll = dim.next();
                 container[cur] = if roll < 128 {
@@ -70,7 +56,6 @@ impl CellTrait for Water {
             }
         }
 
-        // Now try to fall (after temperature check)
         let is_falling =
             fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1);
 
@@ -78,7 +63,6 @@ impl CellTrait for Water {
             return;
         }
 
-        // When water is not falling, check for dissolution
         let top = cs::xy_to_index(i, j + 1);
         let down = cs::xy_to_index(i, j - 1);
         let r = cs::xy_to_index(i + 1, j);
@@ -105,9 +89,19 @@ impl CellTrait for Water {
     }
 
     fn shadow_rgba(&self) -> [u8; 4] {
-        // Water should cast a softer, slightly bluish shadow (semi-transparent occluder).
-        // RGB is a multiplier (255 = no darkening), A controls how strongly it affects shadows.
         [210, 225, 255, 255]
+    }
+    /// Вода хорошо проводит и перемешивает тепло.
+    fn thermal_conductivity(&self) -> f32 {
+        1.3
+    }
+    /// Сильная конвекция: тёплая вода активно поднимает тепло вверх.
+    fn convection_factor(&self) -> f32 {
+        1.0
+    }
+
+    fn display_color(&self) -> [u8; 3] {
+        [26, 38, 255]
     }
 
     fn name(&self) -> &str {

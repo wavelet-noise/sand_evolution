@@ -1,8 +1,56 @@
 use super::{TemperatureContext, *};
 use crate::cs::{self, PointType};
 
-pub struct BurningCoal;
-impl BurningCoal {
+pub struct BurningPowder;
+
+// Helper function to spawn smoke particles in nearby Void cells
+fn try_spawn_smoke(
+    i: PointType,
+    j: PointType,
+    container: &mut [CellType],
+    prng: &mut Prng,
+    target_count: usize,
+) -> usize {
+    let mut spawned = 0;
+    let mut candidates = Vec::new();
+
+    // Collect all adjacent Void cells as candidates
+    if j + 1 < cs::SECTOR_SIZE.y {
+        let top = cs::xy_to_index(i, j + 1);
+        if container[top] == Void::id() {
+            candidates.push(top);
+        }
+    }
+    if j > 0 {
+        let bot = cs::xy_to_index(i, j - 1);
+        if container[bot] == Void::id() {
+            candidates.push(bot);
+        }
+    }
+    if i + 1 < cs::SECTOR_SIZE.x {
+        let right = cs::xy_to_index(i + 1, j);
+        if container[right] == Void::id() {
+            candidates.push(right);
+        }
+    }
+    if i > 0 {
+        let left = cs::xy_to_index(i - 1, j);
+        if container[left] == Void::id() {
+            candidates.push(left);
+        }
+    }
+
+    // Shuffle candidates using prng and spawn smoke
+    while spawned < target_count && !candidates.is_empty() {
+        let idx = (prng.next() as usize) % candidates.len();
+        let cell_idx = candidates.remove(idx);
+        container[cell_idx] = Smoke::id();
+        spawned += 1;
+    }
+
+    spawned
+}
+impl BurningPowder {
     pub const fn new() -> Self {
         Self
     }
@@ -11,27 +59,11 @@ impl BurningCoal {
     }
 
     pub fn id() -> CellType {
-        7
+        51
     }
 }
 
-fn has_adjacent_air(i: PointType, j: PointType, container: &[CellType]) -> bool {
-    if i > 0 && container[cs::xy_to_index(i - 1, j)] == Void::id() {
-        return true;
-    }
-    if i + 1 < cs::SECTOR_SIZE.x && container[cs::xy_to_index(i + 1, j)] == Void::id() {
-        return true;
-    }
-    if j > 0 && container[cs::xy_to_index(i, j - 1)] == Void::id() {
-        return true;
-    }
-    if j + 1 < cs::SECTOR_SIZE.y && container[cs::xy_to_index(i, j + 1)] == Void::id() {
-        return true;
-    }
-    false
-}
-
-impl CellTrait for BurningCoal {
+impl CellTrait for BurningPowder {
     fn update(
         &self,
         i: PointType,
@@ -42,14 +74,7 @@ impl CellTrait for BurningCoal {
         prng: &mut Prng,
         mut temp_context: Option<&mut TemperatureContext>,
     ) {
-        if !has_adjacent_air(i, j, container) {
-            if prng.next() > 220 {
-                container[cur] = Coal::id();
-                return;
-            }
-        }
-
-        const BURNING_COAL_SUSTAIN_TEMP: f32 = 90.0;
+        const BURNING_POWDER_SUSTAIN_TEMP: f32 = 90.0;
         let mut extinguish = false;
         if let Some(temp_ctx) = temp_context.as_deref() {
             let mut sum = (temp_ctx.get_temp)(i, j);
@@ -72,9 +97,10 @@ impl CellTrait for BurningCoal {
                 n += 1.0;
             }
 
-            extinguish = (sum / n) < BURNING_COAL_SUSTAIN_TEMP;
+            extinguish = (sum / n) < BURNING_POWDER_SUSTAIN_TEMP;
         }
 
+        // Burning powder releases heat
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
             (temp_ctx.add_temp)(i, j + 1, 3.0); // top
             (temp_ctx.add_temp)(i, j - 1, 3.0); // bottom
@@ -82,7 +108,9 @@ impl CellTrait for BurningCoal {
             (temp_ctx.add_temp)(i - 1, j, 3.0); // left
         }
         if extinguish {
-            container[cur] = Coal::id();
+            // Try to spawn 4 smoke particles when extinguishing
+            try_spawn_smoke(i, j, container, prng, 4);
+            container[cur] = Powder::id();
             return;
         }
         if !sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
@@ -91,6 +119,12 @@ impl CellTrait for BurningCoal {
 
             let top = cs::xy_to_index(i, j + 1);
 
+            // Generate smoke continuously during burning
+            if prng.next() > 100 {
+                // ~60% chance to spawn smoke each tick
+                try_spawn_smoke(i, j, container, prng, 1);
+            }
+
             if prng.next() > 200 {
                 return;
             }
@@ -98,12 +132,14 @@ impl CellTrait for BurningCoal {
             if container[top] == Water::id() {
                 container[top] = Steam::id();
                 if prng.next() > 200 {
-                    container[cur] = Coal::id();
+                    container[cur] = Powder::id();
                 }
                 return;
             }
 
-            if prng.next() < 1 && prng.next() < 1 {
+            if prng.next() > 250 {
+                // Try to spawn 4 smoke particles when despawning
+                try_spawn_smoke(i, j, container, prng, 4);
                 container[cur] = Void::id();
                 //prng.add_carb();
                 return;
@@ -135,16 +171,17 @@ impl CellTrait for BurningCoal {
     }
 
     fn den(&self) -> i8 {
-        10
+        2
     }
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
     }
     fn name(&self) -> &str {
-        "burning coal"
+        "burning powder"
     }
 
     fn id(&self) -> CellType {
-        7
+        51
     }
 }
+

@@ -66,4 +66,7 @@ impl CellTrait for SaltyWater {
     fn id(&self) -> CellType {
         16
     }
+    fn display_color(&self) -> [u8; 3] {
+        [128, 128, 255]
+    }
 }

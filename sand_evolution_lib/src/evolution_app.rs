@@ -18,6 +18,38 @@ use crate::{
 };
 use specs::WorldExt;
 
+/// Simple manager for window styling (background color, text color, etc.).
+/// For now all app windows share the same style.
+pub struct WindowStyleManager {
+    pub window_background: Color32,
+    pub text_color: Color32,
+}
+
+impl WindowStyleManager {
+    /// Apply common frame (background) to a window builder.
+    pub fn apply<'a>(&self, window: egui::Window<'a>) -> egui::Window<'a> {
+        window.frame(
+            egui::Frame::window(&egui::Style::default()).fill(self.window_background),
+        )
+    }
+
+    /// Apply common text color to a window's UI.
+    pub fn apply_to_ui(&self, ui: &mut egui::Ui) {
+        ui.visuals_mut().override_text_color = Some(self.text_color);
+    }
+}
+
+impl Default for WindowStyleManager {
+    fn default() -> Self {
+        Self {
+            // Slightly translucent dark background.
+            window_background: Color32::from_rgba_unmultiplied(20, 10, 10, 180),
+            // Brighter, warm-ish text.
+            text_color: Color32::from_rgb(240, 230, 230),
+        }
+    }
+}
+
 struct Executor {
     #[cfg(not(target_arch = "wasm32"))]
     pool: futures::executor::ThreadPool,
@@ -46,6 +78,10 @@ pub struct EvolutionApp {
     pub number_of_cells_to_add: i32,
     pub number_of_structures_to_add: i32,
     pub simulation_steps_per_second: i32,
+    /// Whether automatic simulation stepping is paused (manual step buttons still work).
+    pub simulation_paused: bool,
+    /// Extra simulation steps to run once (used by "step" buttons in the UI).
+    pub pending_simulation_steps: i32,
     pub selected_option: String,
     pub options: Vec<String>,
     pub cursor_position: Option<PhysicalPosition<f64>>,
@@ -90,6 +126,13 @@ pub struct EvolutionApp {
 
     // Display mode: Normal or Temperature map
     pub display_mode: DisplayMode,
+    /// Which temperature field is visualized (ambient / per‑cell / combined).
+    pub heat_vis_mode: HeatVisMode,
+    /// Number of per‑cell temperature diffusion iterations per simulation tick.
+    /// Позволяет усиливать «проводимость» без изменения самой схемы.
+    pub cell_diffusion_iterations: i32,
+    /// Centralized window style (background color, etc.).
+    pub window_style: WindowStyleManager,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -97,7 +140,10 @@ pub struct HoverInfo {
     pub x: cs::PointType,
     pub y: cs::PointType,
     pub cell_id: u8,
-    pub temperature: f32,
+    /// Температура самой клетки (локальная, 1:1 с сеткой клеток).
+    pub cell_temperature: f32,
+    /// Амбиентная (сглаженная, низкочастотная) температура в окрестности курсора.
+    pub ambient_temperature: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +151,16 @@ pub enum DisplayMode {
     Normal,
     Temperature,
     Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeatVisMode {
+    /// Show only the low‑resolution ambient temperature field.
+    Ambient,
+    /// Show only the per‑cell temperature field (1:1 with cells).
+    Cells,
+    /// Show a combined view (current behaviour, max(ambient, cell)).
+    Combined,
 }
 
 pub fn compact_number_string(n: f32) -> String {
@@ -327,20 +383,24 @@ impl EvolutionApp {
         // Editor Hierarchy - right column, top half
         let (hierarchy_x, hierarchy_y) = self.editor_state.hierarchy_pos.unwrap_or((1560.0, 10.0));
         let (hierarchy_w, hierarchy_h) = self.editor_state.hierarchy_size.unwrap_or((350.0, 530.0));
-        egui::Window::new("Hierarchy")
+        self.window_style
+            .apply(egui::Window::new("Hierarchy"))
             .default_pos(egui::pos2(hierarchy_x, hierarchy_y))
             .default_size(egui::vec2(hierarchy_w, hierarchy_h))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 EditorHierarchy::ui(ui, &mut self.editor_state, world);
             });
 
         // Editor Inspector - right column, bottom half
         let (inspector_x, inspector_y) = self.editor_state.inspector_pos.unwrap_or((1560.0, 550.0));
         let (inspector_w, inspector_h) = self.editor_state.inspector_size.unwrap_or((350.0, 530.0));
-        egui::Window::new("Inspector")
+        self.window_style
+            .apply(egui::Window::new("Inspector"))
             .default_pos(egui::pos2(inspector_x, inspector_y))
             .default_size(egui::vec2(inspector_w, inspector_h))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 EditorInspector::ui(ui, &mut self.editor_state, world);
             });
 
@@ -353,10 +413,12 @@ impl EvolutionApp {
         // Show toasts
         self.show_toasts(context);
 
-        egui::Window::new("🪟 Windows")
+        self.window_style
+            .apply(egui::Window::new("🪟 Windows"))
             .default_pos(egui::pos2(10.0, 10.0))
             .resizable(false)
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 let toggle_btn = |ui: &mut egui::Ui, value: &mut bool, label: &str| {
                     if ui.add(egui::SelectableLabel::new(*value, label)).clicked() {
                         *value = !*value;
@@ -410,13 +472,33 @@ impl EvolutionApp {
                         self.display_mode = DisplayMode::Both;
                     }
                 });
+                ui.add_space(6.0);
+                ui.label("Temperature source");
+                ComboBox::from_id_source("heat_source_mode")
+                    .width(180.0)
+                    .selected_text(match self.heat_vis_mode {
+                        HeatVisMode::Ambient => "Ambient",
+                        HeatVisMode::Cells => "Cells",
+                        HeatVisMode::Combined => "Ambient + Cells",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.heat_vis_mode, HeatVisMode::Ambient, "Ambient");
+                        ui.selectable_value(&mut self.heat_vis_mode, HeatVisMode::Cells, "Cells");
+                        ui.selectable_value(
+                            &mut self.heat_vis_mode,
+                            HeatVisMode::Combined,
+                            "Ambient + Cells",
+                        );
+                    });
             });
 
-        egui::Window::new("🔎 Hover")
+        self.window_style
+            .apply(egui::Window::new("🔎 Hover"))
             .open(&mut win_hover)
             .default_pos(egui::pos2(340.0, 440.0))
             .resizable(false)
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 ui.heading("Hovered cell");
                 ui.add_space(4.0);
 
@@ -430,17 +512,20 @@ impl EvolutionApp {
 
                     ui.label(format!("Pos: ({}, {})", info.x, info.y));
                     ui.label(format!("Cell: {} (id {})", cell_name, info.cell_id));
-                    ui.label(format!("Temp: {:.1}°", info.temperature));
+                    ui.label(format!("Cell temp: {:.1}°", info.cell_temperature));
+                    ui.label(format!("Ambient temp: {:.1}°", info.ambient_temperature));
                 } else {
                     ui.label("Move cursor over the simulation to inspect.");
                 }
             });
 
-        egui::Window::new("📁 Files")
+        self.window_style
+            .apply(egui::Window::new("📁 Files"))
             .open(&mut win_files)
             .default_pos(egui::pos2(340.0, 5.0))
             .default_size(egui::vec2(320.0, 420.0))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 egui::CollapsingHeader::new("📦 Project")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -534,11 +619,13 @@ impl EvolutionApp {
                                                       // Fix the window size so it cannot become too large
         let fixed_height = max_window_height.min(600.0);
 
-        egui::Window::new("📝 Script Editor")
+        self.window_style
+            .apply(egui::Window::new("📝 Script Editor"))
             .open(&mut win_script_editor)
             .default_pos(egui::pos2(560.0, 5.0))
             .fixed_size(egui::vec2(600.0, fixed_height))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 use crate::ecs::components::Name;
                 use specs::Join;
 
@@ -570,8 +657,6 @@ impl EvolutionApp {
                         });
                 });
 
-                // Check for change in selected object and load script only on change
-                // Important: check must be AFTER rendering ComboBox so changes are detected in the same frame
                 if self.selected_object_name != self.last_loaded_object {
                     if let Some(script_text) =
                         self.get_object_script(world, &self.selected_object_name)
@@ -755,11 +840,13 @@ impl EvolutionApp {
         self.win_script_editor = win_script_editor;
 
         // Script Log Window
-        egui::Window::new("Script Log")
+        self.window_style
+            .apply(egui::Window::new("Script Log"))
             .open(&mut self.show_log_window)
             .default_pos(egui::pos2(1160.0, 5.0))
             .default_size(egui::vec2(400.0, 500.0))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 ui.horizontal(|ui| {
                     if ui.button("Clear").clicked() {
                         self.script_log.borrow_mut().clear();
@@ -786,19 +873,59 @@ impl EvolutionApp {
                 *any_win_hovered |= context.is_pointer_over_area()
             });
 
-        egui::Window::new("⏱ Simulation")
+        self.window_style
+            .apply(egui::Window::new("⏱ Simulation"))
             .open(&mut win_simulation)
             .default_pos(egui::pos2(5.0, 5.0))
             .default_size(egui::vec2(280.0, 460.0))
             .resizable(true)
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 // Simulation Configuration
-                ui.heading("Pause or simulation speed");
+                ui.heading("Simulation control");
+                ui.horizontal(|ui| {
+                    let is_running = !self.simulation_paused;
+                    if ui
+                        .button(if is_running { "⏸ Pause" } else { "▶ Play" })
+                        .clicked()
+                    {
+                        self.simulation_paused = !self.simulation_paused;
+                    }
+
+                    let can_step = self.simulation_steps_per_second > 0;
+
+                    let mut step1 = ui.add_enabled(can_step, egui::Button::new("Step ×1"));
+                    if !can_step {
+                        step1 = step1.on_hover_text("Increase speed above 0 to enable stepping");
+                    }
+                    if step1.clicked() {
+                        self.pending_simulation_steps += 1;
+                    }
+
+                    let mut step10 = ui.add_enabled(can_step, egui::Button::new("Step ×10"));
+                    if !can_step {
+                        step10 = step10.on_hover_text("Increase speed above 0 to enable stepping");
+                    }
+                    if step10.clicked() {
+                        self.pending_simulation_steps += 10;
+                    }
+                });
+
+                ui.add_space(4.0);
+                ui.heading("Simulation speed");
                 ui.add(
-                    egui::Slider::new(&mut self.simulation_steps_per_second, 0..=480)
+                    egui::Slider::new(&mut self.simulation_steps_per_second, 1..=480)
                         // Keep slider limited, but don't clamp the value when it's typed/edited.
                         .clamp_to_range(false)
-                        .text("Simulation steps per second"),
+                        .text("Steps per second"),
+                );
+
+                ui.add_space(6.0);
+                ui.heading("Heat diffusion");
+                ui.add(
+                    egui::Slider::new(&mut self.cell_diffusion_iterations, 1..=32)
+                        .clamp_to_range(true)
+                        .text("Cell diffusion iterations / tick"),
                 );
 
                 ui.separator();
@@ -844,7 +971,9 @@ impl EvolutionApp {
                     "fps: {}",
                     compact_number_string(fps_meter.next() as f32)
                 ));
-                let sim_step_avg_time_str = if self.simulation_steps_per_second == 0 {
+                let sim_step_avg_time_str = if self.simulation_paused
+                    || self.simulation_steps_per_second <= 0
+                {
                     "Simulation Step Avg Time: ON PAUSE".to_string()
                 } else {
                     format!(
@@ -862,23 +991,6 @@ impl EvolutionApp {
                 } else {
                     ui.label("running ok");
                 }
-
-                // Particle Spawning
-                ui.separator();
-                ui.heading("Particle Spawning");
-                ui.label("Hold left mouse button to spawn particles");
-                ComboBox::from_id_source("dropdown_list")
-                    .selected_text(&self.selected_option)
-                    .show_ui(ui, |ui| {
-                        self.options.iter().for_each(|option| {
-                            ui.selectable_value(
-                                &mut self.selected_option,
-                                option.to_string(),
-                                option.to_string(),
-                            );
-                        });
-                    });
-                ui.label(format!("Selected: {}", self.selected_option));
 
                 // Structure Spawning
                 ui.separator();
@@ -904,12 +1016,14 @@ impl EvolutionApp {
 
         // Graphics settings window
         let mut win_graphics: bool = self.win_graphics;
-        egui::Window::new("🎛 Graphics")
+        self.window_style
+            .apply(egui::Window::new("🎛 Graphics"))
             .open(&mut win_graphics)
             .default_pos(egui::pos2(300.0, 10.0))
             .default_size(egui::vec2(320.0, 220.0))
             .resizable(true)
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 ui.heading("Shadows");
                 ui.add_space(6.0);
 
@@ -952,11 +1066,13 @@ impl EvolutionApp {
             });
         self.win_graphics = win_graphics;
         // Separate window for GitHub templates / projects
-        egui::Window::new("🧩 Templates")
+        self.window_style
+            .apply(egui::Window::new("🧩 Templates"))
             .open(&mut win_templates)
             .default_pos(egui::pos2(780.0, 5.0))
             .default_size(egui::vec2(420.0, 360.0))
             .show(context, |ui| {
+                self.window_style.apply_to_ui(ui);
                 ui.heading("GitHub templates");
 
                 ui.separator();
@@ -1121,43 +1237,15 @@ impl EvolutionApp {
         let input_rect = context.input().screen_rect;
         let palette_y = (input_rect.height() - 70.0).max(50.0);
         let palette_width = (input_rect.width() - 20.0).max(400.0);
-        egui::Window::new("🎨 Palette")
+        self.window_style
+            .apply(egui::Window::new("🎨 Palette"))
             .open(&mut win_palette)
             .default_pos(egui::pos2(10.0, palette_y))
             .fixed_size(egui::vec2(palette_width, 50.0))
             .resizable(true)
             .collapsible(true)
             .show(context, |ui| {
-                // Cell type data: (name for dict, display name, color RGB)
-                let cell_types: Vec<(&str, &str, [u8; 3])> = vec![
-                    ("sand", "Sand", [204, 204, 26]),
-                    ("earth", "Earth", [120, 72, 35]),
-                    ("gravel", "Gravel", [140, 140, 150]),
-                    ("water", "Water", [26, 38, 255]),
-                    ("steam", "Steam", [128, 128, 128]),
-                    ("fire", "Fire", [255, 128, 0]),
-                    ("coal", "Coal", [26, 26, 26]),
-                    ("acid", "Acid", [0, 102, 0]),
-                    ("gas", "Gas", [51, 204, 51]),
-                    ("delute acid", "Delute Acid", [51, 153, 204]),
-                    ("salt", "Salt", [204, 204, 204]),
-                    ("base", "Base", [255, 51, 51]),
-                    ("salty water", "Salty Water", [128, 128, 255]),
-                    ("base water", "Base Water", [255, 128, 255]),
-                    ("liquid_gas", "Liquid Gas", [77, 230, 179]),
-                    ("wood", "Wood", [128, 51, 51]),
-                    ("ice", "Ice", [77, 153, 255]),
-                    ("crushed ice", "Crushed Ice", [128, 204, 255]),
-                    ("snow", "Snow", [204, 230, 255]),
-                    ("electricity", "Electricity", [51, 102, 255]),
-                    ("plasma", "Plasma", [153, 77, 255]),
-                    ("laser", "Laser", [255, 26, 0]),
-                    ("grass", "Grass", [102, 255, 102]),
-                    ("dry grass", "Dry Grass", [179, 125, 107]),
-                    ("black_hole", "Black Hole", [89, 0, 89]),
-                    ("stone", "Stone", [200, 200, 200]),
-                ];
-
+                self.window_style.apply_to_ui(ui);
                 ui.horizontal(|ui| {
                     // Brush size slider
                     ui.spacing_mut().slider_width = 100.0;
@@ -1177,9 +1265,17 @@ impl EvolutionApp {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
 
-                                for (dict_name, display_name, color) in &cell_types {
+                                // Iterate over all registered cell types (except id 0 / Void).
+                                for cell in state.pal_container.pal.iter() {
+                                    let id = cell.id();
+                                    if id == 0 {
+                                        continue;
+                                    }
+
+                                    let dict_name = cell.name();
+                                    let color = cell.display_color();
                                     let color32 = Color32::from_rgb(color[0], color[1], color[2]);
-                                    let is_selected = self.selected_option == *dict_name;
+                                    let is_selected = self.selected_option == dict_name;
 
                                     // Button with color square and name
                                     let button_response =
@@ -1235,7 +1331,7 @@ impl EvolutionApp {
                                                     rect.min
                                                         + egui::vec2(28.0, rect.height() / 2.0),
                                                     egui::Align2::LEFT_CENTER,
-                                                    *display_name,
+                                                    dict_name,
                                                     egui::FontId::proportional(11.0),
                                                     Color32::WHITE,
                                                 );
@@ -1272,11 +1368,13 @@ impl EvolutionApp {
                 crate::editor::state::ToastLevel::Error => Color32::from_rgb(255, 50, 50),
             };
 
-            egui::Window::new("")
+            self.window_style
+                .apply(egui::Window::new(""))
                 .title_bar(false)
                 .resizable(false)
                 .fixed_pos(egui::pos2(10.0, 500.0 + (i as f32 * 40.0)))
                 .show(ctx, |ui| {
+                    self.window_style.apply_to_ui(ui);
                     ui.colored_label(color, &toast.message);
                 });
         }
@@ -1386,6 +1484,8 @@ impl EvolutionApp {
             number_of_cells_to_add,
             number_of_structures_to_add,
             simulation_steps_per_second: 240,
+            simulation_paused: false,
+            pending_simulation_steps: 0,
             selected_option,
             options,
             cursor_position: None,
@@ -1423,6 +1523,9 @@ impl EvolutionApp {
             show_log_window: false,
 
             display_mode: DisplayMode::Normal,
+            heat_vis_mode: HeatVisMode::Combined,
+            cell_diffusion_iterations: 1,
+            window_style: WindowStyleManager::default(),
         }
     }
 }

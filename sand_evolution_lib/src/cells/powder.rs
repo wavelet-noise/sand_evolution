@@ -1,13 +1,12 @@
 use crate::cs::PointType;
-use crate::cs;
 
 use super::{
-    burning_coal::BurningCoal, burning_gas::BurningGas, helper::sand_falling_helper, CellRegistry,
-    CellTrait, CellType, Prng, TemperatureContext, void::Void,
+    burning_powder::BurningPowder, burning_gas::BurningGas, helper::sand_falling_helper, CellRegistry,
+    CellTrait, CellType, Prng, TemperatureContext,
 };
 
-pub struct Coal;
-impl Coal {
+pub struct Powder;
+impl Powder {
     pub const fn new() -> Self {
         Self
     }
@@ -15,27 +14,11 @@ impl Coal {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        8
+        5
     }
 }
 
-fn has_adjacent_air(i: PointType, j: PointType, container: &[CellType]) -> bool {
-    if i > 0 && container[cs::xy_to_index(i - 1, j)] == Void::id() {
-        return true;
-    }
-    if i + 1 < cs::SECTOR_SIZE.x && container[cs::xy_to_index(i + 1, j)] == Void::id() {
-        return true;
-    }
-    if j > 0 && container[cs::xy_to_index(i, j - 1)] == Void::id() {
-        return true;
-    }
-    if j + 1 < cs::SECTOR_SIZE.y && container[cs::xy_to_index(i, j + 1)] == Void::id() {
-        return true;
-    }
-    false
-}
-
-impl CellTrait for Coal {
+impl CellTrait for Powder {
     fn update(
         &self,
         i: PointType,
@@ -46,11 +29,13 @@ impl CellTrait for Coal {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Coal can ignite at high temperature (varies by type/particle size).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            if temperature >= 450.0 && dim.next() > 235 && has_adjacent_air(i, j, container) {
-                container[cur] = BurningCoal::id();
+            // A rough baseline: ~450°C for ignition in this simulation.
+            if temperature >= 450.0 && dim.next() > 235 {
+                container[cur] = BurningPowder::id();
                 return;
             }
         }
@@ -62,21 +47,22 @@ impl CellTrait for Coal {
         10
     }
     fn burnable(&self) -> u8 {
-        BurningCoal::id()
+        BurningPowder::id()
     }
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
     }
     fn ignition_temperature(&self) -> Option<f32> {
-        Some(300.0)
+        Some(450.0)
     }
     fn name(&self) -> &str {
-        "coal"
+        "powder"
     }
     fn id(&self) -> CellType {
-        8
+        5
     }
     fn display_color(&self) -> [u8; 3] {
         [26, 26, 26]
     }
 }
+

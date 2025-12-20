@@ -94,13 +94,15 @@ impl CellTrait for DryGrass {
         burning_wood::id()
     }
     fn ignition_temperature(&self) -> Option<f32> {
-        // Dry grass ignites easier than wood/green grass.
-        Some(250.0)
+        Some(220.0)
     }
     fn id(&self) -> CellType {
         71
     }
     fn name(&self) -> &str {
         "dry grass"
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [179, 125, 107]
     }
 }

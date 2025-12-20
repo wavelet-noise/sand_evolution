@@ -37,4 +37,10 @@ impl CellTrait for Stone {
     fn id(&self) -> CellType {
         255
     }
+    fn thermal_conductivity(&self) -> f32 {
+        0.4
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [200, 200, 200]
+    }
 }

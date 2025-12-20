@@ -28,14 +28,11 @@ impl CellTrait for Snow {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Snow melts only based on temperature - if temperature > 0, it melts.
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // If temperature is above 0 degrees, snow melts
             if temperature > 0.0 {
                 container[cur] = Water::id();
-                // Latent heat of fusion: melting snow should also cool (a bit weaker than ice).
                 const MELT_COOLING: f32 = 2.0;
                 (temp_ctx.add_temp)(i, j, -MELT_COOLING);
                 (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
@@ -64,9 +61,6 @@ impl CellTrait for Snow {
         let _bot = cs::xy_to_index(i, j - 1);
         let _left = cs::xy_to_index(i + 1, j);
         let _right = cs::xy_to_index(i - 1, j);
-
-        // Snow should not turn into water on contact
-        // Only melting at temperature > 0 (if temperature system is added)
     }
 
     fn den(&self) -> i8 {
@@ -85,5 +79,8 @@ impl CellTrait for Snow {
     }
     fn id(&self) -> CellType {
         Self::id()
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [204, 230, 255]
     }
 }

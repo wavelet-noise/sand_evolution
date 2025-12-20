@@ -1,5 +1,5 @@
 use crate::cells::base_water::BaseWater;
-use crate::cells::salty_water::SaltyWater;
+use crate::cells::salt::Salt;
 use crate::cs::PointType;
 
 use super::{
@@ -35,53 +35,21 @@ impl CellTrait for Sand {
     fn den(&self) -> i8 {
         10
     }
+    /// Песок — сыпучий и сравнительно плохо проводит тепло.
+    fn thermal_conductivity(&self) -> f32 {
+        0.5
+    }
     fn proton_transfer(&self) -> CellType {
         Gas::id()
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [204, 204, 26]
     }
     fn id(&self) -> CellType {
         1
     }
     fn name(&self) -> &str {
         "sand"
-    }
-}
-
-pub struct Salt;
-impl Salt {
-    pub const fn new() -> Self {
-        Self
-    }
-    pub fn boxed() -> Box<Self> {
-        Box::new(Self::new())
-    }
-    pub fn id() -> CellType {
-        13
-    }
-}
-impl CellTrait for Salt {
-    fn update(
-        &self,
-        i: PointType,
-        j: PointType,
-        cur: usize,
-        container: &mut [CellType],
-        pal_container: &CellRegistry,
-        prng: &mut Prng,
-        _: Option<&mut TemperatureContext>,
-    ) {
-        sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
-    }
-    fn den(&self) -> i8 {
-        10
-    }
-    fn dissolve(&self) -> CellType {
-        SaltyWater::id()
-    }
-    fn id(&self) -> CellType {
-        13
-    }
-    fn name(&self) -> &str {
-        "salt"
     }
 }
 
@@ -118,6 +86,12 @@ impl CellTrait for Base {
     }
     fn dissolve(&self) -> CellType {
         BaseWater::id()
+    }
+    fn thermal_conductivity(&self) -> f32 {
+        0.6
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [255, 51, 51]
     }
     fn id(&self) -> CellType {
         14

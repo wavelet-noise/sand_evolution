@@ -27,16 +27,12 @@ impl CellTrait for CrushedIce {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Crushed ice melts only based on temperature - if temperature > 0, it melts.
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // If temperature is above 0 degrees, crushed ice melts
-            // Check rarely to avoid fast melt/freeze cycles
             if prng.next() > 200 {
                 if temperature > 0.0 {
                     container[cur] = Water::id();
-                    // Latent heat of fusion (smaller than solid ice due to lower "mass"/packing).
                     const MELT_COOLING: f32 = 3.0;
                     (temp_ctx.add_temp)(i, j, -MELT_COOLING);
                     (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
@@ -106,9 +102,6 @@ impl CellTrait for CrushedIce {
         let _bot = cs::xy_to_index(i, j - 1);
         let _left = cs::xy_to_index(i + 1, j);
         let _right = cs::xy_to_index(i - 1, j);
-
-        // Crushed ice should not turn into water on contact
-        // Only melting at temperature > 0
     }
 
     fn den(&self) -> i8 {
@@ -131,5 +124,8 @@ impl CellTrait for CrushedIce {
     }
     fn id(&self) -> CellType {
         Self::id()
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [128, 204, 255]
     }
 }

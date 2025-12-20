@@ -3,21 +3,26 @@ mod base_water;
 pub mod black_hole;
 pub mod burning_coal;
 pub mod burning_gas;
+pub mod burning_powder;
 pub mod burning_wood;
 pub mod coal;
 pub mod crushed_ice;
+pub mod powder;
 mod delute_acid;
 pub mod earth;
 pub mod electricity;
 pub mod fire;
 pub mod gas;
+pub mod copper;
 mod grass;
 pub mod gravel;
 mod helper;
 pub mod ice;
 pub mod liquid_gas;
+pub mod salt;
 mod salty_water;
 pub mod sand;
+pub mod smoke;
 pub mod snow;
 pub mod steam;
 pub mod stone;
@@ -46,15 +51,20 @@ use self::{
     black_hole::BlackHole,
     burning_coal::BurningCoal,
     burning_gas::BurningGas,
+    burning_powder::BurningPowder,
+    copper::Copper,
     coal::Coal,
     crushed_ice::CrushedIce,
+    powder::Powder,
     earth::Earth,
     gas::Gas,
     gravel::Gravel,
     helper::sand_falling_helper,
     ice::Ice,
     liquid_gas::LiquidGas,
-    sand::{Base, Salt, Sand},
+    salt::Salt,
+    sand::{Base, Sand},
+    smoke::Smoke,
     snow::Snow,
     steam::Steam,
     void::Void,
@@ -63,15 +73,18 @@ use self::{
 };
 pub type CellType = u8;
 
+/// Размер пула случайных чисел для Prng. Можно легко изменить для настройки производительности.
+pub const PRNG_POOL_SIZE: usize = 2048;
+
 pub struct Prng {
-    rnd: [u8; 256],
+    rnd: [u8; PRNG_POOL_SIZE],
     rnd_next: usize,
     carb: i32,
 }
 
 impl Prng {
     pub fn new() -> Self {
-        let mut buf = [0u8; 256];
+        let mut buf = [0u8; PRNG_POOL_SIZE];
         // High‑quality randomness from OS / WebCrypto via getrandom.
         let _ = getrandom::getrandom(&mut buf);
         Self {
@@ -89,7 +102,7 @@ impl Prng {
 
     pub fn next(&mut self) -> u8 {
         self.rnd_next += 1;
-        self.rnd_next = if self.rnd_next >= 256 {
+        self.rnd_next = if self.rnd_next >= PRNG_POOL_SIZE {
             0
         } else {
             self.rnd_next
@@ -192,6 +205,37 @@ pub trait CellTrait {
     fn ignition_temperature(&self) -> Option<f32> {
         None
     }
+    /// Relative thermal conductivity of this material for *local* heat spreading.
+    ///
+    /// Безразмерный коэффициент, который управляет тем, как быстро локальная
+    /// температура этой клетки выравнивается с соседями в
+    /// `State::diffuse_temperature_fast`:
+    ///
+    /// - 0.0  — почти изолятор / тепло в основном остаётся «на месте»,
+    /// - 0.3–0.7 — сыпучие материалы (песок, грунт, снег),
+    /// - ~1.0    — типичное твёрдое тело (камень),
+    /// - >1.0   — очень хорошо проводящие среды (медь, вода, плазма и т.п.).
+    ///
+    /// Чем больше значение, тем быстрее нагретая область будет «растекаться»
+    /// по этому материалу и тем быстрее по нему видно фронт температуры.
+    fn thermal_conductivity(&self) -> f32 {
+        0.0
+    }
+    /// Strength of vertical convection / перемешивания тепла для материала.
+    ///
+    /// Тоже безразмерный коэффициент:
+    /// - 0.0 — конвекции почти нет (твёрдые, сыпучие),
+    /// - ~0.2–0.5 — умеренное перемешивание (вязкие жидкости),
+    /// - ~1.0 — сильная конвекция (вода, газы, плазма).
+    fn convection_factor(&self) -> f32 {
+        0.0
+    }
+    /// UI color for this cell in the palette (sRGB 0–255).
+    ///
+    /// По умолчанию — нейтрально‑серый. Конкретные типы могут переопределить.
+    fn display_color(&self) -> [u8; 3] {
+        [200, 200, 200]
+    }
     fn name(&self) -> &str {
         ""
     }
@@ -209,6 +253,7 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[2] = Water::boxed();
     cell_registry.pal[3] = Steam::boxed();
     cell_registry.pal[4] = fire::boxed();
+    cell_registry.pal[5] = Powder::boxed();
     cell_registry.pal[6] = burning_wood::boxed();
     cell_registry.pal[7] = BurningCoal::boxed();
     cell_registry.pal[8] = Coal::boxed();
@@ -223,7 +268,10 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[17] = LiquidGas::boxed();
     cell_registry.pal[18] = Earth::boxed();
     cell_registry.pal[19] = Gravel::boxed();
+    cell_registry.pal[20] = Copper::boxed();
+    cell_registry.pal[21] = Smoke::boxed();
     cell_registry.pal[50] = Wood::boxed();
+    cell_registry.pal[51] = BurningPowder::boxed();
     cell_registry.pal[55] = Ice::boxed();
     cell_registry.pal[56] = CrushedIce::boxed();
     cell_registry.pal[57] = Snow::boxed();

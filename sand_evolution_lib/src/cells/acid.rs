@@ -1,4 +1,4 @@
-use super::{helper::fluid_falling_helper, TemperatureContext, *};
+use super::{helper::fluid_falling_helper, salt::Salt, TemperatureContext, *};
 use crate::cs::PointType;
 
 pub struct Acid;
@@ -87,5 +87,8 @@ impl CellTrait for Acid {
 
     fn id(&self) -> CellType {
         9
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [0, 102, 0]
     }
 }

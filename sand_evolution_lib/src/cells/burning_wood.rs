@@ -24,8 +24,6 @@ impl CellTrait for Cell {
         prng: &mut Prng,
         mut temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Burning wood should extinguish if the environment is not hot enough.
-        // This makes "surrounded by water" work via cooling/temperature only.
         const BURNING_WOOD_SUSTAIN_TEMP: f32 = 60.0;
         let mut extinguish = false;
         if let Some(temp_ctx) = temp_context.as_deref() {
@@ -52,7 +50,6 @@ impl CellTrait for Cell {
             extinguish = (sum / n) < BURNING_WOOD_SUSTAIN_TEMP;
         }
 
-        // Burning wood releases heat
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
             (temp_ctx.add_temp)(i, j + 1, 1.0); // top
             (temp_ctx.add_temp)(i, j - 1, 1.0); // bottom
@@ -63,17 +60,11 @@ impl CellTrait for Cell {
             container[cur] = Wood::id();
             return;
         }
-        // Spawn "little fire" sparks independently from burn progression.
-        // (My previous change accidentally made sparks rarer by gating this under progress.)
         {
-            // More "little fires" from burning wood, but still probabilistic
-            // to avoid runaway spread.
             const SPARK_TRIES_PER_TICK: u8 = 2;
-            const SPARK_ATTEMPT_THRESHOLD: u8 = 210; // ~82% chance to attempt each try
-            const SPARK_IGNITE_THRESHOLD: u8 = 170; // ~33% chance to ignite on attempt
+            const SPARK_ATTEMPT_THRESHOLD: u8 = 210;
+            const SPARK_IGNITE_THRESHOLD: u8 = 170;
 
-            // Candidate cells above the burning wood: top, top-left, top-right.
-            // Keep bounds checks to avoid u16 underflow/overflow at borders.
             let mut candidates: [usize; 3] = [0; 3];
             let mut n = 0usize;
 
@@ -106,9 +97,6 @@ impl CellTrait for Cell {
             return;
         }
 
-        // Char to coal only rarely per progress step.
-        // With threshold 253 -> 2/256 ~= 0.78% per progress step.
-        // Combined with the progress gate above gives ~22-23s expected lifetime.
         if prng.next() > 253 {
             container[cur] = Coal::id();
             return;

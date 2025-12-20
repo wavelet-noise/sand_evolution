@@ -2,10 +2,7 @@ use crate::cs::PointType;
 
 use crate::cs;
 
-use super::{
-    burning_wood, gas::Gas, steam::Steam, void::Void, CellRegistry, CellTrait, CellType, Prng,
-    TemperatureContext,
-};
+use super::{{burning_wood, gas::Gas, void::Void, CellRegistry, CellTrait, CellType, Prng, TemperatureContext}};
 
 pub struct Wood;
 impl Wood {
@@ -21,8 +18,6 @@ impl Wood {
 }
 
 fn has_adjacent_air(i: PointType, j: PointType, container: &[CellType]) -> bool {
-    // "Access to air": at least one orthogonal neighbor is Void.
-    // Bounds checks avoid u16 underflow/wrap at edges.
     if i > 0 && container[cs::xy_to_index(i - 1, j)] == Void::id() {
         return true;
     }
@@ -48,21 +43,11 @@ impl CellTrait for Wood {
         prng: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Wood can auto-ignite only when very hot (environment ignition).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
-
-            // Keep auto-ignition high, and make it rare: otherwise it behaves like gunpowder.
+            
             if temperature >= 320.0 && prng.next() > 200 && has_adjacent_air(i, j, container) {
                 container[cur] = burning_wood::id();
-                // When wood ignites into burning wood, it may release steam upward if there is space.
-                // Chance: 1/5.
-                if j + 1 < cs::SECTOR_SIZE.y {
-                    let top = cs::xy_to_index(i, j + 1);
-                    if container[top] == Void::id() && (prng.next() % 5) == 0 {
-                        container[top] = Steam::id();
-                    }
-                }
                 return;
             }
         }
@@ -78,9 +63,6 @@ impl CellTrait for Wood {
         Gas::id()
     }
     fn ignition_temperature(&self) -> Option<f32> {
-        // "Can ignite from external fire" threshold.
-        // Actual ignition probability is handled in fire.rs and scales with (temp - threshold),
-        // so at low heat it will ignite very slowly.
         Some(260.0)
     }
     fn name(&self) -> &str {

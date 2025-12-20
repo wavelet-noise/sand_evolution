@@ -36,8 +36,7 @@ impl CellTrait for Earth {
     }
 
     fn den(&self) -> i8 {
-        // Чуть тяжелее песка, чтобы чаще оседала ниже.
-        11
+        10
     }
 
     fn name(&self) -> &str {
@@ -47,5 +46,13 @@ impl CellTrait for Earth {
     fn id(&self) -> CellType {
         Self::id()
     }
+    /// Грунт — сыпучий, немного лучше проводит тепло, чем песок.
+    fn thermal_conductivity(&self) -> f32 {
+        0.6
+    }
+    fn display_color(&self) -> [u8; 3] {
+        [120, 72, 35]
+    }
 }
+
 

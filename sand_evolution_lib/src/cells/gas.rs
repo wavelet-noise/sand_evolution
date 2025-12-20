@@ -27,17 +27,6 @@ impl CellTrait for Gas {
         if let Some(temp_ctx) = temp_context.as_deref() {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // Gas should ignite well from temperature.
-            // We model this as a probability that grows with temperature once above a threshold.
-            //
-            // Start igniting from "hot air" temps; at 200°C this is already quite likely.
-            // p(T) = clamp((T - 150) * 1.92, 0..255) / 256
-            // Examples:
-            // - 150°C => 0%
-            // - 180°C => ~22%
-            // - 200°C => ~37.5%
-            // - 250°C => ~75%
-            // - 300°C => ~99%
             if temperature >= 150.0 {
                 let chance_f = ((temperature - 150.0) * (96.0 / 50.0)).clamp(0.0, 255.0);
                 let chance = chance_f as u8;
@@ -47,8 +36,6 @@ impl CellTrait for Gas {
                 }
             }
 
-            // Gas condenses into liquid gas at very low temperature.
-            // With small probability to avoid instant condensation.
             if temperature < -50.0 && prng.next() < 10 {
                 use super::liquid_gas::LiquidGas;
                 container[cur] = LiquidGas::id();
@@ -66,13 +53,9 @@ impl CellTrait for Gas {
         false
     }
     fn burnable(&self) -> CellType {
-        // Disable "contact ignition" routes (neighbor rules that use burnable()).
-        // Gas should ignite via temperature logic instead.
         Void::id()
     }
     fn heatable(&self) -> CellType {
-        // Disable "contact ignition" routes (neighbor rules that use heatable()).
-        // Gas should ignite via temperature logic instead.
         Void::id()
     }
     fn name(&self) -> &str {
@@ -81,5 +64,9 @@ impl CellTrait for Gas {
 
     fn id(&self) -> CellType {
         10
+    }
+
+    fn display_color(&self) -> [u8; 3] {
+        [51, 204, 51]
     }
 }
