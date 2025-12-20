@@ -55,4 +55,7 @@ impl CellTrait for Electricity {
     fn id(&self) -> CellType {
         Self::id()
     }
+    fn display_color(&self) -> [u8; 3] {
+        [51, 102, 255]
+    }
 }

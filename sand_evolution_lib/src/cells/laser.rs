@@ -70,4 +70,7 @@ impl CellTrait for Laser {
     fn id(&self) -> CellType {
         Self::id()
     }
+    fn display_color(&self) -> [u8; 3] {
+        [255, 26, 0]
+    }
 }

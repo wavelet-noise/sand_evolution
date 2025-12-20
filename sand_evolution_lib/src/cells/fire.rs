@@ -150,4 +150,7 @@ impl CellTrait for Cell {
     fn id(&self) -> CellType {
         4
     }
+    fn display_color(&self) -> [u8; 3] {
+        [255, 128, 0]
+    }
 }

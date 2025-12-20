@@ -16,6 +16,12 @@ struct WorldSettings {
     // Background.
     bg_saturation: f32,            // 0..1
     bg_brightness: f32,            // 0.1..5
+    // Temperature visualization source: 0 = ambient, 1 = per‑cell, 2 = combined.
+    heat_source_mode: f32,
+    // Padding / reserved (keep struct size a multiple of 16 bytes, in sync with Rust).
+    _pad_heat0: f32,
+    _pad_heat1: f32,
+    _pad_heat2: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -315,6 +321,10 @@ var t_shadow_props: texture_2d<f32>;
 @group(3) @binding(1)
 var s_shadow_props: sampler;
 
+// Full-resolution per-cell temperature (1:1 with simulation grid).
+@group(2) @binding(2)
+var t_cell_temperature: texture_2d<f32>;
+
 fn shadow_props(id: u32) -> vec4<f32> {
     // Texture is 256x1 (RGBA8Unorm). Channels are normalized to [0..1].
     // - rgb: shadow multiplier color (1.0 = no darkening)
@@ -361,26 +371,18 @@ fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
     }
     dir = normalize(dir);
 
-    // DDA-like step: ensure we advance at least one texel per iteration
-    // along the dominant axis to avoid sampling the same cell repeatedly.
     let inv = 1.0 / max(abs(dir.x), abs(dir.y));
     let step = dir * inv;
 
-    // Raymarch budget (texel steps).
-    // Use a fixed upper bound for predictable shader compilation.
     let MAX_STEPS: i32 = 64;
     let max_steps: i32 = clamp(i32(round(settings.shadow_length_steps)), 1, MAX_STEPS);
 
-    // Soft shadow: cast a few slightly offset rays (cheap penumbra) and
-    // attenuate darkness by hit distance (near occluders = darker).
     let perp = vec2<f32>(-dir.y, dir.x);
     let samples: i32 = 5;
-    // NOTE: avoid `half` identifier (conflicts with Metal's `half` type).
     let half_samples = f32(samples - 1) * 0.5;
     var strength_sum: f32 = 0.0;
     var mult_rgb_sum: vec3<f32> = vec3<f32>(0.0);
 
-    // Stable per-pixel jitter to reduce banding.
     let jitter = (noise2(vec2<f32>(f32(cell_xy.x), f32(cell_xy.y)) * 0.17) - 0.5) * 0.25;
 
     for (var s: i32 = 0; s < samples; s = s + 1) {
@@ -391,9 +393,7 @@ fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
         var hit_mult_rgb: vec3<f32> = vec3<f32>(1.0);
         for (var i: i32 = 1; i <= MAX_STEPS; i = i + 1) {
             if (i > max_steps) { break; }
-            // March towards the light source (opposite of light direction).
             p -= step;
-            // Important: use floor so negatives become -1, -2, ... (i32() truncates toward 0).
             let pi = vec2<i32>(i32(floor(p.x)), i32(floor(p.y)));
 
             if (pi.x < 0 || pi.y < 0 || pi.x >= i32(settings.res_x) || pi.y >= i32(settings.res_y)) {
@@ -490,8 +490,6 @@ fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
     let chips = smoothstep(0.72, 0.93, voroNoise2(p * 0.28 + brick_id * 3.1, 0.55, 0.9));
     brick = mix(brick, brick * vec3<f32>(1.14, 1.14, 1.14), chips * wear_k * 0.28);
 
-    // Mortar (cooler, slightly noisy).
-    // Make it warm dark-gray (avoid green/cyan tint) and low-contrast.
     var grout = vec3<f32>(0.12, 0.12, 0.125);
     let grout_n = fbm_simplex_2d(p * 0.16 + vec2<f32>(13.1, 7.7), 2, 2.2, 0.55) * 0.5 + 0.5;
     grout *= 0.92 + 0.08 * grout_n;
@@ -529,7 +527,6 @@ fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
 fn wall_brick_mortar_mask_simple(cell_xy: vec2<i32>) -> f32 {
     let p = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
 
-    // Must match the wall brick grid used in `wall_background_albedo()`.
     let brick_size = vec2<f32>(16.0, 8.0);
     var b = p / brick_size;
 
@@ -562,8 +559,6 @@ fn wall_brick_pseudo_normal(cell_xy: vec2<i32>) -> vec3<f32> {
 }
 
 fn is_translucent_fluid_or_gas(t: u32) -> bool {
-    // Cells that should show the wall background through them.
-    // Keep this list tight: we don't want to accidentally make solids transparent.
     return
         t == 2u  || // water
         t == 3u  || // steam
@@ -573,8 +568,10 @@ fn is_translucent_fluid_or_gas(t: u32) -> bool {
         t == 12u || // delute acid
         t == 15u || // salty water
         t == 16u || // base water
-        t == 17u;   // liquid gas
+        t == 17u || // liquid gas
+        t == 21u;   // smoke
 }
+
 
 // Fire color ramp: deep red -> orange -> yellow -> white (HDR-ready).
 // Input is normalized "heat" in [0..1].
@@ -593,8 +590,6 @@ fn fire_color_ramp(heat01: f32) -> vec3<f32> {
     return c;
 }
 
-// Heat tint for the *wall bricks* in Normal mode (not flames):
-// dull red -> hot red-orange, intentionally avoiding yellow/white.
 fn brick_heat_color_ramp(heat01: f32) -> vec3<f32> {
     let t = clamp(heat01, 0.0, 1.0);
     let c0 = vec3<f32>(0.0, 0.0, 0.0);
@@ -632,7 +627,37 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let temp_smooth = sample_temperature_bilinear(uv, temp_dims_i, temp_dims_f);
 
     let is_temp_point_sampling = (settings.display_mode > 0.5);
-    let temp_value = (select(temp_smooth, temp_point, is_temp_point_sampling)) + settings.global_temperature;
+    let temp_value_ambient =
+        (select(temp_smooth, temp_point, is_temp_point_sampling)) + settings.global_temperature;
+
+    // Full-resolution per-cell temperature (local delta from global), 1:1 with cell grid.
+    let cell_xy_full = vec2<i32>(
+        clamp(i32(in.uv.x * settings.res_x), 0, i32(settings.res_x) - 1),
+        clamp(i32(in.uv.y * settings.res_y), 0, i32(settings.res_y) - 1),
+    );
+    let cell_temp_local = textureLoad(t_cell_temperature, cell_xy_full, 0).r;
+    // Cell type at this texel (0 = void).
+    let cell_type_here: u32 = textureLoad(t_diffuse, cell_xy_full, 0).x;
+    var temp_value_cell = cell_temp_local + settings.global_temperature;
+    if (settings.heat_source_mode > 0.5 && settings.heat_source_mode < 1.5) {
+        if (cell_type_here == 0u) {
+            temp_value_cell = 0.0;
+        }
+    }
+
+    // Combine or select ambient / per‑cell temperature for visualization.
+    // heat_source_mode:
+    //   0.0 => ambient only
+    //   1.0 => per‑cell only
+    //   2.0 => combined (max of both, previous behaviour)
+    var temp_value: f32;
+    if (settings.heat_source_mode < 0.5) {
+        temp_value = temp_value_ambient;
+    } else if (settings.heat_source_mode < 1.5) {
+        temp_value = temp_value_cell;
+    } else {
+        temp_value = max(temp_value_ambient, temp_value_cell);
+    }
 
     // Extra smoothing for heat visualization in Normal render (more "blurry heat").
     // Temperature grid is already low-res (res/4), so a few taps are cheap.
@@ -644,29 +669,22 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let t4 = sample_temperature_bilinear(uv + vec2<f32>(0.0, -texel_uv.y), temp_dims_i, temp_dims_f);
     let temp_vis = (t0 + t1 + t2 + t3 + t4) * 0.2 + settings.global_temperature;
     
-    // Map temperature (degrees) to color: cold (blue) -> neutral (black) -> hot (red/yellow).
-    //
-    // Visualization ranges (in degrees):
-    // - cold: 0 .. -100 (saturates below -100)
-    // - hot:  0 ..  300 (saturates above 300)
     var temp_col: vec4<f32>;
-    if temp_value < 0.0 {
-        // Cold: smooth blue gradient from neutral (black) to bright blue
-        // Use a more noticeable gradient for better visibility
-        let coldness = clamp(abs(temp_value) / 100.0, 0.0, 1.0);
-        // Brighter blue with a slight green tint for smoothness
-        temp_col = vec4<f32>(0.0, coldness * 0.4, coldness * 1.2, 1.0);
-        // Clamp blue channel to 1.0
-        temp_col.b = min(temp_col.b, 1.0);
+    if (temp_value < 0.0) {
+        let cold = clamp(-temp_value / 100.0, 0.0, 1.0);
+        let cold_rgb = mix(
+            vec3<f32>(0.0, 0.0, 0.0),
+            vec3<f32>(0.0, 0.35, 1.0),
+            cold,
+        );
+        temp_col = vec4<f32>(cold_rgb, 1.0);
     } else {
-        // Hot: red/yellow gradient
-        //
-        // Start "warm" visualization only after +100 degrees to avoid
-        // glowing too early on low positive temperatures.
-        let warm_start = 100.0;
-        let warm_end = 300.0;
-        let hotness = clamp((temp_value - warm_start) / (warm_end - warm_start), 0.0, 1.0);
-        temp_col = vec4<f32>(hotness, hotness * 0.5, 0.0, 1.0);
+        let hot = clamp(temp_value / 500.0, 0.0, 1.0);
+        let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
+        let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
+        let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
+        let rgb = vec3<f32>(red, green, blue) * hot;
+        temp_col = vec4<f32>(rgb, 1.0);
     }
     
     // Check if we're in temperature-only mode
@@ -764,6 +782,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
       let a = clamp(0.10 + 0.18 * k, 0.10, 0.32);
       col = vec4<f32>(vec3<f32>(0.5) * k, a);
     }
+    else if t == 21u // smoke
+    {
+      let k = clamp((tdnoise_fast + 2.0) / 3.0, 0.0, 1.0);
+      let a = clamp(0.15 + 0.10 * k, 0.6, 0.99);
+      let smoke_color = vec3<f32>(0.02, 0.02, 0.02) * (0.9 + 0.1 * k);
+      col = vec4<f32>(0.0,0.0,0.0, 1.0);//test
+    }
     else if t == 4u // fire
     {
       // Improved fire shading with separated temperature, flame, and incandescence
@@ -796,7 +821,6 @@ let flame_fbm = fbm_simplex_3d(
 );
 let f01 = clamp(flame_fbm * 0.5 + 0.5, 0.0, 1.0);
 
-// Lateral sway to avoid grid-lock
 let sway_n = simplex_noise_3d(vec3<f32>((cell_pos + cell_uv) * 0.18, settings.time * 0.9));
 let sway = clamp(sway_n, -1.0, 1.0) * 0.22;
 
@@ -930,7 +954,6 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     }
     else if t == 6u // burning_wood
     {
-      // Warm orange embers with subtle flicker (avoid greenish tint).
       let flicker = clamp((tdnoise_fast + 1.0) * 0.5, 0.0, 1.0);
       col = mix(
         vec4<f32>(1.4, 0.35, 0.03, 1.0),  // darker ember orange
@@ -939,6 +962,14 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
       );
     }
     else if t == 7u
+    {
+      col = mix(
+        vec4<f32>(8.0, 0.0, 0.0, 1.0),
+        vec4<f32>(8.0, 0.5, 0.0, 1.0),
+        noisy_mixer
+      ) * 10.0;
+    }
+    else if t == 51u // burning powder
     {
       col = mix(
         vec4<f32>(8.0, 0.0, 0.0, 1.0),
@@ -1014,24 +1045,20 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     }
 
     // Composite translucent fluids/gases over the wall (so bricks are visible through them).
-    // Use additive-style compositing: keeps background fully visible and preserves bright/bloom colors.
+    // Use alpha blending so dark colors are visible.
     if (is_translucent_fluid_or_gas(t)) {
         let a = clamp(col.a, 0.0, 1.0);
-        col = vec4<f32>(wall_bg_shadowed + col.rgb * a, 1.0);
+        col = vec4<f32>(mix(wall_bg_shadowed, col.rgb, a), 1.0);
     }
 
     // Direct heat visualization in Normal render (NOT bloom):
     // Blackbody-like heat tint driven by blurred temperature field.
     // Keep it subtle so it reads as "heat", not "paint".
     let heat = clamp((temp_vis - 140.0) / (520.0 - 140.0), 0.0, 1.0);
-    // NOTE: In Both mode we show the temperature map via `temp_col`,
-    // so don't add the extra blurred heat overlay.
     if (heat > 0.0 && settings.display_mode < 1.5) {
         // Exponential response (more perceptual): keeps low heat subtle, ramps high heat faster.
         let heat_e = 1.0 - exp(-2.6 * heat);
 
-        // Small animated shimmer so the heat field isn't perfectly static.
-        // Keep the amplitude low to avoid "sparkly" look.
         let shimmer = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
 
         // Feed the same ramp as fire, but clamp the top end so normal-mode heat
@@ -1084,8 +1111,6 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     
     // Calculate bloom before clamping (bloom needs values > 1.0)
     if (col.r > 1.0 || col.g > 1.0 || col.b > 1.0) {
-        // NOTE: normalize(vec4) makes bright colors look washed out (and also shrinks alpha).
-        // Use max-component normalization instead: preserves hue/saturation.
         let maxc = max(col.r, max(col.g, col.b));
         let rgb = col.rgb / max(1.0, maxc);
         out.albedo = vec4<f32>(rgb, col.a);

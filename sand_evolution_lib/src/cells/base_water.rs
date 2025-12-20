@@ -79,4 +79,7 @@ impl CellTrait for BaseWater {
     fn id(&self) -> CellType {
         15
     }
+    fn display_color(&self) -> [u8; 3] {
+        [255, 128, 255]
+    }
 }

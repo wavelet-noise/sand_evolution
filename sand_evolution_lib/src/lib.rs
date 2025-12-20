@@ -384,7 +384,6 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     };
     surface.configure(&device, &surface_config);
 
-    // We use the egui_winit_platform crate as the platform.
     let mut platform = Platform::new(PlatformDescriptor {
         physical_width: size.width as u32,
         physical_height: size.height as u32,
@@ -393,7 +392,6 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         style: Default::default(),
     });
 
-    // We use the egui_wgpu_backend crate as the render backend.
     let mut egui_rpass = RenderPass::new(&device, surface_format, 1);
 
     // Display the demo application that ships with egui.
@@ -490,12 +488,29 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let steps_per_this_frame = ((delta_t + collected_delta)
-                    * evolution_app.simulation_steps_per_second as f64)
-                    .floor();
-                if evolution_app.simulation_steps_per_second != 0 {
+                // Calculate how many simulation steps to run this frame.
+                // When paused, automatic stepping is disabled, but manual step buttons
+                // in the UI can still queue discrete steps.
+                let mut sim_steps: i32 = 0;
+                if !evolution_app.simulation_paused
+                    && evolution_app.simulation_steps_per_second > 0
+                {
+                    let steps_per_this_frame = ((delta_t + collected_delta)
+                        * evolution_app.simulation_steps_per_second as f64)
+                        .floor();
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
                     collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
+                    sim_steps += steps_per_this_frame as i32;
+                } else {
+                    // While paused (or with zero speed) we don't want to accumulate
+                    // fractional time towards future automatic steps.
+                    collected_delta = 0.0;
+                }
+
+                // Apply any queued manual steps (from "Step ×1/×10" buttons).
+                if evolution_app.pending_simulation_steps > 0 {
+                    sim_steps += evolution_app.pending_simulation_steps;
+                    evolution_app.pending_simulation_steps = 0;
                 }
 
                 if evolution_app.need_to_recompile {
@@ -552,12 +567,6 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     }
                 }
 
-                let sim_steps = if evolution_app.simulation_steps_per_second == 0 {
-                    0
-                } else {
-                    steps_per_this_frame as i32
-                };
-
                 // UPDATE (also runs on pause with sim_steps=0, to keep uniforms/UI responsive)
                 let upd_result = game_context.update(
                     &queue,
@@ -568,9 +577,12 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     window.scale_factor(),
                 );
 
-                // dispatch() is now called inside update_tick on each simulation tick
-                // Keep one call for cases when simulation is not running
-                if evolution_app.simulation_steps_per_second == 0 {
+                // dispatch() is now called inside update_tick on each simulation tick.
+                // Keep one call for cases when simulation is not running at all.
+                if sim_steps == 0
+                    && (evolution_app.simulation_paused
+                        || evolution_app.simulation_steps_per_second <= 0)
+                {
                     game_context.dispatch();
                 }
 

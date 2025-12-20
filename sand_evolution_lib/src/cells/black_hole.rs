@@ -58,4 +58,7 @@ impl CellTrait for BlackHole {
     fn id(&self) -> CellType {
         Self::id()
     }
+    fn display_color(&self) -> [u8; 3] {
+        [89, 0, 89]
+    }
 }
