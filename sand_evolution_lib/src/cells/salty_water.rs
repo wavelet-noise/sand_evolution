@@ -12,7 +12,7 @@ impl SaltyWater {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        15
+        84
     }
 }
 
@@ -64,7 +64,7 @@ impl CellTrait for SaltyWater {
     }
 
     fn id(&self) -> CellType {
-        16
+        84
     }
     fn display_color(&self) -> [u8; 3] {
         [128, 128, 255]
