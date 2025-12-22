@@ -15,7 +15,7 @@ impl DeluteAcid {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        12
+        83
     }
 }
 
@@ -95,6 +95,6 @@ impl CellTrait for DeluteAcid {
     }
 
     fn id(&self) -> CellType {
-        12
+        83
     }
 }

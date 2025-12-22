@@ -6,6 +6,7 @@ pub mod burning_gas;
 pub mod burning_powder;
 pub mod burning_wood;
 pub mod coal;
+pub mod compressed_steam;
 pub mod crushed_ice;
 pub mod powder;
 mod delute_acid;
@@ -19,13 +20,14 @@ pub mod gravel;
 mod helper;
 pub mod ice;
 pub mod liquid_gas;
-pub mod salt;
 mod salty_water;
+pub mod salt;
 pub mod sand;
 pub mod smoke;
 pub mod snow;
 pub mod steam;
 pub mod stone;
+pub mod twice_compressed_steam;
 pub mod void;
 pub mod water;
 pub mod wood;
@@ -54,6 +56,7 @@ use self::{
     burning_powder::BurningPowder,
     copper::Copper,
     coal::Coal,
+    compressed_steam::CompressedSteam,
     crushed_ice::CrushedIce,
     powder::Powder,
     earth::Earth,
@@ -67,6 +70,7 @@ use self::{
     smoke::Smoke,
     snow::Snow,
     steam::Steam,
+    twice_compressed_steam::TwiceCompressedSteam,
     void::Void,
     water::Water,
     wood::Wood,
@@ -253,24 +257,21 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[2] = Water::boxed();
     cell_registry.pal[3] = Steam::boxed();
     cell_registry.pal[4] = fire::boxed();
-    cell_registry.pal[5] = Powder::boxed();
+    cell_registry.pal[5] = Wood::boxed();
     cell_registry.pal[6] = burning_wood::boxed();
     cell_registry.pal[7] = BurningCoal::boxed();
     cell_registry.pal[8] = Coal::boxed();
     cell_registry.pal[9] = Acid::boxed();
     cell_registry.pal[10] = Gas::boxed();
     cell_registry.pal[11] = BurningGas::boxed();
-    cell_registry.pal[12] = DeluteAcid::boxed();
     cell_registry.pal[13] = Salt::boxed();
     cell_registry.pal[14] = Base::boxed();
-    cell_registry.pal[15] = SaltyWater::boxed();
-    cell_registry.pal[16] = BaseWater::boxed();
     cell_registry.pal[17] = LiquidGas::boxed();
     cell_registry.pal[18] = Earth::boxed();
     cell_registry.pal[19] = Gravel::boxed();
     cell_registry.pal[20] = Copper::boxed();
     cell_registry.pal[21] = Smoke::boxed();
-    cell_registry.pal[50] = Wood::boxed();
+    cell_registry.pal[50] = Powder::boxed();
     cell_registry.pal[51] = BurningPowder::boxed();
     cell_registry.pal[55] = Ice::boxed();
     cell_registry.pal[56] = CrushedIce::boxed();
@@ -281,6 +282,11 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[70] = Grass::boxed();
     cell_registry.pal[71] = DryGrass::boxed();
     cell_registry.pal[80] = BlackHole::boxed();
+    cell_registry.pal[81] = CompressedSteam::boxed();
+    cell_registry.pal[82] = TwiceCompressedSteam::boxed();
+    cell_registry.pal[83] = DeluteAcid::boxed();
+    cell_registry.pal[84] = SaltyWater::boxed();
+    cell_registry.pal[85] = BaseWater::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;

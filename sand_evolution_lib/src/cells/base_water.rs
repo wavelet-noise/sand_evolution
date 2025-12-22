@@ -16,7 +16,7 @@ impl BaseWater {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        16
+        85
     }
 }
 
@@ -77,7 +77,7 @@ impl CellTrait for BaseWater {
     }
 
     fn id(&self) -> CellType {
-        15
+        85
     }
     fn display_color(&self) -> [u8; 3] {
         [255, 128, 255]

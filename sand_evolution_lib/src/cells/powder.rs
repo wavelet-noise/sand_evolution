@@ -14,7 +14,7 @@ impl Powder {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        5
+        50
     }
 }
 
@@ -59,7 +59,7 @@ impl CellTrait for Powder {
         "powder"
     }
     fn id(&self) -> CellType {
-        5
+        50
     }
     fn display_color(&self) -> [u8; 3] {
         [26, 26, 26]

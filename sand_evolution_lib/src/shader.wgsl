@@ -565,9 +565,9 @@ fn is_translucent_fluid_or_gas(t: u32) -> bool {
         t == 9u  || // acid
         t == 10u || // gas
         t == 11u || // burning gas (emissive overlay)
-        t == 12u || // delute acid
-        t == 15u || // salty water
-        t == 16u || // base water
+        t == 83u || // delute acid
+        t == 84u || // salty water
+        t == 85u || // base water
         t == 17u || // liquid gas
         t == 21u;   // smoke
 }
@@ -678,8 +678,16 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
             cold,
         );
         temp_col = vec4<f32>(cold_rgb, 1.0);
+    } else if (temp_value < 21.0) {
+        let cool = clamp(temp_value / 21.0, 0.0, 1.0);
+        let cool_rgb = mix(
+            vec3<f32>(0.0, 0.15, 0.25),  // dark blue-green at 0
+            vec3<f32>(0.0, 0.45, 0.65),  // brighter cyan at 21
+            cool,
+        );
+        temp_col = vec4<f32>(cool_rgb, 1.0);
     } else {
-        let hot = clamp(temp_value / 500.0, 0.0, 1.0);
+        let hot = clamp((temp_value - 21.0) / (500.0 - 21.0), 0.0, 1.0);
         let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
         let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
         let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
@@ -870,7 +878,7 @@ let spark_rgb = vec3<f32>(1.0, 0.8, 0.4) * spark * 6.0;
 col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
 
     }
-    else if t == 5u // slow fire
+    else if t == 50u // powder (slow fire)
     {
       // Cooler + dimmer version: more orange, less white.
       let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
@@ -913,7 +921,7 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
       let intensity = mix(1.5, 5.5, heat01) * flicker * shape_intensity;
       col = vec4<f32>(rgb * intensity, 1.0);
     }
-    else if t == 50u // wood
+    else if t == 5u // wood
     {
       col = mix(vec4<f32>(0.5, 0.2, 0.2, 1.0) * 1.5, vec4<f32>(0.5, 0.2, 0.2, 1.0) * 0.5, woodColor) * 0.5 * ((noise_pixel+1.0)/3.0);
     }
@@ -997,7 +1005,7 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
       // Emissive overlay: add over the wall in the composite pass below.
       col = vec4<f32>(vec3<f32>(1.0, 0.8, 0.5) * 10.0 * tdnoise_fast, 1.0);
     }
-    else if t == 12u // delute acid
+    else if t == 83u // delute acid
     {
       let a = clamp(0.18 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.12, 0.30);
       col = vec4<f32>(0.2, 0.6, 0.8, a);
@@ -1010,12 +1018,12 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     {
       col = vec4<f32>(1.0,0.2,0.2,1.0);
     }
-    else if t == 15u // salty water
+    else if t == 84u // salty water
     {
       let a = clamp(0.12 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.10, 0.25);
       col = vec4<f32>(0.5, 0.5, 1.0, a);
     }
-    else if t == 16u // base water
+    else if t == 85u // base water
     {
       let a = clamp(0.12 + 0.10 * (noise_pixel * 0.5 + 0.5), 0.10, 0.25);
       col = vec4<f32>(1.0, 0.5, 1.0, a);

@@ -103,7 +103,7 @@ impl CellTrait for BurningCoal {
                 return;
             }
 
-            if prng.next() < 1 && prng.next() < 1 {
+            if prng.next() < 2 {
                 container[cur] = Void::id();
                 //prng.add_carb();
                 return;

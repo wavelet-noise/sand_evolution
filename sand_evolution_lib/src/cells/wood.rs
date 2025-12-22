@@ -13,7 +13,7 @@ impl Wood {
         Box::new(Self::new())
     }
     pub fn id() -> CellType {
-        50
+        5
     }
 }
 
@@ -69,6 +69,6 @@ impl CellTrait for Wood {
         "wood"
     }
     fn id(&self) -> CellType {
-        50
+        5
     }
 }
