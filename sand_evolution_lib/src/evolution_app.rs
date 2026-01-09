@@ -129,7 +129,6 @@ pub struct EvolutionApp {
     /// Which temperature field is visualized (ambient / per‑cell / combined).
     pub heat_vis_mode: HeatVisMode,
     /// Number of per‑cell temperature diffusion iterations per simulation tick.
-    /// Позволяет усиливать «проводимость» без изменения самой схемы.
     pub cell_diffusion_iterations: i32,
     /// Centralized window style (background color, etc.).
     pub window_style: WindowStyleManager,
@@ -140,9 +139,9 @@ pub struct HoverInfo {
     pub x: cs::PointType,
     pub y: cs::PointType,
     pub cell_id: u8,
-    /// Температура самой клетки (локальная, 1:1 с сеткой клеток).
+    /// Temperature of the cell itself (local, 1:1 with cell grid).
     pub cell_temperature: f32,
-    /// Амбиентная (сглаженная, низкочастотная) температура в окрестности курсора.
+    /// Ambient (smoothed, low-frequency) temperature in the cursor vicinity.
     pub ambient_temperature: f32,
 }
 

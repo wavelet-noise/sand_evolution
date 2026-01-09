@@ -35,7 +35,6 @@ impl CellTrait for Sand {
     fn den(&self) -> i8 {
         10
     }
-    /// Песок — сыпучий и сравнительно плохо проводит тепло.
     fn thermal_conductivity(&self) -> f32 {
         0.5
     }

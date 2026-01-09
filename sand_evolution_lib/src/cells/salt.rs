@@ -36,7 +36,6 @@ impl CellTrait for Salt {
     fn dissolve(&self) -> CellType {
         SaltyWater::id()
     }
-    /// Кристаллическая соль чуть лучше проводит тепло, чем песок.
     fn thermal_conductivity(&self) -> f32 {
         0.7
     }
