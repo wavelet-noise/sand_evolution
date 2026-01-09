@@ -54,30 +54,123 @@ pub fn register_rhai(
                 .set_pixel(v.x as i32, v.y as i32, t as u8);
         });
     }
+    // String-based cell type overloads for set_cell
+    // Helper function to convert string to ID, then call numeric set_cell
     {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell", move |x: i64, y: i64, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(x as i32, y as i32, cell_id);
+            }
+            // Silently ignore if not found - this allows scripts to continue
+        });
+    }
+    {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell", move |x: f64, y: f64, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(x as i32, y as i32, cell_id);
+            }
+        });
+    }
+    {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell", move |v: Vector2<f64>, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(v.x as i32, v.y as i32, cell_id);
+            }
+        });
+    }
+    {
+        let shared_state_clone = shared_state_rc.clone();
         rhai.register_fn(
             "draw_line",
             move |v1: Vector2<f64>, v2: Vector2<f64>, t: i64| {
-                draw_line(v1, v2, t as u8, shared_state_rc.clone());
+                draw_line(v1, v2, t as u8, shared_state_clone.clone());
             },
         );
     }
-    rhai.register_fn(
-        "type_id",
-        move |name: &str| -> Result<i64, Box<rhai::EvalAltResult>> {
-            if id_dict.contains_key(name) {
-                Ok(id_dict[name] as i64)
-            } else {
-                Err(EvalAltResult::ErrorSystem(
-                    "SystemError".into(),
-                    Box::new(CellTypeNotFound {
-                        name: name.to_string(),
-                    }),
-                )
-                .into())
+    // String-based cell type overload for draw_line
+    {
+        let id_dict_clone = id_dict.clone();
+        let shared_state_clone = shared_state_rc.clone();
+        rhai.register_fn(
+            "draw_line",
+            move |v1: Vector2<f64>, v2: Vector2<f64>, t: &str| {
+                if let Some(&cell_id) = id_dict_clone.get(t) {
+                    draw_line(v1, v2, cell_id, shared_state_clone.clone());
+                }
+            },
+        );
+    }
+    // Converter function: string cell type name -> numeric ID
+    {
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn(
+            "type_id",
+            move |name: &str| -> i64 {
+                id_dict_clone.get(name)
+                    .copied()
+                    .unwrap_or(0) as i64
+            },
+        );
+    }
+    // Alias for type_id - shorter name for convenience
+    {
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn(
+            "cell_id",
+            move |name: &str| -> i64 {
+                id_dict_clone.get(name)
+                    .copied()
+                    .unwrap_or(0) as i64
+            },
+        );
+    }
+    // Alternative function name for string-based set_cell to test if overloading is the issue
+    {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell_str", move |x: i64, y: i64, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(x as i32, y as i32, cell_id);
             }
-        },
-    );
+        });
+    }
+    {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell_str", move |x: f64, y: f64, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(x as i32, y as i32, cell_id);
+            }
+        });
+    }
+    {
+        let moved_clone = shared_state_rc.clone();
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("set_cell_str", move |v: Vector2<f64>, t: &str| {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                moved_clone
+                    .borrow_mut()
+                    .set_pixel(v.x as i32, v.y as i32, cell_id);
+            }
+        });
+    }
+
     rhai.register_fn("fract", move |v: f64| v.fract());
     rhai.register_fn("rand", move || -> i64 { crate::random::my_rand() });
     scope.push("time", 0f64);
