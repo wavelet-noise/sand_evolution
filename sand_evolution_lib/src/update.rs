@@ -149,7 +149,6 @@ pub fn update_tick(
             for _ in 0..iters {
                 state.diffuse_temperature_fast();
             }
-            state.diffuse_ambient_temperature_fast();
         }
 
         // Create temperature context ONCE before the loop for reuse
@@ -157,7 +156,7 @@ pub fn update_tick(
         let state_ptr: *mut State = state;
         let mut temp_context = crate::cells::TemperatureContext {
             get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| unsafe {
-                (*state_ptr).get_ambient_temperature(x, y)
+                (*state_ptr).get_temperature(x, y)
             }),
             add_temp: Box::new(
                 move |x: cs::PointType, y: cs::PointType, delta: f32| unsafe {

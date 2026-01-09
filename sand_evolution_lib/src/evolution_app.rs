@@ -127,8 +127,7 @@ pub struct EvolutionApp {
     // Display mode: Normal or Temperature map
     pub display_mode: DisplayMode,
     /// Which temperature field is visualized (ambient / per‑cell / combined).
-    pub heat_vis_mode: HeatVisMode,
-    /// Number of per‑cell temperature diffusion iterations per simulation tick.
+    /// Number of temperature diffusion iterations per simulation tick.
     pub cell_diffusion_iterations: i32,
     /// Centralized window style (background color, etc.).
     pub window_style: WindowStyleManager,
@@ -152,15 +151,6 @@ pub enum DisplayMode {
     Both,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HeatVisMode {
-    /// Show only the low‑resolution ambient temperature field.
-    Ambient,
-    /// Show only the per‑cell temperature field (1:1 with cells).
-    Cells,
-    /// Show a combined view (current behaviour, max(ambient, cell)).
-    Combined,
-}
 
 pub fn compact_number_string(n: f32) -> String {
     let abs = cgmath::num_traits::abs(n);
@@ -472,23 +462,6 @@ impl EvolutionApp {
                     }
                 });
                 ui.add_space(6.0);
-                ui.label("Temperature source");
-                ComboBox::from_id_source("heat_source_mode")
-                    .width(180.0)
-                    .selected_text(match self.heat_vis_mode {
-                        HeatVisMode::Ambient => "Ambient",
-                        HeatVisMode::Cells => "Cells",
-                        HeatVisMode::Combined => "Ambient + Cells",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.heat_vis_mode, HeatVisMode::Ambient, "Ambient");
-                        ui.selectable_value(&mut self.heat_vis_mode, HeatVisMode::Cells, "Cells");
-                        ui.selectable_value(
-                            &mut self.heat_vis_mode,
-                            HeatVisMode::Combined,
-                            "Ambient + Cells",
-                        );
-                    });
             });
 
         self.window_style
@@ -1522,7 +1495,6 @@ impl EvolutionApp {
             show_log_window: false,
 
             display_mode: DisplayMode::Normal,
-            heat_vis_mode: HeatVisMode::Combined,
             cell_diffusion_iterations: 1,
             window_style: WindowStyleManager::default(),
         }
