@@ -1,7 +1,5 @@
 use crate::shared_state::SharedState;
-use crate::CellTypeNotFound;
 use cgmath::{InnerSpace, Matrix, Matrix2, Matrix3, SquareMatrix, Vector2, Vector3};
-use rhai::EvalAltResult;
 use specs::{Builder, Join, WorldExt};
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -30,31 +28,7 @@ pub fn register_rhai(
     //rhai_scope.push_constant("RES_X", dimensions.0);
     //rhai_scope.push_constant("RES_Y", dimensions.1);
 
-    {
-        let moved_clone = shared_state_rc.clone();
-        rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
-            moved_clone
-                .borrow_mut()
-                .set_pixel(x as i32, y as i32, t as u8);
-        });
-    }
-    {
-        let moved_clone = shared_state_rc.clone();
-        rhai.register_fn("set_cell", move |x: f64, y: f64, t: i64| {
-            moved_clone
-                .borrow_mut()
-                .set_pixel(x as i32, y as i32, t as u8);
-        });
-    }
-    {
-        let moved_clone = shared_state_rc.clone();
-        rhai.register_fn("set_cell", move |v: Vector2<f64>, t: i64| {
-            moved_clone
-                .borrow_mut()
-                .set_pixel(v.x as i32, v.y as i32, t as u8);
-        });
-    }
-    // String-based cell type overloads for set_cell
+    // String-based cell type overloads for set_cell (register first)
     // Helper function to convert string to ID, then call numeric set_cell
     {
         let moved_clone = shared_state_rc.clone();
@@ -90,16 +64,32 @@ pub fn register_rhai(
             }
         });
     }
+    // Numeric ID overloads for set_cell (register after string overloads to ensure priority)
     {
-        let shared_state_clone = shared_state_rc.clone();
-        rhai.register_fn(
-            "draw_line",
-            move |v1: Vector2<f64>, v2: Vector2<f64>, t: i64| {
-                draw_line(v1, v2, t as u8, shared_state_clone.clone());
-            },
-        );
+        let moved_clone = shared_state_rc.clone();
+        rhai.register_fn("set_cell", move |x: i64, y: i64, t: i64| {
+            moved_clone
+                .borrow_mut()
+                .set_pixel(x as i32, y as i32, t as u8);
+        });
     }
-    // String-based cell type overload for draw_line
+    {
+        let moved_clone = shared_state_rc.clone();
+        rhai.register_fn("set_cell", move |x: f64, y: f64, t: i64| {
+            moved_clone
+                .borrow_mut()
+                .set_pixel(x as i32, y as i32, t as u8);
+        });
+    }
+    {
+        let moved_clone = shared_state_rc.clone();
+        rhai.register_fn("set_cell", move |v: Vector2<f64>, t: i64| {
+            moved_clone
+                .borrow_mut()
+                .set_pixel(v.x as i32, v.y as i32, t as u8);
+        });
+    }
+    // String-based cell type overload for draw_line (register first)
     {
         let id_dict_clone = id_dict.clone();
         let shared_state_clone = shared_state_rc.clone();
@@ -109,6 +99,16 @@ pub fn register_rhai(
                 if let Some(&cell_id) = id_dict_clone.get(t) {
                     draw_line(v1, v2, cell_id, shared_state_clone.clone());
                 }
+            },
+        );
+    }
+    // Numeric ID overload for draw_line (register after string overload to ensure priority)
+    {
+        let shared_state_clone = shared_state_rc.clone();
+        rhai.register_fn(
+            "draw_line",
+            move |v1: Vector2<f64>, v2: Vector2<f64>, t: i64| {
+                draw_line(v1, v2, t as u8, shared_state_clone.clone());
             },
         );
     }
