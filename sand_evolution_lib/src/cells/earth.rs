@@ -4,7 +4,6 @@ use super::{
     helper::sand_falling_helper, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
-/// Earth (soil) — рыхлый сыпучий материал, ведёт себя почти как песок.
 pub struct Earth;
 
 impl Earth {
@@ -46,7 +45,6 @@ impl CellTrait for Earth {
     fn id(&self) -> CellType {
         Self::id()
     }
-    /// Грунт — сыпучий, немного лучше проводит тепло, чем песок.
     fn thermal_conductivity(&self) -> f32 {
         0.6
     }

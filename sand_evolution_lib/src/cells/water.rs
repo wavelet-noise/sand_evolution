@@ -91,11 +91,9 @@ impl CellTrait for Water {
     fn shadow_rgba(&self) -> [u8; 4] {
         [210, 225, 255, 255]
     }
-    /// Вода хорошо проводит и перемешивает тепло.
     fn thermal_conductivity(&self) -> f32 {
         1.3
     }
-    /// Сильная конвекция: тёплая вода активно поднимает тепло вверх.
     fn convection_factor(&self) -> f32 {
         1.0
     }

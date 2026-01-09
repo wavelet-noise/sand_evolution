@@ -4,7 +4,6 @@ use super::{
     helper::sand_falling_helper, CellRegistry, CellTrait, CellType, Prng, TemperatureContext,
 };
 
-/// Gravel — сыпучий материал, тяжелее песка/земли.
 pub struct Gravel;
 
 impl Gravel {
@@ -46,7 +45,6 @@ impl CellTrait for Gravel {
     fn id(&self) -> CellType {
         Self::id()
     }
-    /// Гравий — сыпучий и довольно хорошо проводит тепло за счёт плотных контактов.
     fn thermal_conductivity(&self) -> f32 {
         0.9
     }

@@ -154,12 +154,11 @@ pub struct State {
     pub day_night: DayNightCycle,
     // Temperature system for each cell (absolute degrees), full-resolution (1:1 with cell grid).
     pub cell_temperatures: Vec<f32>,
-    /// Ambient / визуальная температура (абсолютная температура воздуха/окружения), низкое
-    /// разрешение (res/4).
+    /// Ambient temperature (absolute temperature of air/surroundings), low resolution (res/4).
     pub ambient_temperatures: Vec<f32>,
     /// Global/base temperature (degrees).
     pub global_temperature: f32,
-    // Ambient/visual temperature texture for GPU (low-res, res/4), 1:1 с `ambient_temperatures`.
+    // Ambient/visual temperature texture for GPU (low-res, res/4), 1:1 with `ambient_temperatures`.
     temperature_texture: wgpu::Texture,
     temperature_bind_group: wgpu::BindGroup,
     // Full-resolution per-cell temperature texture for precise visualization.
@@ -1182,7 +1181,7 @@ impl State {
         self.get_cell_temperature(idx)
     }
 
-    /// Амбиентная температура по координатам клетки (через low‑res поле).
+    /// Ambient temperature at cell coordinates (via low-res field).
     pub fn get_ambient_temperature(&self, i: PointType, j: PointType) -> f32 {
         let ambient_w = (cs::SECTOR_SIZE.x / 4) as usize;
         let ax = (i / 4) as usize;
@@ -1245,12 +1244,11 @@ impl State {
             .fill(self.global_temperature);
     }
 
-    /// Медленный обмен: часть избыточного тепла из амбиента отдаётся
-    /// в «массу» клетки (исторический костыль).
+    /// Slow exchange: part of excess heat from ambient is transferred to cell "mass" (historical workaround).
     pub fn absorb_ambient_heat(&mut self) {
     }
 
-    /// Fast diffusion for the **ambient** (низкочастотное) поле температуры.
+    /// Fast diffusion for the **ambient** (low-frequency) temperature field.
     pub fn diffuse_ambient_temperature_fast(&mut self) {
         let diffusion_rate = 0.10;
         let cooling_rate = 0.998;
