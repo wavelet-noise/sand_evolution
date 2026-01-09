@@ -16,12 +16,11 @@ struct WorldSettings {
     // Background.
     bg_saturation: f32,            // 0..1
     bg_brightness: f32,            // 0.1..5
-    // Temperature visualization source: 0 = ambient, 1 = per‑cell, 2 = combined.
-    heat_source_mode: f32,
     // Padding / reserved (keep struct size a multiple of 16 bytes, in sync with Rust).
     _pad_heat0: f32,
     _pad_heat1: f32,
     _pad_heat2: f32,
+    _pad_heat3: f32,
 };
 @group(0) @binding(0)
 var<uniform> settings: WorldSettings;
@@ -315,15 +314,13 @@ var s_diffuse: sampler;
 
 @group(2) @binding(0)
 var t_temperature: texture_2d<f32>;
+@group(2) @binding(1)
+var s_temperature: sampler;
 
 @group(3) @binding(0)
 var t_shadow_props: texture_2d<f32>;
 @group(3) @binding(1)
 var s_shadow_props: sampler;
-
-// Full-resolution per-cell temperature (1:1 with simulation grid).
-@group(2) @binding(2)
-var t_cell_temperature: texture_2d<f32>;
 
 fn shadow_props(id: u32) -> vec4<f32> {
     // Texture is 256x1 (RGBA8Unorm). Channels are normalized to [0..1].
@@ -627,37 +624,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let temp_smooth = sample_temperature_bilinear(uv, temp_dims_i, temp_dims_f);
 
     let is_temp_point_sampling = (settings.display_mode > 0.5);
-    let temp_value_ambient =
+    let temp_value =
         (select(temp_smooth, temp_point, is_temp_point_sampling)) + settings.global_temperature;
-
-    // Full-resolution per-cell temperature (local delta from global), 1:1 with cell grid.
-    let cell_xy_full = vec2<i32>(
-        clamp(i32(in.uv.x * settings.res_x), 0, i32(settings.res_x) - 1),
-        clamp(i32(in.uv.y * settings.res_y), 0, i32(settings.res_y) - 1),
-    );
-    let cell_temp_local = textureLoad(t_cell_temperature, cell_xy_full, 0).r;
-    // Cell type at this texel (0 = void).
-    let cell_type_here: u32 = textureLoad(t_diffuse, cell_xy_full, 0).x;
-    var temp_value_cell = cell_temp_local + settings.global_temperature;
-    if (settings.heat_source_mode > 0.5 && settings.heat_source_mode < 1.5) {
-        if (cell_type_here == 0u) {
-            temp_value_cell = 0.0;
-        }
-    }
-
-    // Combine or select ambient / per‑cell temperature for visualization.
-    // heat_source_mode:
-    //   0.0 => ambient only
-    //   1.0 => per‑cell only
-    //   2.0 => combined (max of both, previous behaviour)
-    var temp_value: f32;
-    if (settings.heat_source_mode < 0.5) {
-        temp_value = temp_value_ambient;
-    } else if (settings.heat_source_mode < 1.5) {
-        temp_value = temp_value_cell;
-    } else {
-        temp_value = max(temp_value_ambient, temp_value_cell);
-    }
 
     // Extra smoothing for heat visualization in Normal render (more "blurry heat").
     // Temperature grid is already low-res (res/4), so a few taps are cheap.

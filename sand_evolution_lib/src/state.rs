@@ -35,12 +35,11 @@ pub struct WorldSettings {
     pub(crate) bg_saturation: f32,
     /// Background wall brightness multiplier (0..5.0).
     pub(crate) bg_brightness: f32,
-    /// Which temperature field is visualized: 0 = ambient, 1 = per‑cell, 2 = combined.
-    pub(crate) heat_source_mode: f32,
     // Padding / reserved for future flags. Keep uniform size a multiple of 16 bytes.
     _pad_heat0: f32,
     _pad_heat1: f32,
     _pad_heat2: f32,
+    _pad_heat3: f32,
 }
 #[derive(Default)]
 pub struct UpdateResult {
@@ -152,17 +151,14 @@ pub struct State {
     /// Simulation time in seconds (advances with ticks, not wall clock).
     pub sim_time_seconds: f64,
     pub day_night: DayNightCycle,
-    // Temperature system for each cell (absolute degrees), full-resolution (1:1 with cell grid).
+    // Temperature system for each cell (degrees), reduced grid (4x smaller for optimization).
+    // Stored as delta from global_temperature: effective_temp = cell_temperatures[idx] + global_temperature
     pub cell_temperatures: Vec<f32>,
-    /// Ambient temperature (absolute temperature of air/surroundings), low resolution (res/4).
-    pub ambient_temperatures: Vec<f32>,
     /// Global/base temperature (degrees).
     pub global_temperature: f32,
-    // Ambient/visual temperature texture for GPU (low-res, res/4), 1:1 with `ambient_temperatures`.
+    // Temperature texture for GPU (low-res, res/4), 1:1 with `cell_temperatures`.
     temperature_texture: wgpu::Texture,
     temperature_bind_group: wgpu::BindGroup,
-    // Full-resolution per-cell temperature texture for precise visualization.
-    cell_temperature_texture: wgpu::Texture,
 }
 
 /// Minimum allowed temperature in the simulation (degrees).
@@ -465,10 +461,10 @@ impl State {
             shadow_distance_falloff: day_night.shadow_distance_falloff,
             bg_saturation: 0.5,
             bg_brightness: 0.04,
-            heat_source_mode: 2.0, // Combined by default
             _pad_heat0: 0.0,
             _pad_heat1: 0.0,
             _pad_heat2: 0.0,
+            _pad_heat3: 0.0,
         };
 
         let raw_ptr = &world_settings as *const WorldSettings;
@@ -725,30 +721,8 @@ impl State {
             ..Default::default()
         });
 
-        let cell_temp_texture_size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
-        let cell_temperature_texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: cell_temp_texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: TextureFormat::R32Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("cell_temperature_texture"),
-        });
-
-        let mut cell_temperature_texture_view_desc = wgpu::TextureViewDescriptor::default().clone();
-        cell_temperature_texture_view_desc.format = Some(TextureFormat::R32Float);
-        let cell_temperature_texture_view =
-            cell_temperature_texture.create_view(&cell_temperature_texture_view_desc);
-
-        // Bind group layout for temperature textures:
-        // - binding 0: low-res ambient temperature
-        // - binding 1: sampler for ambient texture
-        // - binding 2: full-res per-cell temperature
+        // Create bind group layout for temperature texture
+        // R32Float doesn't support filtering, so we use NonFiltering
         let temperature_texture_bgl =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -768,16 +742,6 @@ impl State {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        },
-                        count: None,
-                    },
                 ],
                 label: Some("temperature_texture_bind_group_layout"),
             });
@@ -792,10 +756,6 @@ impl State {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&temperature_texture_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&cell_temperature_texture_view),
                 },
             ],
             label: Some("temperature_bind_group"),
@@ -1080,19 +1040,13 @@ impl State {
         let prng = Prng::new();
 
         // Initialize cell temperatures (initial temperature = 0.0)
-        // Full-resolution grid (1:1 with cell types) for precise per-cell temperature.
-        let temp_width_full = cs::SECTOR_SIZE.x as usize;
-        let temp_height_full = cs::SECTOR_SIZE.y as usize;
-        let total_cells = temp_width_full * temp_height_full;
-
-        // Global/base temperature (absolute degrees) used as initial value for all fields.
-        let initial_global_temperature = 21.0;
-        let cell_temperatures = vec![initial_global_temperature; total_cells];
-
-        let ambient_width = (cs::SECTOR_SIZE.x / 4) as usize;
-        let ambient_height = (cs::SECTOR_SIZE.y / 4) as usize;
-        let ambient_temperatures =
-            vec![initial_global_temperature; ambient_width * ambient_height];
+        // Initialize cell temperatures (reduced grid, 4x smaller for optimization)
+        // Use a reduced grid (4x smaller) for optimization
+        let temp_width = (cs::SECTOR_SIZE.x / 4) as usize;
+        let temp_height = (cs::SECTOR_SIZE.y / 4) as usize;
+        let total_cells = temp_width * temp_height;
+        // Temperatures stored as delta from global_temperature, so initialize to 0.0
+        let cell_temperatures = vec![0.0; total_cells];
 
         Self {
             render_pipeline: type_render_pipeline,
@@ -1131,11 +1085,9 @@ impl State {
             sim_time_seconds: 0.0,
             day_night,
             cell_temperatures,
-            ambient_temperatures,
-            global_temperature: initial_global_temperature,
+            global_temperature: 21.0,
             temperature_texture,
             temperature_bind_group,
-            cell_temperature_texture,
         }
     }
 
@@ -1158,18 +1110,21 @@ impl State {
             .put_pixel(x as u32, y as u32, image::Luma([t]));
     }
 
-    // Convert full grid coordinates (1:1 with cell types) to temperature index
+    // Convert full grid coordinates to reduced grid temperature index (4x smaller)
     fn temp_coords_to_index(&self, i: PointType, j: PointType) -> usize {
-        let temp_x = i as usize;
-        let temp_y = j as usize;
-        let temp_width = cs::SECTOR_SIZE.x as usize;
+        let temp_x = (i / 4) as usize;
+        let temp_y = (j / 4) as usize;
+        let temp_width = (cs::SECTOR_SIZE.x / 4) as usize;
         temp_y * temp_width + temp_x
     }
 
     // Get cell temperature by index (in reduced grid)
+    // Returns effective temperature: stored_delta + global_temperature
     pub fn get_cell_temperature(&self, index: usize) -> f32 {
         if index < self.cell_temperatures.len() {
-            self.cell_temperatures[index].max(TEMP_MIN).min(TEMP_MAX)
+            (self.cell_temperatures[index] + self.global_temperature)
+                .max(TEMP_MIN)
+                .min(TEMP_MAX)
         } else {
             0.0
         }
@@ -1181,24 +1136,13 @@ impl State {
         self.get_cell_temperature(idx)
     }
 
-    /// Ambient temperature at cell coordinates (via low-res field).
-    pub fn get_ambient_temperature(&self, i: PointType, j: PointType) -> f32 {
-        let ambient_w = (cs::SECTOR_SIZE.x / 4) as usize;
-        let ax = (i / 4) as usize;
-        let ay = (j / 4) as usize;
-        let idx = ay * ambient_w + ax;
-        if idx < self.ambient_temperatures.len() {
-            self.ambient_temperatures[idx].max(TEMP_MIN).min(TEMP_MAX)
-        } else {
-            0.0
-        }
-    }
 
     // Set cell temperature by index (in reduced grid)
+    // Stores as delta from global_temperature: stored = temp - global_temperature
     pub fn set_cell_temperature(&mut self, index: usize, temp: f32) {
         if index < self.cell_temperatures.len() {
             let clamped = temp.max(TEMP_MIN).min(TEMP_MAX);
-            self.cell_temperatures[index] = clamped;
+            self.cell_temperatures[index] = clamped - self.global_temperature;
         }
     }
 
@@ -1208,17 +1152,15 @@ impl State {
         self.set_cell_temperature(idx, temp);
     }
 
+    // Add temperature to cell (for heat generation)
     pub fn add_temperature(&mut self, i: PointType, j: PointType, delta: f32) {
-        let ambient_w = (cs::SECTOR_SIZE.x / 4) as usize;
-        let ax = (i / 4) as usize;
-        let ay = (j / 4) as usize;
-        let idx_amb = ay * ambient_w + ax;
-        if idx_amb < self.ambient_temperatures.len() {
-            self.ambient_temperatures[idx_amb] += delta;
-            let clamped = self.ambient_temperatures[idx_amb]
-                .max(TEMP_MIN)
-                .min(TEMP_MAX);
-            self.ambient_temperatures[idx_amb] = clamped;
+        let idx = self.temp_coords_to_index(i, j);
+        if idx < self.cell_temperatures.len() {
+            self.cell_temperatures[idx] += delta;
+            // Clamp effective temperature to reasonable limits
+            let eff = self.cell_temperatures[idx] + self.global_temperature;
+            let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+            self.cell_temperatures[idx] = clamped - self.global_temperature;
         }
     }
 
@@ -1226,22 +1168,17 @@ impl State {
     pub fn add_cell_temperature(&mut self, index: usize, delta: f32) {
         if index < self.cell_temperatures.len() {
             self.cell_temperatures[index] += delta;
-            // Clamp temperature to reasonable limits
-            let clamped = self.cell_temperatures[index]
-                .max(TEMP_MIN)
-                .min(TEMP_MAX);
-            self.cell_temperatures[index] = clamped;
+            // Clamp effective temperature to reasonable limits
+            let eff = self.cell_temperatures[index] + self.global_temperature;
+            let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
+            self.cell_temperatures[index] = clamped - self.global_temperature;
         }
     }
 
-    /// Reset per-cell and ambient temperature fields to the current global temperature.
+    /// Reset per-cell temperature field (local delta, reduced grid) to zero.
+    /// Note: global temperature offset is preserved.
     pub fn reset_temperatures(&mut self) {
-        self.cell_temperatures
-            .as_mut_slice()
-            .fill(self.global_temperature);
-        self.ambient_temperatures
-            .as_mut_slice()
-            .fill(self.global_temperature);
+        self.cell_temperatures.as_mut_slice().fill(0.0);
     }
 
     /// Slow exchange: part of excess heat from ambient is transferred to cell "mass" (historical workaround).
@@ -1249,22 +1186,30 @@ impl State {
     }
 
     /// Fast diffusion for the **ambient** (low-frequency) temperature field.
-    pub fn diffuse_ambient_temperature_fast(&mut self) {
+
+    // Fast temperature diffusion - processes all cells of the reduced grid each frame
+    pub fn diffuse_temperature_fast(&mut self) {
+        // Tuned to avoid rapid global heat "flooding" from local sources (fire/wood).
         let diffusion_rate = 0.10;
+        // Slower cooling so heat persists longer.
         let cooling_rate = 0.998;
+        // Weak buoyancy: a small fraction of *positive* heat drifts upward each step.
+        // (Reduced grid, so keep it small to avoid visible "staircase" artifacts.)
+        // 2x faster upward drift.
         let rise_rate = 0.016;
 
+        // Work directly with the reduced grid
         let width = (cs::SECTOR_SIZE.x / 4) as usize;
         let height = (cs::SECTOR_SIZE.y / 4) as usize;
 
-        // Temporary buffer for new absolute temperatures.
+        // Temporary buffer for new local temperatures (delta from global_temperature).
         let mut new_temps = vec![0.0f32; width * height];
 
         // Process all cells of the reduced grid
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
-                let current = self.ambient_temperatures.get(idx).copied().unwrap_or(0.0);
+                let current = self.cell_temperatures.get(idx).copied().unwrap_or(0.0);
 
                 // Get temperatures of neighboring cells in the reduced grid
                 let top_idx = (ty + 1) * width + tx;
@@ -1273,22 +1218,22 @@ impl State {
                 let right_idx = ty * width + (tx + 1);
 
                 let top_temp = self
-                    .ambient_temperatures
+                    .cell_temperatures
                     .get(top_idx)
                     .copied()
                     .unwrap_or(current);
                 let bot_temp = self
-                    .ambient_temperatures
+                    .cell_temperatures
                     .get(bot_idx)
                     .copied()
                     .unwrap_or(current);
                 let left_temp = self
-                    .ambient_temperatures
+                    .cell_temperatures
                     .get(left_idx)
                     .copied()
                     .unwrap_or(current);
                 let right_temp = self
-                    .ambient_temperatures
+                    .cell_temperatures
                     .get(right_idx)
                     .copied()
                     .unwrap_or(current);
@@ -1296,12 +1241,13 @@ impl State {
                 // Simple diffusion: average with neighbors
                 let avg = (top_temp + bot_temp + left_temp + right_temp) / 4.0;
                 let diffused = current + (avg - current) * diffusion_rate;
-                let cooled = self.global_temperature
-                    + (diffused - self.global_temperature) * cooling_rate;
-                new_temps[idx] = cooled;
+                // Temperatures are stored as local delta.
+                new_temps[idx] = diffused * cooling_rate;
             }
         }
 
+        // Weak upward drift: move a small fraction of positive heat into the cell above.
+        // Note: in this reduced grid, "top" is (ty + 1).
         if rise_rate > 0.0 {
             for ty in 1..(height - 2) {
                 for tx in 1..(width - 1) {
@@ -1317,146 +1263,13 @@ impl State {
             }
         }
 
-        // Apply new temperatures with clamping in absolute domain.
+        // Apply new temperatures with clamping in effective (global + local) domain.
         for ty in 1..(height - 1) {
             for tx in 1..(width - 1) {
                 let idx = ty * width + tx;
-                let eff = new_temps[idx];
+                let eff = new_temps[idx] + self.global_temperature;
                 let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
-
-                self.ambient_temperatures[idx] = clamped;
-            }
-        }
-    }
-
-    // Fast temperature diffusion - processes all cells of the full grid each frame
-    pub fn diffuse_temperature_fast(&mut self) {
-        let diffusion_rate = 0.10;
-        let cooling_rate = 0.998;
-        let rise_rate = 0.016;
-
-        let width = cs::SECTOR_SIZE.x as usize;
-        let height = cs::SECTOR_SIZE.y as usize;
-
-        // Temporary buffer for new absolute temperatures.
-        let mut new_temps = vec![0.0f32; width * height];
-        // Accumulated exchange with ambient field (same layout as `ambient_temperatures`).
-        let ambient_width = (cs::SECTOR_SIZE.x / 4) as usize;
-        let ambient_height = (cs::SECTOR_SIZE.y / 4) as usize;
-        let mut ambient_delta = vec![0.0f32; ambient_width * ambient_height];
-
-        // Process all cells of the full grid
-        for ty in 1..(height - 1) {
-            for tx in 1..(width - 1) {
-                let idx = ty * width + tx;
-                let current = self.cell_temperatures.get(idx).copied().unwrap_or(0.0);
-
-                let cell_id = *self.diffuse_rgba.get(idx).unwrap_or(&0u8);
-                let material = &self.pal_container.pal[cell_id as usize];
-                let k_self = material.thermal_conductivity().max(0.0);
-
-                let k_scale = 1.0 + 3.0 * k_self;
-                let cell_diffusion_rate = (diffusion_rate * k_scale).min(0.9);
-
-                let top_idx = (ty + 1) * width + tx;
-                let bot_idx = (ty - 1) * width + tx;
-                let left_idx = ty * width + (tx - 1);
-                let right_idx = ty * width + (tx + 1);
-
-                let top_temp = self
-                    .cell_temperatures
-                    .get(top_idx)
-                    .copied()
-                    .unwrap_or(current);
-                let bot_temp = self
-                    .cell_temperatures
-                    .get(bot_idx)
-                    .copied()
-                    .unwrap_or(current);
-                let left_temp = self
-                    .cell_temperatures
-                    .get(left_idx)
-                    .copied()
-                    .unwrap_or(current);
-                let right_temp = self
-                    .cell_temperatures
-                    .get(right_idx)
-                    .copied()
-                    .unwrap_or(current);
-
-                let neigh_sum = top_temp + bot_temp + left_temp + right_temp;
-                let neigh_avg = neigh_sum / 4.0;
-
-                let mut diffused = current + (neigh_avg - current) * cell_diffusion_rate;
-
-                if k_self > 0.0 {
-                    let ax = (tx / 4) as usize;
-                    let ay = (ty / 4) as usize;
-                    let aidx = ay * ambient_width + ax;
-                    if aidx < self.ambient_temperatures.len() {
-                        let amb_local = self.ambient_temperatures[aidx];
-
-                        if k_self >= 2.0 {
-                            let diff_to_cell = amb_local - diffused;
-                            if diff_to_cell > 0.0 {
-                                let heating_rate = 0.6;
-                                diffused += diff_to_cell * heating_rate;
-                            }
-                        } else {
-                            let cells_per_ambient = 8.0f32;
-                            let k_clamped = k_self.min(3.0);
-                            let base_full = 0.11 * k_clamped;
-                            let exchange_rate = (base_full / cells_per_ambient).min(0.12);
-
-                            let diff_to_cell = amb_local - diffused;
-                            if diff_to_cell > 0.0 {
-                                let delta = diff_to_cell * exchange_rate;
-                                diffused += delta;
-                                ambient_delta[aidx] -= delta;
-                            }
-                        }
-                    }
-                }
-
-                // Temperatures are stored as absolute values.
-                let local_cooling = if k_self >= 2.0 { 1.0 } else { cooling_rate };
-                let cooled = self.global_temperature
-                    + (diffused - self.global_temperature) * local_cooling;
-                new_temps[idx] = cooled;
-            }
-        }
-
-        if rise_rate > 0.0 {
-            for ty in 1..(height - 2) {
-                for tx in 1..(width - 1) {
-                    let idx = ty * width + tx;
-                    let top_idx = (ty + 1) * width + tx;
-                    let v = new_temps[idx];
-                    if v > 0.0 {
-                        let amount = v * rise_rate;
-                        new_temps[idx] -= amount;
-                        new_temps[top_idx] += amount;
-                    }
-                }
-            }
-        }
-
-        // Apply new temperatures with clamping in absolute domain.
-        for ty in 1..(height - 1) {
-            for tx in 1..(width - 1) {
-                let idx = ty * width + tx;
-                let eff = new_temps[idx];
-                let clamped = eff.max(TEMP_MIN).min(TEMP_MAX);
-                self.cell_temperatures[idx] = clamped;
-            }
-        }
-
-        for ay in 0..ambient_height {
-            for ax in 0..ambient_width {
-                let aidx = ay * ambient_width + ax;
-                let v = self.ambient_temperatures[aidx] + ambient_delta[aidx];
-                let clamped = v.max(TEMP_MIN).min(TEMP_MAX);
-                self.ambient_temperatures[aidx] = clamped;
+                self.cell_temperatures[idx] = clamped - self.global_temperature;
             }
         }
     }
@@ -1520,12 +1333,6 @@ impl State {
             crate::evolution_app::DisplayMode::Temperature => 1.0,
             crate::evolution_app::DisplayMode::Both => 2.0,
         };
-        // Update temperature source mode (ambient vs per‑cell vs combined).
-        self.world_settings.heat_source_mode = match evolution_app.heat_vis_mode {
-            crate::evolution_app::HeatVisMode::Ambient => 0.0,
-            crate::evolution_app::HeatVisMode::Cells => 1.0,
-            crate::evolution_app::HeatVisMode::Combined => 2.0,
-        };
         self.world_settings.global_temperature = self.global_temperature;
 
         let sim_upd_start_time = instant::now();
@@ -1569,18 +1376,7 @@ impl State {
                     let y = py as PointType;
                     let cell_id = self.diffuse_rgba.get_pixel(x as u32, y as u32).0[0];
                     let cell_temperature = self.get_temperature(x, y);
-
-                    let ambient_w = (cs::SECTOR_SIZE.x / 4) as usize;
-                    let ax = (x / 4) as usize;
-                    let ay = (y / 4) as usize;
-                    let idx_amb = ay * ambient_w + ax;
-                    let ambient_local = self
-                        .ambient_temperatures
-                        .get(idx_amb)
-                        .copied()
-                        .unwrap_or(0.0);
-                    let ambient_temperature =
-                        ambient_local.max(TEMP_MIN).min(TEMP_MAX);
+                    let ambient_temperature = cell_temperature;
 
                     evolution_app.hover_info = Some(crate::evolution_app::HoverInfo {
                         x,
@@ -1673,7 +1469,7 @@ impl State {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            bytemuck::cast_slice(&self.ambient_temperatures),
+            bytemuck::cast_slice(&self.cell_temperatures),
             wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: std::num::NonZeroU32::new(temp_width * 4), // 4 bytes per f32
@@ -1682,27 +1478,6 @@ impl State {
             temp_texture_size,
         );
 
-        // Upload full-resolution per-cell temperature for precise visualization
-        let cell_temp_texture_size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &self.cell_temperature_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            bytemuck::cast_slice(&self.cell_temperatures),
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(dimensions.0 * 4), // 4 bytes per f32
-                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
-            },
-            cell_temp_texture_size,
-        );
 
         UpdateResult {
             simulation_step_average_time,
