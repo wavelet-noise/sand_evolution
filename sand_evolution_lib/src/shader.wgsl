@@ -1032,6 +1032,14 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     {
       col = vec4<f32>(0.35, 0.0, 0.35, 1.0);
     }
+    else if t == 20u // copper
+    {
+      // Copper color: RGB(184, 115, 51) normalized
+      let base = vec3<f32>(0.72, 0.45, 0.20);
+      let n = clamp((noise_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let rgb = base * (0.90 + 0.15 * n);
+      col = vec4<f32>(rgb, 1.0);
+    }
     else
     {
       col = vec4<f32>(0.0,1.0,0.0,1.0);
