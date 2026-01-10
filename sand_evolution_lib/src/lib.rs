@@ -448,6 +448,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 engine: rhai,
                 scope: rhai_scope,
                 state_ptr: std::cell::Cell::new(std::ptr::null_mut()),
+                script_log: script_log_rc.clone(),
             }),
         });
     }
@@ -720,6 +721,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     match String::from_utf8(text) {
                         Ok(text) => {
                             evolution_app.set_script(text.as_str());
+                            // Also set the script to World Script entity so it actually runs
+                            evolution_app.set_object_script(&mut game_context.world, "World Script", text.as_str());
                         }
                         Err(_) => {
                             panic!("Invalid UTF-8 data");

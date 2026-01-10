@@ -638,28 +638,45 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let temp_vis = (t0 + t1 + t2 + t3 + t4) * 0.2 + settings.global_temperature;
     
     var temp_col: vec4<f32>;
-    if (temp_value < 0.0) {
-        let cold = clamp(-temp_value / 100.0, 0.0, 1.0);
-        let cold_rgb = mix(
-            vec3<f32>(0.0, 0.0, 0.0),
-            vec3<f32>(0.0, 0.35, 1.0),
-            cold,
-        );
-        temp_col = vec4<f32>(cold_rgb, 1.0);
-    } else if (temp_value < 21.0) {
-        let cool = clamp(temp_value / 21.0, 0.0, 1.0);
+    // Temperature visualization ramp (smoothly blended across 0° and 21°).
+    // Goal: keep transitions readable, but avoid harsh "stripes"/kinks at branch boundaries.
+    {
+        // More subdued (readable) ramp:
+        // keep the smooth blending across 0° and 21°, but avoid HDR-brightness and neon greens.
+
+        // --- Cold (<=0): continuous at 0° (matches cool start)
+        let cold0 = vec3<f32>(0.0, 0.15, 0.25); // 0°
+        let cold1 = vec3<f32>(0.0, 0.35, 1.0);  // deep cold blue
+        let cold_raw = clamp((-temp_value) / 140.0, 0.0, 1.0);
+        let cold_t = pow(smoothstep(0.0, 1.0, cold_raw), 1.25);
+        let cold_rgb = mix(cold0, cold1, cold_t);
+
+        // --- Cool (0..21): keep it close to the old palette (blue-green -> cyan)
+        let cool_raw = clamp(temp_value / 21.0, 0.0, 1.0);
+        let cool_t = pow(smoothstep(0.0, 1.0, cool_raw), 1.10);
         let cool_rgb = mix(
-            vec3<f32>(0.0, 0.15, 0.25),  // dark blue-green at 0
-            vec3<f32>(0.0, 0.45, 0.65),  // brighter cyan at 21
-            cool,
+            vec3<f32>(0.0, 0.15, 0.25),  // 0°
+            vec3<f32>(0.0, 0.45, 0.65),  // 21°
+            cool_t,
         );
-        temp_col = vec4<f32>(cool_rgb, 1.0);
-    } else {
+
+        // --- Hot (>=21): keep the original "physics-ish" warm ramp (readable, not too bright)
         let hot = clamp((temp_value - 21.0) / (500.0 - 21.0), 0.0, 1.0);
         let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
         let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
         let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
-        let rgb = vec3<f32>(red, green, blue) * hot;
+        let hot_rgb = vec3<f32>(red, green, blue) * hot;
+
+        // Blend widths (degrees): boundary stays visible, but without a hard stripe.
+        let w0: f32 = 4.0;  // around 0°
+        let w1: f32 = 8.0;  // around 21°
+
+        let k0 = smoothstep(-w0, w0, temp_value);
+        let cc_rgb = mix(cold_rgb, cool_rgb, k0);
+
+        let k1 = smoothstep(21.0 - w1, 21.0 + w1, temp_value);
+        let rgb = mix(cc_rgb, hot_rgb, k1);
+
         temp_col = vec4<f32>(rgb, 1.0);
     }
     
@@ -754,7 +771,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
     else if t == 3u // steam
     {
-      let k = clamp((tdnoise_fast + 2.0) / 3.0, 0.0, 1.0);
+      let k = (tdnoise_fast + 2.0) / 3.0;
       let a = clamp(0.10 + 0.18 * k, 0.10, 0.32);
       col = vec4<f32>(vec3<f32>(0.5) * k, a);
     }
