@@ -11,11 +11,11 @@ use std::rc::Rc;
 fn set_frame_vars(state: &mut State, storage: &mut RhaiResourceStorage) {
     // Make `time` deterministic and tied to simulation time (starts from 0).
     // If scripts need wall clock, they should derive it themselves.
-    let frame_time = state.sim_time_seconds as f32;
+    let frame_time = state.sim_time_seconds as f64;
     storage.scope.set_value("time", frame_time);
     storage
         .scope
-        .set_value("sim_time", state.sim_time_seconds as f32);
+        .set_value("sim_time", state.sim_time_seconds as f64);
     storage
         .scope
         .set_value("time_of_day", state.day_night.time_of_day_seconds);
@@ -86,7 +86,7 @@ pub fn update_tick(
                         storage.scope.set_value("tick", state.tick);
                         storage
                             .scope
-                            .set_value("sim_time", state.sim_time_seconds as f32);
+                            .set_value("sim_time", state.sim_time_seconds as f64);
                         storage
                             .scope
                             .set_value("time_of_day", state.day_night.time_of_day_seconds);

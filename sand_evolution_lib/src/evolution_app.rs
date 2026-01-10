@@ -823,6 +823,13 @@ impl EvolutionApp {
                     if ui.button("Clear").clicked() {
                         self.script_log.borrow_mut().clear();
                     }
+                    if ui.button("Copy").clicked() {
+                        let logs = self.script_log.borrow();
+                        let log_text = logs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n");
+                        if !log_text.is_empty() {
+                            let _ = copy_text_to_clipboard(&log_text);
+                        }
+                    }
                     ui.label(format!("Messages: {}", self.script_log.borrow().len()));
                 });
 

@@ -173,23 +173,6 @@ pub fn register_rhai(
 
     rhai.register_fn("fract", move |v: f64| v.fract());
     rhai.register_fn("rand", move || -> i64 { crate::random::my_rand() });
-
-    // Compatibility math functions for older scripts that use sin(x), cos(x), etc.
-    // Newer scripts often use method forms like x.sin(), but many existing templates
-    // rely on function-call style.
-    rhai.register_fn("sin", |x: f64| x.sin());
-    rhai.register_fn("sin", |x: i64| (x as f64).sin());
-    rhai.register_fn("cos", |x: f64| x.cos());
-    rhai.register_fn("cos", |x: i64| (x as f64).cos());
-    rhai.register_fn("tan", |x: f64| x.tan());
-    rhai.register_fn("tan", |x: i64| (x as f64).tan());
-    rhai.register_fn("sqrt", |x: f64| x.sqrt());
-    rhai.register_fn("abs", |x: f64| x.abs());
-    rhai.register_fn("abs", |x: i64| x.abs());
-    rhai.register_fn("min", |a: f64, b: f64| a.min(b));
-    rhai.register_fn("min", |a: i64, b: i64| a.min(b));
-    rhai.register_fn("max", |a: f64, b: f64| a.max(b));
-    rhai.register_fn("max", |a: i64, b: i64| a.max(b));
     scope.push("time", 0f64);
     scope.push("GRID_WIDTH", 1024i64);
     scope.push("GRID_HEIGHT", 512i64);
