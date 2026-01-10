@@ -27,7 +27,6 @@ pub mod smoke;
 pub mod snow;
 pub mod steam;
 pub mod stone;
-pub mod twice_compressed_steam;
 pub mod void;
 pub mod water;
 pub mod wood;
@@ -70,7 +69,6 @@ use self::{
     smoke::Smoke,
     snow::Snow,
     steam::Steam,
-    twice_compressed_steam::TwiceCompressedSteam,
     void::Void,
     water::Water,
     wood::Wood,
@@ -263,7 +261,6 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[71] = DryGrass::boxed();
     cell_registry.pal[80] = BlackHole::boxed();
     cell_registry.pal[81] = CompressedSteam::boxed();
-    cell_registry.pal[82] = TwiceCompressedSteam::boxed();
     cell_registry.pal[83] = DeluteAcid::boxed();
     cell_registry.pal[84] = SaltyWater::boxed();
     cell_registry.pal[85] = BaseWater::boxed();

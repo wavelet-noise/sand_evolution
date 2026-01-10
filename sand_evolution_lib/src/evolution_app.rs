@@ -1383,6 +1383,19 @@ impl EvolutionApp {
                 self.script_error = err.to_string()
             }
         }
+
+        // Mirror compilation failures to Script Log to avoid silent failures when
+        // loading scripts via templates / URL, and to keep history visible.
+        if !self.script_error.is_empty() {
+            let mut log = self.script_log.borrow_mut();
+            if log.len() >= 30 {
+                log.pop_front();
+            }
+            log.push_back(format!(
+                "Rhai compile error ({}): {}",
+                self.selected_object_name, self.script_error
+            ));
+        }
     }
 
     fn spawn_blocks(&mut self, state: &mut State) {
