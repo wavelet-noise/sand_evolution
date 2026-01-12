@@ -183,7 +183,7 @@ pub fn update_tick(
                 // Pass temp_context for cells with temperature interactions:
                 // water (2), steam (3), fire (4), burning wood (6), burning coal (7), coal (8),
                 // acid (9), gas (10), burning gas (11), diluted acid (12), liquid gas (17),
-                // wood (50), ice (55), crushed ice (56), snow (57)
+                // wood (50), burning powder (51), ice (55), crushed ice (56), snow (57)
                 // For other cells pass None for optimization
                 let needs_temp = cur_v == 2
                     || cur_v == 3
@@ -197,6 +197,7 @@ pub fn update_tick(
                     || cur_v == 12
                     || cur_v == 17
                     || cur_v == 50
+                    || cur_v == 51
                     || cur_v == 55
                     || cur_v == 56
                     || cur_v == 57;

@@ -910,7 +910,7 @@ impl EvolutionApp {
                 ui.add(
                     egui::Slider::new(
                         &mut state.global_temperature,
-                        crate::state::TEMP_MIN..=crate::state::TEMP_MAX,
+                        crate::state::TEMP_MIN..=1000.0,
                     )
                     // Keep slider limited, but allow any numeric input via the slider's value editor.
                     .clamp_to_range(false)
