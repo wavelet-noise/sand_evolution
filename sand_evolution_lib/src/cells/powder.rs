@@ -1,4 +1,4 @@
-use crate::cs::PointType;
+use crate::cs::{self, PointType};
 
 use super::{
     burning_powder::BurningPowder, burning_gas::BurningGas, helper::sand_falling_helper, CellRegistry,
@@ -29,14 +29,19 @@ impl CellTrait for Powder {
         dim: &mut Prng,
         temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Coal can ignite at high temperature (varies by type/particle size).
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            // A rough baseline: ~450°C for ignition in this simulation.
-            if temperature >= 450.0 && dim.next() > 235 {
-                container[cur] = BurningPowder::id();
-                return;
+            if temperature >= 200.0 {
+                let ignition_chance = if temperature >= 300.0 {
+                    50
+                } else {
+                    100
+                };
+                if dim.next() > ignition_chance {
+                    container[cur] = BurningPowder::id();
+                    return;
+                }
             }
         }
 
@@ -53,7 +58,7 @@ impl CellTrait for Powder {
         BurningGas::id()
     }
     fn ignition_temperature(&self) -> Option<f32> {
-        Some(450.0)
+        Some(200.0)
     }
     fn name(&self) -> &str {
         "powder"

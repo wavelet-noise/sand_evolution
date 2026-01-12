@@ -6,7 +6,6 @@ pub mod burning_gas;
 pub mod burning_powder;
 pub mod burning_wood;
 pub mod coal;
-pub mod compressed_steam;
 pub mod crushed_ice;
 pub mod powder;
 mod delute_acid;
@@ -55,7 +54,6 @@ use self::{
     burning_powder::BurningPowder,
     copper::Copper,
     coal::Coal,
-    compressed_steam::CompressedSteam,
     crushed_ice::CrushedIce,
     powder::Powder,
     earth::Earth,
@@ -86,7 +84,6 @@ pub struct Prng {
 impl Prng {
     pub fn new() -> Self {
         let mut buf = [0u8; PRNG_POOL_SIZE];
-        // High‑quality randomness from OS / WebCrypto via getrandom.
         let _ = getrandom::getrandom(&mut buf);
         Self {
             rnd: buf,
@@ -96,7 +93,6 @@ impl Prng {
     }
 
     pub fn gen(&mut self) {
-        // Refill the buffer with fresh random bytes each time.
         let _ = getrandom::getrandom(&mut self.rnd);
         self.rnd_next = 0;
     }
@@ -141,7 +137,6 @@ impl CellRegistry {
     }
 }
 
-// Context for working with temperature (optional).
 pub struct TemperatureContext<'a> {
     pub get_temp: Box<dyn Fn(PointType, PointType) -> f32 + 'a>,
     pub add_temp: Box<dyn FnMut(PointType, PointType, f32) + 'a>,
@@ -182,8 +177,6 @@ pub trait CellTrait {
         if !self.casts_shadow() {
             return [255, 255, 255, 0];
         }
-        // Previous shader used `dark_rgb = col.rgb * 0.55`.
-        // 0.55 * 255 ~= 140.
         [140, 140, 140, 255]
     }
     fn burnable(&self) -> CellType {
@@ -201,20 +194,15 @@ pub trait CellTrait {
     fn heat_proof(&self) -> u8 {
         1
     }
-    /// Temperature (degrees) at/above which this cell can ignite when heated by fire.
-    /// If None, fire may still interact via `burnable()`/`heatable()` legacy rules.
     fn ignition_temperature(&self) -> Option<f32> {
         None
     }
-    /// Relative thermal conductivity of this material for *local* heat spreading.
     fn thermal_conductivity(&self) -> f32 {
         0.0
     }
-    /// Strength of vertical convection for the material.
     fn convection_factor(&self) -> f32 {
         0.0
     }
-    /// UI color for this cell in the palette (sRGB 0–255).
     fn display_color(&self) -> [u8; 3] {
         [200, 200, 200]
     }
@@ -260,7 +248,6 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[70] = Grass::boxed();
     cell_registry.pal[71] = DryGrass::boxed();
     cell_registry.pal[80] = BlackHole::boxed();
-    cell_registry.pal[81] = CompressedSteam::boxed();
     cell_registry.pal[83] = DeluteAcid::boxed();
     cell_registry.pal[84] = SaltyWater::boxed();
     cell_registry.pal[85] = BaseWater::boxed();

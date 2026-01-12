@@ -1,4 +1,4 @@
-use super::{TemperatureContext, *};
+use super::{helper::try_spawn_smoke, TemperatureContext, *};
 use crate::cs::{self, PointType};
 
 pub const fn new() -> Cell {
@@ -22,8 +22,6 @@ impl CellTrait for Cell {
         prng: &mut Prng,
         mut temp_context: Option<&mut TemperatureContext>,
     ) {
-        // Fire can only exist if the environment is hot enough.
-        // This makes "extinguishing" naturally temperature-based (e.g. lots of evaporation cooling).
         const FIRE_SUSTAIN_TEMP: f32 = 80.0;
         let mut extinguish = false;
         if let Some(temp_ctx) = temp_context.as_deref() {
@@ -51,43 +49,45 @@ impl CellTrait for Cell {
         }
 
         if prng.next() > 128 {
-            // Fire constantly heats the surrounding environment
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                // Constantly give heat to neighbors
-                (temp_ctx.add_temp)(i, j + 1, 1.5); // top
-                (temp_ctx.add_temp)(i, j - 1, 1.5); // bottom
-                (temp_ctx.add_temp)(i + 1, j, 1.5); // right
-                (temp_ctx.add_temp)(i - 1, j, 1.5); // left
+                (temp_ctx.add_temp)(i, j + 1, 1.5);
+                (temp_ctx.add_temp)(i, j - 1, 1.5);
+                (temp_ctx.add_temp)(i + 1, j, 1.5);
+                (temp_ctx.add_temp)(i - 1, j, 1.5);
+            }
+            if prng.next() > 240 {
+                try_spawn_smoke(i, j, container, prng, 1);
             }
             if extinguish {
+                try_spawn_smoke(i, j, container, prng, 1);
                 container[cur] = Void::id();
             }
             return;
         }
 
-        // Fire is finite - when disappearing gives additional heat to neighboring cells
         if prng.next() > 200 {
-            // Give heat to neighboring cells before disappearing
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                // Give additional heat to neighbors when disappearing
-                (temp_ctx.add_temp)(i, j + 1, 2.5); // top
-                (temp_ctx.add_temp)(i, j - 1, 2.5); // bottom
-                (temp_ctx.add_temp)(i + 1, j, 2.5); // right
-                (temp_ctx.add_temp)(i - 1, j, 2.5); // left
+                (temp_ctx.add_temp)(i, j + 1, 2.5);
+                (temp_ctx.add_temp)(i, j - 1, 2.5);
+                (temp_ctx.add_temp)(i + 1, j, 2.5);
+                (temp_ctx.add_temp)(i - 1, j, 2.5);
             }
+            try_spawn_smoke(i, j, container, prng, 1);
             container[cur] = 0;
             return;
         }
 
-        // Fire constantly heats the surrounding environment
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
-            // Constantly give heat to neighbors
-            (temp_ctx.add_temp)(i, j + 1, 1.5); // top
-            (temp_ctx.add_temp)(i, j - 1, 1.5); // bottom
-            (temp_ctx.add_temp)(i + 1, j, 1.5); // right
-            (temp_ctx.add_temp)(i - 1, j, 1.5); // left
+            (temp_ctx.add_temp)(i, j + 1, 1.5);
+            (temp_ctx.add_temp)(i, j - 1, 1.5);
+            (temp_ctx.add_temp)(i + 1, j, 1.5);
+            (temp_ctx.add_temp)(i - 1, j, 1.5);
+        }
+        if prng.next() > 240 {
+            try_spawn_smoke(i, j, container, prng, 1);
         }
         if extinguish {
+            try_spawn_smoke(i, j, container, prng, 1);
             container[cur] = Void::id();
             return;
         }
@@ -97,7 +97,6 @@ impl CellTrait for Cell {
         let r = cs::xy_to_index(i + 1, j);
         let l = cs::xy_to_index(i - 1, j);
 
-        // Pick a neighbor (track both index and coordinates for temperature checks).
         let arr = [
             (i, j + 1, top),
             (i, j - 1, down),
@@ -105,9 +104,6 @@ impl CellTrait for Cell {
             (i + 1, j, r),
         ];
         let (_nx, _ny, _cc) = arr[(prng.next() % 4) as usize];
-
-        // Fire does NOT directly ignite/transform neighbors on contact.
-        // It only heats (handled above) and moves/disappears.
 
         let top_v = container[top];
 
@@ -132,8 +128,7 @@ impl CellTrait for Cell {
             return;
         }
 
-        // Fire disappears and gives heat to neighboring cells
-        // temp_context already used above, but if we reached here, it was None or already used
+        try_spawn_smoke(i, j, container, prng, 1);
         container[cur] = 0;
     }
 

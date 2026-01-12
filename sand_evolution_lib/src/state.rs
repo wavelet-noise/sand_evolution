@@ -161,13 +161,8 @@ pub struct State {
     temperature_bind_group: wgpu::BindGroup,
 }
 
-/// Minimum allowed temperature in the simulation (degrees).
 pub const TEMP_MIN: f32 = -100.0;
-/// Maximum allowed temperature in the simulation (degrees).
-///
-/// Note: some cells use ignition thresholds above 100 (e.g. coal at 150),
-/// so this needs to be > 150 to make those rules reachable.
-pub const TEMP_MAX: f32 = 500.0;
+pub const TEMP_MAX: f32 = 1000.0;
 
 impl State {
     pub(crate) fn update_with_data(&mut self, p0: &[u8]) {

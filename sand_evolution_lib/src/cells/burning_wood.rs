@@ -1,4 +1,4 @@
-use super::{TemperatureContext, *};
+use super::{helper::try_spawn_smoke, TemperatureContext, *};
 use crate::cs::{self, PointType};
 
 pub const fn new() -> Cell {
@@ -51,12 +51,16 @@ impl CellTrait for Cell {
         }
 
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
-            (temp_ctx.add_temp)(i, j + 1, 1.0); // top
-            (temp_ctx.add_temp)(i, j - 1, 1.0); // bottom
-            (temp_ctx.add_temp)(i + 1, j, 1.0); // right
-            (temp_ctx.add_temp)(i - 1, j, 1.0); // left
+            (temp_ctx.add_temp)(i, j + 1, 1.0);
+            (temp_ctx.add_temp)(i, j - 1, 1.0);
+            (temp_ctx.add_temp)(i + 1, j, 1.0);
+            (temp_ctx.add_temp)(i - 1, j, 1.0);
+        }
+        if prng.next() > 250 {
+            try_spawn_smoke(i, j, container, prng, 1);
         }
         if extinguish {
+            try_spawn_smoke(i, j, container, prng, 1);
             container[cur] = Wood::id();
             return;
         }
@@ -98,6 +102,7 @@ impl CellTrait for Cell {
         }
 
         if prng.next() > 253 {
+            try_spawn_smoke(i, j, container, prng, 1);
             container[cur] = Coal::id();
             return;
         }

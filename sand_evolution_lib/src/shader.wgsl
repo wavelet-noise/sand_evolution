@@ -1,4 +1,3 @@
-// Vertex shader
 
 struct WorldSettings {
     time: f32,
@@ -45,7 +44,6 @@ fn vs_main(
     return out;
 }
 
-// Fragment shader
 
 
 
@@ -255,9 +253,7 @@ fn simplex_noise_3d(v: vec3<f32>) -> f32 {
     return 42. * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
-// higher level concepts:
 
-/// Fractional brownian motion (fbm) based on 2d simplex noise
 fn fbm_simplex_2d(pos: vec2<f32>, octaves: i32, lacunarity: f32, gain: f32) -> f32 {
     var sum = 0.;
     var amplitude = 1.;
@@ -272,7 +268,6 @@ fn fbm_simplex_2d(pos: vec2<f32>, octaves: i32, lacunarity: f32, gain: f32) -> f
     return sum;
 }
 
-/// Fractional brownian motion (fbm) based on seeded 2d simplex noise
 fn fbm_simplex_2d_seeded(pos: vec2<f32>, octaves: i32, lacunarity: f32, gain: f32, seed: f32) -> f32 {
     var sum = 0.;
     var amplitude = 1.;
@@ -287,7 +282,6 @@ fn fbm_simplex_2d_seeded(pos: vec2<f32>, octaves: i32, lacunarity: f32, gain: f3
     return sum;
 }
 
-/// Fractional brownian motion (fbm) based on 3d simplex noise
 fn fbm_simplex_3d(pos: vec3<f32>, octaves: i32, lacunarity: f32, gain: f32) -> f32 {
     var sum = 0.;
     var amplitude = 1.;
@@ -329,9 +323,6 @@ fn shadow_props(id: u32) -> vec4<f32> {
     return textureLoad(t_shadow_props, vec2<i32>(i32(id), 0), 0);
 }
 
-// Manual bilinear sampling for the temperature texture.
-// Needed because (depending on format/usage) the texture may not be filterable,
-// and older WGSL versions don't allow local (nested) functions.
 fn sample_temperature_bilinear(uv: vec2<f32>, dims_i: vec2<i32>, dims_f: vec2<f32>) -> f32 {
     // Map uv [0..1] to texel space, aligned to texel centers.
     let pos = uv * dims_f - vec2<f32>(0.5, 0.5);
@@ -355,9 +346,6 @@ fn sample_temperature_bilinear(uv: vec2<f32>, dims_i: vec2<i32>, dims_f: vec2<f3
     return mix(a, b, fy);
 }
 
-// Returns vec4(mult_rgb, strength)
-// - mult_rgb: multiplier color for shadowing (1.0 = no darkening)
-// - strength: accumulated shadow strength [0..1]
 fn compute_wall_shadow(cell_xy: vec2<i32>) -> vec4<f32> {
     // Directional light direction in texel space (x,y), provided via padding fields.
     // If not set, fall back to a sensible default.
@@ -518,9 +506,6 @@ fn wall_background_albedo(uv: vec2<f32>, cell_xy: vec2<i32>) -> vec3<f32> {
     return clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(8.0));
 }
 
-// A lightweight brick-edge mask used for "heat glow" modulation.
-// Purposefully simpler than `wall_background_albedo()` (no fbm roughness),
-// so we can sample neighbors cheaply to build pseudo-normals.
 fn wall_brick_mortar_mask_simple(cell_xy: vec2<i32>) -> f32 {
     let p = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
 
@@ -539,8 +524,6 @@ fn wall_brick_mortar_mask_simple(cell_xy: vec2<i32>) -> f32 {
     return smoothstep(mortar, 0.0, edge0); // 1 near seams, 0 inside brick
 }
 
-// Pseudo-normal from brick seam mask gradient (stable in cell space).
-// Used to slightly boost heat incandescence along brick edges.
 fn wall_brick_pseudo_normal(cell_xy: vec2<i32>) -> vec3<f32> {
     let mx1 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>( 1,  0));
     let mx0 = wall_brick_mortar_mask_simple(cell_xy + vec2<i32>(-1,  0));
@@ -570,8 +553,6 @@ fn is_translucent_fluid_or_gas(t: u32) -> bool {
 }
 
 
-// Fire color ramp: deep red -> orange -> yellow -> white (HDR-ready).
-// Input is normalized "heat" in [0..1].
 fn fire_color_ramp(heat01: f32) -> vec3<f32> {
     let t = clamp(heat01, 0.0, 1.0);
     let c0 = vec3<f32>(0.02, 0.00, 0.00); // almost black
@@ -661,7 +642,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         );
 
         // --- Hot (>=21): keep the original "physics-ish" warm ramp (readable, not too bright)
-        let hot = clamp((temp_value - 21.0) / (500.0 - 21.0), 0.0, 1.0);
+        // Increased max temp to 1000 to allow explosive temperatures
+        let hot = clamp((temp_value - 21.0) / (1000.0 - 21.0), 0.0, 1.0);
         let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
         let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
         let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
@@ -785,15 +767,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     else if t == 4u // fire
     {
       // Improved fire shading with separated temperature, flame, and incandescence
-// Drop-in replacement for the original block. Keeps the same inputs and noise sources.
 
-// --- Noise helpers (unchanged) ---
 let n_fast   = clamp(tdnoise_fast   * 0.5 + 0.5, 0.0, 1.0);
 let n_faster = clamp(tdnoise_faster * 0.5 + 0.5, 0.0, 1.0);
 
-// --- Physical temperature (slow signal) ---
-var heat01 = clamp((temp_value - 220.0) / (780.0 - 220.0), 0.0, 1.0);
-// small turbulence that does NOT dominate the physics
+var heat01 = clamp((temp_value - 220.0) / (1000.0 - 220.0), 0.0, 1.0);
 heat01 = clamp(
   heat01
   + (n_faster - 0.5) * 0.16
@@ -801,12 +779,10 @@ heat01 = clamp(
   0.0, 1.0
 );
 
-// --- Sub-cell flame animation ---
 let grid_uv = uv * vec2<f32>(settings.res_x, settings.res_y);
 let cell_uv = fract(grid_uv);              // [0..1) inside the cell
 let cell_pos = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
 
-// Upward advection (hotter = faster rise)
 let flow = vec2<f32>(0.0, -settings.time * (2.0 + 3.0 * heat01));
 let flame_fbm = fbm_simplex_3d(
   vec3<f32>((cell_pos + cell_uv) * 0.55 + flow, settings.time * 1.25),
@@ -822,15 +798,12 @@ let y = cell_uv.y;              // y grows down
 let v = clamp(y, 0.0, 1.0);     // 0 = top, 1 = base
 let base = 1.0 - v;             // 1 = base, 0 = top
 
-// Flame shape: wide at base, narrow at top
 let width = mix(0.50, 0.14, v);
 let edge = 1.0 - smoothstep(width - 0.10, width, abs(x));
 
-// Ridged noise -> vertical tongues
 let ridge = 1.0 - abs(2.0 * f01 - 1.0);
 let tongues = pow(clamp(ridge, 0.0, 1.0), 1.8);
 
-// Flame mask (fast signal)
 let flame_mask = clamp(
   edge *
   (0.45 + 0.75 * tongues) *
@@ -838,25 +811,19 @@ let flame_mask = clamp(
   0.0, 1.0
 );
 
-// --- Separate flame vs heat ---
 let flame01 = clamp(flame_mask * (0.6 + 0.6 * heat01), 0.0, 1.0);
 
-// Incandescence (slow, material glow)
 let incand01 = pow(heat01, 1.25);
 
-// --- Color ---
-// Color is driven by the hotter of heat or flame
 let color_t = clamp(max(incand01, flame01), 0.0, 1.0);
 let rgb = fire_color_ramp(color_t);
 
-// --- Intensity (non-linear, flame-dominated) ---
 let flicker = clamp(0.80 + 0.45 * n_fast, 0.70, 1.30);
 let intensity =
   (3.0 + 10.0 * pow(incand01, 1.4)) *
   mix(0.7, 1.8, flame01) *
   flicker;
 
-// --- Optional micro-sparks (cheap but effective) ---
 let spark = step(0.985, f01) * step(0.7, base) * heat01;
 let spark_rgb = vec3<f32>(1.0, 0.8, 0.4) * spark * 6.0;
 
@@ -865,46 +832,23 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     }
     else if t == 50u // powder (slow fire)
     {
-      // Cooler + dimmer version: more orange, less white.
+      // Simplified powder shader
       let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
-      let n_faster = clamp(tdnoise_faster * 0.5 + 0.5, 0.0, 1.0);
-
-      var heat01 = clamp((temp_value - 180.0) / (520.0 - 180.0), 0.0, 1.0);
-      heat01 = clamp(heat01 + (n_faster - 0.5) * 0.18 + (noise_pixel - 0.5) * 0.04, 0.0, 1.0);
-      heat01 = min(heat01, 0.88); // prevent frequent pure-white on slow fire
-
-      // A softer variant of the same sub-cell flame animation.
-      let grid_uv = uv * vec2<f32>(settings.res_x, settings.res_y);
-      let cell_uv = fract(grid_uv);
-      let cell_pos = vec2<f32>(f32(cell_xy.x), f32(cell_xy.y));
-
-      let flow = vec2<f32>(0.0, -settings.time * (1.4 + 2.0 * heat01));
-      let flame_fbm = fbm_simplex_3d(
-        vec3<f32>((cell_pos + cell_uv) * 0.45 + flow, settings.time * 1.05),
-        4, 2.0, 0.5
-      );
-      let f01 = clamp(flame_fbm * 0.5 + 0.5, 0.0, 1.0);
-
-      let sway_n = simplex_noise_3d(vec3<f32>((cell_pos + cell_uv) * 0.15, settings.time * 0.75));
-      let sway = clamp(sway_n, -1.0, 1.0) * 0.16;
-
-      let x = (cell_uv.x - 0.5) + sway;
-      let y = cell_uv.y;
-      let v = clamp(y, 0.0, 1.0);
-      let width = mix(0.18, 0.52, v);
-      let edge = 1.0 - smoothstep(width - 0.12, width, abs(x));
-
-      let ridge = 1.0 - abs(2.0 * f01 - 1.0);
-      let tongues = pow(clamp(ridge, 0.0, 1.0), 1.5);
-      let flame_mask = clamp(edge * (0.50 + 0.60 * tongues) * (0.35 + 0.65 * v), 0.0, 1.0);
-
-      heat01 = clamp(heat01 + (flame_mask - 0.5) * 0.10, 0.0, 0.90);
-
-      let rgb = fire_color_ramp(heat01);
-      let flicker = clamp(0.88 + 0.30 * n_fast, 0.78, 1.18);
-      let shape_intensity = mix(0.65, 1.35, flame_mask);
-      let intensity = mix(1.5, 5.5, heat01) * flicker * shape_intensity;
-      col = vec4<f32>(rgb * intensity, 1.0);
+      
+      // Increased max temp to 1000 to allow explosive temperatures from gunpowder
+      var heat01 = clamp((temp_value - 180.0) / (1000.0 - 180.0), 0.0, 1.0);
+      heat01 = clamp(heat01 + (noise_pixel - 0.5) * 0.05, 0.0, 1.0);
+      // Removed 0.85 cap to allow full brightness at high temperatures
+      
+      // Base color for powder (dark gray-brown)
+      let base_color = vec3<f32>(0.2, 0.15, 0.1);
+      
+      // Glow only when hot
+      let glow_rgb = fire_color_ramp(heat01);
+      let flicker = clamp(0.90 + 0.20 * n_fast, 0.80, 1.20);
+      let glow_intensity = mix(0.0, 4.0, heat01) * flicker;
+      
+      col = vec4<f32>(base_color + glow_rgb * glow_intensity, 1.0);
     }
     else if t == 5u // wood
     {
@@ -964,11 +908,23 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     }
     else if t == 51u // burning powder
     {
-      col = mix(
-        vec4<f32>(8.0, 0.0, 0.0, 1.0),
-        vec4<f32>(8.0, 0.5, 0.0, 1.0),
-        noisy_mixer
-      ) * 10.0;
+      // Burning powder uses temperature for intense visual heat
+      let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
+      
+      // Use temperature to drive the intensity - gunpowder gets EXTREMELY hot
+      var heat01 = clamp((temp_value - 200.0) / (1000.0 - 200.0), 0.0, 1.0);
+      heat01 = clamp(heat01 + (noise_pixel - 0.5) * 0.1, 0.0, 1.0);
+      
+      // Base color for burning powder (bright red-orange)
+      let base_color = vec3<f32>(1.0, 0.3, 0.0);
+      
+      // Intense glow based on temperature
+      let glow_rgb = fire_color_ramp(heat01);
+      let flicker = clamp(0.90 + 0.30 * n_fast, 0.80, 1.40);
+      // Much higher intensity multiplier for explosive heat
+      let glow_intensity = mix(5.0, 25.0, heat01) * flicker;
+      
+      col = vec4<f32>(base_color + glow_rgb * glow_intensity, 1.0);
     }
     else if t == 8u // coal
     {
@@ -1055,7 +1011,8 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     // Direct heat visualization in Normal render (NOT bloom):
     // Blackbody-like heat tint driven by blurred temperature field.
     // Keep it subtle so it reads as "heat", not "paint".
-    let heat = clamp((temp_vis - 140.0) / (520.0 - 140.0), 0.0, 1.0);
+    // Increased max temp to 1000 to allow explosive temperatures
+    let heat = clamp((temp_vis - 140.0) / (1000.0 - 140.0), 0.0, 1.0);
     if (heat > 0.0 && settings.display_mode < 1.5) {
         // Exponential response (more perceptual): keeps low heat subtle, ramps high heat faster.
         let heat_e = 1.0 - exp(-2.6 * heat);

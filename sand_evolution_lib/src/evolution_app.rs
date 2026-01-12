@@ -18,8 +18,6 @@ use crate::{
 };
 use specs::WorldExt;
 
-/// Simple manager for window styling (background color, text color, etc.).
-/// For now all app windows share the same style.
 pub struct WindowStyleManager {
     pub window_background: Color32,
     pub text_color: Color32,
@@ -1469,7 +1467,7 @@ impl EvolutionApp {
     pub fn new_with_log(script_log: Rc<RefCell<VecDeque<String>>>) -> Self {
         let number_of_cells_to_add = 500;
         let number_of_structures_to_add = 100;
-        let selected_option: String = "water".to_owned();
+        let selected_option: String = "powder".to_owned();
         let options: Vec<String> = Vec::new();
         let executor = Executor::new();
         Self {

@@ -1,6 +1,6 @@
 use crate::cs;
 
-use super::{CellRegistry, Prng};
+use super::{smoke::Smoke, void::Void, CellRegistry, CellType, PointType, Prng};
 
 pub fn sand_falling_helper(
     my_den: i8,
@@ -233,4 +233,49 @@ pub fn fluid_flying_helper(
     }
 
     false
+}
+
+pub fn try_spawn_smoke(
+    i: PointType,
+    j: PointType,
+    container: &mut [CellType],
+    prng: &mut Prng,
+    target_count: usize,
+) -> usize {
+    let mut spawned = 0;
+    let mut candidates = Vec::new();
+
+    if j + 1 < cs::SECTOR_SIZE.y {
+        let top = cs::xy_to_index(i, j + 1);
+        if container[top] == Void::id() {
+            candidates.push(top);
+        }
+    }
+    if j > 0 {
+        let bot = cs::xy_to_index(i, j - 1);
+        if container[bot] == Void::id() {
+            candidates.push(bot);
+        }
+    }
+    if i + 1 < cs::SECTOR_SIZE.x {
+        let right = cs::xy_to_index(i + 1, j);
+        if container[right] == Void::id() {
+            candidates.push(right);
+        }
+    }
+    if i > 0 {
+        let left = cs::xy_to_index(i - 1, j);
+        if container[left] == Void::id() {
+            candidates.push(left);
+        }
+    }
+
+    while spawned < target_count && !candidates.is_empty() {
+        let idx = (prng.next() as usize) % candidates.len();
+        let cell_idx = candidates.remove(idx);
+        container[cell_idx] = Smoke::id();
+        spawned += 1;
+    }
+
+    spawned
 }
