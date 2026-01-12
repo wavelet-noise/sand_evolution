@@ -32,11 +32,11 @@ impl CellTrait for Powder {
         if let Some(temp_ctx) = temp_context {
             let temperature = (temp_ctx.get_temp)(i, j);
 
-            if temperature >= 200.0 {
-                let ignition_chance = if temperature >= 300.0 {
-                    50
+            if temperature >= 300.0 {
+                let ignition_chance = if temperature >= 400.0 {
+                    180  // ~30% chance at high temperature
                 } else {
-                    100
+                    230  // ~10% chance at medium temperature
                 };
                 if dim.next() > ignition_chance {
                     container[cur] = BurningPowder::id();
@@ -58,7 +58,7 @@ impl CellTrait for Powder {
         BurningGas::id()
     }
     fn ignition_temperature(&self) -> Option<f32> {
-        Some(200.0)
+        Some(300.0)
     }
     fn name(&self) -> &str {
         "powder"

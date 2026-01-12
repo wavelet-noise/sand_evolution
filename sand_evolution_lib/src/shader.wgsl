@@ -642,8 +642,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         );
 
         // --- Hot (>=21): keep the original "physics-ish" warm ramp (readable, not too bright)
-        // Increased max temp to 1000 to allow explosive temperatures
-        let hot = clamp((temp_value - 21.0) / (1000.0 - 21.0), 0.0, 1.0);
+        // Increased max temp to 5000 to allow explosive temperatures
+        let hot = clamp((temp_value - 21.0) / (5000.0 - 21.0), 0.0, 1.0);
         let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
         let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
         let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
@@ -771,7 +771,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 let n_fast   = clamp(tdnoise_fast   * 0.5 + 0.5, 0.0, 1.0);
 let n_faster = clamp(tdnoise_faster * 0.5 + 0.5, 0.0, 1.0);
 
-var heat01 = clamp((temp_value - 220.0) / (1000.0 - 220.0), 0.0, 1.0);
+var heat01 = clamp((temp_value - 220.0) / (5000.0 - 220.0), 0.0, 1.0);
 heat01 = clamp(
   heat01
   + (n_faster - 0.5) * 0.16
@@ -835,8 +835,8 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
       // Simplified powder shader
       let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
       
-      // Increased max temp to 1000 to allow explosive temperatures from gunpowder
-      var heat01 = clamp((temp_value - 180.0) / (1000.0 - 180.0), 0.0, 1.0);
+      // Increased max temp to 5000 to allow explosive temperatures from gunpowder
+      var heat01 = clamp((temp_value - 180.0) / (5000.0 - 180.0), 0.0, 1.0);
       heat01 = clamp(heat01 + (noise_pixel - 0.5) * 0.05, 0.0, 1.0);
       // Removed 0.85 cap to allow full brightness at high temperatures
       
@@ -912,7 +912,7 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
       let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
       
       // Use temperature to drive the intensity - gunpowder gets EXTREMELY hot
-      var heat01 = clamp((temp_value - 200.0) / (1000.0 - 200.0), 0.0, 1.0);
+      var heat01 = clamp((temp_value - 200.0) / (5000.0 - 200.0), 0.0, 1.0);
       heat01 = clamp(heat01 + (noise_pixel - 0.5) * 0.1, 0.0, 1.0);
       
       // Base color for burning powder (bright red-orange)
@@ -1011,8 +1011,8 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     // Direct heat visualization in Normal render (NOT bloom):
     // Blackbody-like heat tint driven by blurred temperature field.
     // Keep it subtle so it reads as "heat", not "paint".
-    // Increased max temp to 1000 to allow explosive temperatures
-    let heat = clamp((temp_vis - 140.0) / (1000.0 - 140.0), 0.0, 1.0);
+    // Increased max temp to 5000 to allow explosive temperatures
+    let heat = clamp((temp_vis - 140.0) / (5000.0 - 140.0), 0.0, 1.0);
     if (heat > 0.0 && settings.display_mode < 1.5) {
         // Exponential response (more perceptual): keeps low heat subtle, ramps high heat faster.
         let heat_e = 1.0 - exp(-2.6 * heat);
