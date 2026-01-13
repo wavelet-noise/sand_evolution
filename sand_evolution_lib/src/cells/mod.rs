@@ -73,38 +73,35 @@ use self::{
 };
 pub type CellType = u8;
 
-pub const PRNG_POOL_SIZE: usize = 2048;
-
 pub struct Prng {
-    rnd: [u8; PRNG_POOL_SIZE],
-    rnd_next: usize,
+    state: u64,
     carb: i32,
 }
 
 impl Prng {
     pub fn new() -> Self {
-        let mut buf = [0u8; PRNG_POOL_SIZE];
-        let _ = getrandom::getrandom(&mut buf);
-        Self {
-            rnd: buf,
-            rnd_next: 0,
-            carb: 100,
+        // Seed once from OS RNG. We avoid calling getrandom in the hot path
+        // (per simulation tick), since that can be extremely expensive on mobile.
+        let mut seed_bytes = [0u8; 8];
+        let _ = getrandom::getrandom(&mut seed_bytes);
+        let mut seed = u64::from_le_bytes(seed_bytes);
+        if seed == 0 {
+            // Avoid the all-zero state.
+            seed = 0x9E37_79B9_7F4A_7C15;
         }
+        Self { state: seed, carb: 100 }
     }
 
     pub fn gen(&mut self) {
-        let _ = getrandom::getrandom(&mut self.rnd);
-        self.rnd_next = 0;
+        // Kept for API compatibility; just advance the internal state a bit.
+        // (Formerly this refilled the pool via getrandom.)
+        self.state = splitmix64(self.state);
     }
 
     pub fn next(&mut self) -> u8 {
-        self.rnd_next += 1;
-        self.rnd_next = if self.rnd_next >= PRNG_POOL_SIZE {
-            0
-        } else {
-            self.rnd_next
-        };
-        self.rnd[self.rnd_next]
+        // Fast non-cryptographic PRNG for simulation use.
+        self.state = splitmix64(self.state);
+        (self.state >> 56) as u8
     }
 
     pub fn add_carb(&mut self) {
@@ -118,6 +115,16 @@ impl Prng {
     pub fn carb(&self) -> i32 {
         self.carb
     }
+}
+
+#[inline]
+fn splitmix64(mut x: u64) -> u64 {
+    // SplitMix64 generator (public domain).
+    x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 pub struct CellRegistry {
