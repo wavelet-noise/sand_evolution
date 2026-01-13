@@ -128,6 +128,12 @@ pub struct State {
     settings_bind_group: wgpu::BindGroup,
     float_texture_plus_sampler_bgl: wgpu::BindGroupLayout,
     float_texture_plus_sampler_plus_texture_bgl: wgpu::BindGroupLayout,
+    // Bloom/postprocess resources: creating these every frame is expensive on mobile.
+    bloom_linear_sampler: wgpu::Sampler,
+    bloom_nearest_sampler: wgpu::Sampler,
+    bloom_to_hor_blur_bg: wgpu::BindGroup,
+    bloom_to_vert_blur_bg: wgpu::BindGroup,
+    bloom_combine_bg: wgpu::BindGroup,
     pub start_time: f64,
     type_bind_group: wgpu::BindGroup,
     shadow_props_bind_group: wgpu::BindGroup,
@@ -641,6 +647,77 @@ impl State {
                 label: Some("gbuffer_bind_group_layout"),
             });
 
+        // Create bloom/postprocess bind groups ONCE (they use stable gbuffer texture views).
+        // Doing this per-frame can cause long-term perf degradation on mobile GPUs/drivers.
+        let bloom_linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        let bloom_nearest_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let bloom_to_hor_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &float_texture_plus_sampler_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&gbuffer.blur_2_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&bloom_linear_sampler),
+                },
+            ],
+            label: Some("bloom_to_hor_blur_bg"),
+        });
+
+        let bloom_to_vert_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &float_texture_plus_sampler_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&gbuffer.blur_1_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&bloom_linear_sampler),
+                },
+            ],
+            label: Some("bloom_to_vert_blur_bg"),
+        });
+
+        let bloom_combine_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &float_texture_plus_sampler_plus_texture_bgl,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&gbuffer.albedo_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&bloom_nearest_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&gbuffer.blur_2_texture_view),
+                },
+            ],
+            label: Some("bloom_combine_bg"),
+        });
+
         let type_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uint_texture_plus_sampler_bgl,
             entries: &[
@@ -1055,6 +1132,11 @@ impl State {
             world_settings,
             settings_buffer,
             settings_bind_group,
+            bloom_linear_sampler,
+            bloom_nearest_sampler,
+            bloom_to_hor_blur_bg,
+            bloom_to_vert_blur_bg,
+            bloom_combine_bg,
             start_time,
             type_bind_group,
             shadow_props_bind_group,
@@ -1532,36 +1614,6 @@ impl State {
 
             // Render pass for the bloom texture
             {
-                let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(self.surface_format);
-
-                let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                    address_mode_u: wgpu::AddressMode::ClampToEdge,
-                    address_mode_v: wgpu::AddressMode::ClampToEdge,
-                    address_mode_w: wgpu::AddressMode::ClampToEdge,
-                    mag_filter: wgpu::FilterMode::Linear,
-                    min_filter: wgpu::FilterMode::Linear,
-                    mipmap_filter: wgpu::FilterMode::Linear,
-                    ..Default::default()
-                });
-
-                let to_hor_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.float_texture_plus_sampler_bgl,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(
-                                &self.gbuffer.blur_2_texture_view,
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&color_texture_sampler),
-                        },
-                    ],
-                    label: Some("to_hor_blur_bg"),
-                });
-
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Hor to Vert"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1577,7 +1629,7 @@ impl State {
 
                 render_pass.set_pipeline(&self.hblur_render_pipeline);
                 render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
-                render_pass.set_bind_group(1, &to_hor_blur_bg, &[]);
+                render_pass.set_bind_group(1, &self.bloom_to_hor_blur_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass
@@ -1587,36 +1639,6 @@ impl State {
             }
 
             {
-                let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(self.surface_format);
-
-                let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                    address_mode_u: wgpu::AddressMode::ClampToEdge,
-                    address_mode_v: wgpu::AddressMode::ClampToEdge,
-                    address_mode_w: wgpu::AddressMode::ClampToEdge,
-                    mag_filter: wgpu::FilterMode::Linear,
-                    min_filter: wgpu::FilterMode::Linear,
-                    mipmap_filter: wgpu::FilterMode::Linear,
-                    ..Default::default()
-                });
-
-                let to_vert_blur_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.float_texture_plus_sampler_bgl,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(
-                                &self.gbuffer.blur_1_texture_view,
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&color_texture_sampler),
-                        },
-                    ],
-                    label: Some("to_vert_blur_bg"),
-                });
-
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Vert to output"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1632,7 +1654,7 @@ impl State {
 
                 render_pass.set_pipeline(&self.vblur_render_pipeline);
                 render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
-                render_pass.set_bind_group(1, &to_vert_blur_bg, &[]);
+                render_pass.set_bind_group(1, &self.bloom_to_vert_blur_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass
@@ -1642,40 +1664,6 @@ impl State {
             }
 
             {
-                let mut color_texture_view = wgpu::TextureViewDescriptor::default().clone();
-                color_texture_view.format = Some(self.surface_format);
-
-                let color_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                    address_mode_u: wgpu::AddressMode::ClampToEdge,
-                    address_mode_v: wgpu::AddressMode::ClampToEdge,
-                    address_mode_w: wgpu::AddressMode::ClampToEdge,
-                    mag_filter: wgpu::FilterMode::Nearest,
-                    min_filter: wgpu::FilterMode::Nearest,
-                    mipmap_filter: wgpu::FilterMode::Nearest,
-                    ..Default::default()
-                });
-
-                let combine_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &self.float_texture_plus_sampler_plus_texture_bgl,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&self.gbuffer.albedo_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&color_texture_sampler),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::TextureView(
-                                &self.gbuffer.blur_2_texture_view,
-                            ),
-                        },
-                    ],
-                    label: Some("combine_bg"),
-                });
-
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Vert to output"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1691,7 +1679,7 @@ impl State {
 
                 render_pass.set_pipeline(&self.bloom_render_pipeline);
                 render_pass.set_bind_group(0, &self.settings_bind_group, &[]);
-                render_pass.set_bind_group(1, &combine_bg, &[]);
+                render_pass.set_bind_group(1, &self.bloom_combine_bg, &[]);
 
                 render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
                 render_pass
