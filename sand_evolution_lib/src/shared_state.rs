@@ -12,3 +12,4 @@ impl SharedState {
         self.points.push((cgmath::Point2::<i32>::new(x, y), t));
     }
 }
+ 
