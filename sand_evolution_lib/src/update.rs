@@ -124,16 +124,30 @@ pub fn update_tick(
             }
         }
 
-        for (p, c) in shared_state.borrow_mut().points.iter() {
-            if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
-                && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
-            {
-                state
-                    .diffuse_rgba
-                    .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
+        // Apply queued brush/input updates.
+        // Important on mobile: the queue can spike very large; `clear()` keeps capacity,
+        // so we opportunistically shrink it to avoid long-term heap pressure.
+        {
+            let mut ss = shared_state.borrow_mut();
+            for (p, c) in ss.points.iter() {
+                if (0..cs::SECTOR_SIZE.x as i32).contains(&p.x)
+                    && (0..cs::SECTOR_SIZE.y as i32).contains(&p.y)
+                {
+                    state
+                        .diffuse_rgba
+                        .put_pixel(p.x as u32, p.y as u32, image::Luma([*c]));
+                }
+            }
+            ss.points.clear();
+
+            // If it ever grew huge, release most of it.
+            // (Values are conservative: keeps enough for big strokes but prevents multi-MB growth.)
+            const MAX_POINTS_CAP: usize = 2_000_000;
+            const SHRINK_TO: usize = 131_072;
+            if ss.points.capacity() > MAX_POINTS_CAP {
+                ss.points.shrink_to(SHRINK_TO);
             }
         }
-        shared_state.borrow_mut().points.clear();
 
         state.flip ^= 1;
         if state.flip == 0 {
