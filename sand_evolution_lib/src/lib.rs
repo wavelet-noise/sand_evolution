@@ -653,6 +653,11 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .remove_textures(tdelta)
                     .expect("remove texture ok");
 
+                // Important (especially on mobile): allow wgpu to process internal queues and
+                // actually retire resources / command buffers. Without polling, some backends
+                // can accumulate work/resources over time and performance degrades until restart.
+                device.poll(wgpu::Maintain::Poll);
+
                 // Support reactive on windows only, but not on linux.
                 // if _output.needs_repaint {
                 //     *control_flow = ControlFlow::Poll;
