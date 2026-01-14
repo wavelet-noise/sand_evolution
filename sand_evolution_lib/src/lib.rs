@@ -457,7 +457,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
     let start_time = instant::now();
     let mut last_frame_time = start_time;
-    let mut collected_delta = 0.0;
+    // No catch-up / no accumulated backlog: simulation does not try to "repay" missed time.
     let event_loop_shared_state = shared_state_rc.clone();
     let upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
@@ -500,33 +500,18 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 // Calculate how many simulation steps to run this frame.
                 // When paused, automatic stepping is disabled, but manual step buttons
                 // in the UI can still queue discrete steps.
-                let mut sim_steps: i32 = 0;
-                if !evolution_app.simulation_paused
+                let mut sim_steps: i32 = if !evolution_app.simulation_paused
                     && evolution_app.simulation_steps_per_second > 0
                 {
                     const MAX_SIM_STEPS_PER_FRAME: i32 = 16;
-                    const MAX_ACCUMULATED_SECONDS: f64 = 0.5;
-                    let steps_per_this_frame = ((delta_t + collected_delta)
-                        * evolution_app.simulation_steps_per_second as f64)
-                        .floor();
-                    let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-                    // Clamp the number of steps we actually execute this frame.
-                    let desired_steps = steps_per_this_frame as i32;
-                    let executed_steps = desired_steps.clamp(0, MAX_SIM_STEPS_PER_FRAME);
-                    // We only "pay back" time that we actually simulated.
-                    collected_delta += delta_t - (executed_steps as f64) * one_tick_delta;
-                    // Don't let the backlog grow without bound; if we can't keep up, we drop time.
-                    if collected_delta > MAX_ACCUMULATED_SECONDS {
-                        collected_delta = MAX_ACCUMULATED_SECONDS;
-                    } else if collected_delta < -MAX_ACCUMULATED_SECONDS {
-                        collected_delta = -MAX_ACCUMULATED_SECONDS;
-                    }
-                    sim_steps += executed_steps;
+                    // No backlog: steps are based only on the current frame's delta.
+                    let desired_steps = (delta_t * evolution_app.simulation_steps_per_second as f64)
+                        .floor() as i32;
+                    desired_steps.clamp(0, MAX_SIM_STEPS_PER_FRAME)
                 } else {
-                    // While paused (or with zero speed) we don't want to accumulate
-                    // fractional time towards future automatic steps.
-                    collected_delta = 0.0;
-                }
+                    // While paused (or with zero speed) don't run automatic simulation steps.
+                    0
+                };
 
                 // Apply any queued manual steps (from "Step ×1/×10" buttons).
                 if evolution_app.pending_simulation_steps > 0 {
