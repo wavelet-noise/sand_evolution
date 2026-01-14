@@ -168,7 +168,7 @@ pub struct State {
 }
 
 pub const TEMP_MIN: f32 = -100.0;
-pub const TEMP_MAX: f32 = 5000.0;
+pub const TEMP_MAX: f32 = 1000.0;
 
 impl State {
     pub(crate) fn update_with_data(&mut self, p0: &[u8]) {

@@ -610,12 +610,14 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     // Extra smoothing for heat visualization in Normal render (more "blurry heat").
     // Temperature grid is already low-res (res/4), so a few taps are cheap.
+    // Increased blur radius so simple campfires can already heat up nearby walls.
     let texel_uv = vec2<f32>(1.0, 1.0) / temp_dims_f;
+    let blur_radius: f32 = 2.5; // Increased from 1.0 to spread heat further
     let t0 = temp_smooth;
-    let t1 = sample_temperature_bilinear(uv + vec2<f32>( texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
-    let t2 = sample_temperature_bilinear(uv + vec2<f32>(-texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
-    let t3 = sample_temperature_bilinear(uv + vec2<f32>(0.0,  texel_uv.y), temp_dims_i, temp_dims_f);
-    let t4 = sample_temperature_bilinear(uv + vec2<f32>(0.0, -texel_uv.y), temp_dims_i, temp_dims_f);
+    let t1 = sample_temperature_bilinear(uv + vec2<f32>( blur_radius * texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
+    let t2 = sample_temperature_bilinear(uv + vec2<f32>(-blur_radius * texel_uv.x, 0.0), temp_dims_i, temp_dims_f);
+    let t3 = sample_temperature_bilinear(uv + vec2<f32>(0.0,  blur_radius * texel_uv.y), temp_dims_i, temp_dims_f);
+    let t4 = sample_temperature_bilinear(uv + vec2<f32>(0.0, -blur_radius * texel_uv.y), temp_dims_i, temp_dims_f);
     let temp_vis = (t0 + t1 + t2 + t3 + t4) * 0.2 + settings.global_temperature;
     
     var temp_col: vec4<f32>;
@@ -642,8 +644,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         );
 
         // --- Hot (>=21): keep the original "physics-ish" warm ramp (readable, not too bright)
-        // Increased max temp to 5000 to allow explosive temperatures
-        let hot = clamp((temp_value - 21.0) / (5000.0 - 21.0), 0.0, 1.0);
+
+        let hot = clamp((temp_value - 200.0) / (1000.0 - 200.0), 0.0, 1.0);
         let red   = clamp(0.4 + 0.6 * pow(hot, 0.35), 0.0, 1.0);
         let green = clamp(0.05 + 0.95 * pow(hot, 1.8), 0.0, 1.0);
         let blue  = clamp(0.0 + 0.55 * pow(hot, 3.0), 0.0, 1.0);
@@ -1012,7 +1014,7 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     // Blackbody-like heat tint driven by blurred temperature field.
     // Keep it subtle so it reads as "heat", not "paint".
     // Increased max temp to 5000 to allow explosive temperatures
-    let heat = clamp((temp_vis - 140.0) / (5000.0 - 140.0), 0.0, 1.0);
+    let heat = clamp((temp_vis - 140.0) / (1000.0 - 140.0), 0.0, 1.0);
     if (heat > 0.0 && settings.display_mode < 1.5) {
         // Exponential response (more perceptual): keeps low heat subtle, ramps high heat faster.
         let heat_e = 1.0 - exp(-2.6 * heat);
