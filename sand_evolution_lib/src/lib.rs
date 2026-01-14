@@ -457,7 +457,6 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
     let start_time = instant::now();
     let mut last_frame_time = start_time;
-    // No catch-up / no accumulated backlog: simulation does not try to "repay" missed time.
     let event_loop_shared_state = shared_state_rc.clone();
     let upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
@@ -467,9 +466,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         match event {
             RedrawRequested(..) => {
                 let frame_start_time = (instant::now() - start_time) / 1000.0;
-                // Protect against the "spiral of death":
-                // if a frame takes long, we must not try to simulate an unbounded amount of time
-                // in the next frame, or we can get stuck in permanent slow-mo.
+                // Protect against the "spiral of death": cap the dt used for stepping.
+                // If a frame takes long, simulating the full backlog can make the next frame even heavier.
                 let mut delta_t = frame_start_time - last_frame_time;
                 if delta_t.is_nan() || delta_t.is_infinite() {
                     delta_t = 0.0;
@@ -504,7 +502,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     && evolution_app.simulation_steps_per_second > 0
                 {
                     const MAX_SIM_STEPS_PER_FRAME: i32 = 16;
-                    // No backlog: steps are based only on the current frame's delta.
+                    // Steps are based only on the current frame's delta (stable FPS > strict real-time).
                     let desired_steps = (delta_t * evolution_app.simulation_steps_per_second as f64)
                         .floor() as i32;
                     desired_steps.clamp(0, MAX_SIM_STEPS_PER_FRAME)
@@ -658,9 +656,8 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     .remove_textures(tdelta)
                     .expect("remove texture ok");
 
-                // Important (especially on mobile): allow wgpu to process internal queues and
-                // actually retire resources / command buffers. Without polling, some backends
-                // can accumulate work/resources over time and performance degrades until restart.
+                // Let wgpu process internal queues and retire resources/command buffers.
+                // Some backends behave poorly if you never poll the device.
                 device.poll(wgpu::Maintain::Poll);
 
                 // Support reactive on windows only, but not on linux.
