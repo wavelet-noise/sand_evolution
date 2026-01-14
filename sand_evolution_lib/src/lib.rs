@@ -783,3 +783,574 @@ pub fn seconds_since_midnight() -> f64 {
     let time = chrono::Local::now().time();
     time.num_seconds_from_midnight() as f64 + 1e-9 * (time.nanosecond() as f64)
 }
+
+#[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))] // Tests require filesystem access, not available in wasm32
+mod tests {
+    use super::*;
+    use crate::cells::CellRegistry;
+    use crate::ecs::components::{Name, Script, ScriptType};
+    use crate::rhai_lib;
+    use crate::shared_state::SharedState;
+    use specs::{Builder, World, WorldExt};
+    use std::collections::{HashMap, VecDeque};
+    use std::fs;
+    use std::path::Path;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    fn get_maps_dir() -> std::path::PathBuf {
+        let maps_dir = Path::new("/Users/olga/Rust/sand_evolution_maps");
+        
+        if maps_dir.exists() {
+            return maps_dir.to_path_buf();
+        }
+        
+        // Try relative paths as fallback
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let parent = Path::new(manifest_dir).parent();
+        if let Some(p) = parent {
+            let sibling = p.join("../sand_evolution_maps");
+            if sibling.exists() {
+                return sibling;
+            }
+        }
+        
+        panic!("sand_evolution_maps directory not found. Tried: {:?}\nManifest dir: {}", maps_dir, manifest_dir);
+    }
+
+    /// Test that compiles all Rhai scripts from sand_evolution_maps directory.
+    /// 
+    /// This test verifies that all scripts have valid syntax and can be compiled.
+    /// 
+    /// **How to verify this test works:**
+    /// 1. Add a syntax error to any .rhai file (e.g., `set_cell(100, 100, "sand"` - missing closing paren)
+    /// 2. Run: `cargo test --package sand_evolution_lib --lib test_compile_all_scripts_from_maps`
+    /// 3. The test should fail with a compilation error
+    #[test]
+    fn test_compile_all_scripts_from_maps() {
+        let maps_dir = get_maps_dir();
+        compile_scripts_in_dir(&maps_dir);
+    }
+    
+    /// Test that compiles AND executes all Rhai scripts from sand_evolution_maps directory.
+    /// 
+    /// This test:
+    /// - Compiles all scripts (catches syntax errors)
+    /// - Executes each script for 10 ticks (catches runtime errors)
+    /// - Verifies scripts run without errors
+    /// 
+    /// **How to verify this test works:**
+    /// 1. Add a runtime error to any .rhai file (e.g., `undefined_function(123);`)
+    /// 2. Run: `cargo test --package sand_evolution_lib --lib test_compile_and_execute_all_scripts_from_maps`
+    /// 3. The test should fail with a runtime error message showing which tick failed
+    /// 
+    /// **Types of errors caught:**
+    /// - Compile errors: syntax mistakes, undefined variables at compile time
+    /// - Runtime errors: calling undefined functions, type mismatches, index out of bounds
+    #[test]
+    fn test_compile_and_execute_all_scripts_from_maps() {
+        let maps_dir = get_maps_dir();
+        compile_and_test_scripts(&maps_dir, true);
+    }
+    
+    /// Generate snapshots (PNG images) for all scripts after 10 ticks.
+    /// 
+    /// This test runs each script for 10 ticks and saves the resulting map as a PNG file.
+    /// Files are saved in a "snapshots" subdirectory with "_snapshot.png" suffix.
+    /// 
+    /// **Usage:**
+    /// ```bash
+    /// cargo test --package sand_evolution_lib --lib generate_snapshots -- --ignored --nocapture
+    /// ```
+    /// 
+    /// The `--ignored` flag is required because this test is marked with `#[ignore]` 
+    /// to prevent it from running during normal test execution (it generates files).
+    /// 
+    /// **Output:**
+    /// Snapshots are saved to `sand_evolution_maps/snapshots/` directory.
+    #[test]
+    #[ignore] // Ignored by default, run explicitly with: cargo test -- --ignored
+    fn generate_snapshots() {
+        let maps_dir = get_maps_dir();
+        generate_script_snapshots(&maps_dir);
+    }
+    
+    fn compile_scripts_in_dir(maps_dir: &Path) {
+        compile_and_test_scripts(maps_dir, false);
+    }
+    
+    fn compile_and_test_scripts(maps_dir: &Path, run_execution_test: bool) {
+        // Create cell registry to get id_dict
+        let cell_registry = CellRegistry::new();
+        let mut id_dict: HashMap<String, u8> = HashMap::new();
+        for a in cell_registry.pal.iter() {
+            if a.id() != 0 {
+                id_dict.insert(a.name().to_owned(), a.id());
+            }
+        }
+
+        // Find all .rhai files
+        let mut script_files = Vec::new();
+        if let Ok(entries) = fs::read_dir(maps_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("rhai") {
+                        script_files.push(path);
+                    }
+                }
+            }
+        }
+
+        if script_files.is_empty() {
+            panic!("No .rhai files found in {:?}", maps_dir);
+        }
+
+        // Sort for consistent output
+        script_files.sort();
+
+        // Try to compile and optionally test execution of each script
+        let mut failed_scripts = Vec::new();
+        for script_path in &script_files {
+            let script_name = script_path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+            
+            match fs::read_to_string(script_path) {
+                Ok(script_content) => {
+                    // Test compilation
+                    let mut rhai = rhai::Engine::new();
+                    rhai.set_max_expr_depths(100, 100);
+                    let mut rhai_scope = rhai::Scope::new();
+                    let shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
+                    let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
+                    
+                    rhai_lib::register_rhai(
+                        &mut rhai,
+                        &mut rhai_scope,
+                        shared_state_rc.clone(),
+                        id_dict.clone(),
+                        None,
+                        script_log_rc.clone(),
+                        None,
+                    );
+                    
+                    match rhai.compile_with_scope(&mut rhai_scope, script_content.as_str()) {
+                        Ok(ast) => {
+                            println!("✓ Successfully compiled: {}", script_name);
+                            
+                            // If execution testing is enabled, run the script for several ticks
+                            if run_execution_test {
+                                // Reset deterministic RNG before each script test
+                                use crate::random::{set_deterministic_rng};
+                                use rand::SeedableRng;
+                                let seed = [42u8; 32];
+                                let deterministic_rng = Rc::new(RefCell::new(rand::rngs::StdRng::from_seed(seed)));
+                                set_deterministic_rng(deterministic_rng);
+                                
+                                match test_script_execution(
+                                    &rhai,
+                                    &mut rhai_scope,
+                                    &ast,
+                                    &shared_state_rc,
+                                    &script_log_rc,
+                                    script_name,
+                                    maps_dir,
+                                ) {
+                                    Ok(_) => {
+                                        println!("  ✓ Execution test passed");
+                                    }
+                                    Err(err) => {
+                                        eprintln!("  ✗ Execution test failed: {}", err);
+                                        failed_scripts.push((script_name.to_string(), format!("Execution error: {}", err)));
+                                    }
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("✗ Failed to compile {}: {}", script_name, err);
+                            failed_scripts.push((script_name.to_string(), err.to_string()));
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("✗ Failed to read {}: {}", script_name, err);
+                    failed_scripts.push((script_name.to_string(), format!("Read error: {}", err)));
+                }
+            }
+        }
+
+        // Report results
+        if !failed_scripts.is_empty() {
+            // Clear deterministic RNG before panic
+            #[cfg(not(target_arch = "wasm32"))]
+            if run_execution_test {
+                crate::random::clear_deterministic_rng();
+            }
+            eprintln!("\nFailed {} out of {} scripts:", failed_scripts.len(), script_files.len());
+            for (name, error) in &failed_scripts {
+                eprintln!("  - {}: {}", name, error);
+            }
+            panic!("Some scripts failed. See errors above.");
+        }
+
+        // Clear deterministic RNG after all tests are complete
+        #[cfg(not(target_arch = "wasm32"))]
+        if run_execution_test {
+            crate::random::clear_deterministic_rng();
+        }
+
+        let test_type = if run_execution_test { "compiled and executed" } else { "compiled" };
+        println!("\n✓ All {} scripts {} successfully!", script_files.len(), test_type);
+    }
+    
+    fn test_script_execution(
+        engine: &rhai::Engine,
+        scope: &mut rhai::Scope,
+        ast: &rhai::AST,
+        shared_state: &Rc<RefCell<SharedState>>,
+        script_log: &Rc<RefCell<VecDeque<String>>>,
+        script_name: &str,
+        maps_dir: &Path,
+    ) -> Result<(), String> {
+        use crate::cs::SECTOR_SIZE;
+        
+        // Note: Deterministic RNG should be set before calling this function
+        // This ensures each script test starts with the same seed
+        
+        // Create a minimal world for script execution
+        let mut world = World::new();
+        world.register::<Script>();
+        world.register::<Name>();
+        
+        // Create a world script entity (not actually used, but good for testing structure)
+        let _script_entity = world.create_entity()
+            .with(Name { name: "World Script".to_string() })
+            .with(Script {
+                script: "".to_string(),
+                ast: Some(ast.clone()),
+                raw: false,
+                script_type: ScriptType::World,
+                run_once: false,
+                has_run: false,
+            })
+            .build();
+        
+        // Initialize scope variables that scripts expect
+        scope.set_value("tick", 0i64);
+        scope.set_value("time", 0.0f64);
+        scope.set_value("sim_time", 0.0f64);
+        scope.set_value("time_of_day", 0.0f64);
+        scope.set_value("day_length", 86400.0f64);
+        scope.set_value("frame", 0i64);
+        scope.set_value("GRID_WIDTH", SECTOR_SIZE.x as i64);
+        scope.set_value("GRID_HEIGHT", SECTOR_SIZE.y as i64);
+        
+        // Take snapshot of initial state
+        let initial_points = shared_state.borrow().points.len();
+        let initial_state_snapshot: Vec<(i32, i32, u8)> = shared_state.borrow().points.iter()
+            .map(|(p, c)| (p.x, p.y, *c))
+            .collect();
+        
+        // Run script for 10 ticks
+        const NUM_TICKS: i64 = 10;
+        let mut runtime_errors = Vec::new();
+        
+        for tick in 0..NUM_TICKS {
+            scope.set_value("tick", tick);
+            scope.set_value("time", tick as f64 * 0.016); // ~60fps
+            scope.set_value("sim_time", tick as f64 * 0.016);
+            scope.set_value("time_of_day", (tick as f64 * 0.016) % 86400.0);
+            scope.set_value("frame", tick);
+            
+            // Execute the script
+            match engine.run_ast_with_scope(scope, ast) {
+                Ok(_) => {}
+                Err(err) => {
+                    runtime_errors.push(format!("Tick {}: {}", tick, err));
+                }
+            }
+            
+            // Check for script log errors
+            let log = script_log.borrow();
+            for entry in log.iter() {
+                if entry.to_lowercase().contains("error") {
+                    runtime_errors.push(format!("Tick {}: Script log error: {}", tick, entry));
+                }
+            }
+        }
+        
+        // Take snapshot of final state
+        let final_points = shared_state.borrow().points.len();
+        let final_state_snapshot: Vec<(i32, i32, u8)> = shared_state.borrow().points.iter()
+            .map(|(p, c)| (p.x, p.y, *c))
+            .collect();
+        
+        // Report results
+        println!("    Initial points: {}, Final points: {}, State changed: {}", 
+                 initial_points, 
+                 final_points,
+                 initial_points != final_points || initial_state_snapshot != final_state_snapshot);
+        
+        // Check for runtime errors
+        if !runtime_errors.is_empty() {
+            return Err(format!("Runtime errors occurred:\n  {}", runtime_errors.join("\n  ")));
+        }
+        
+        // Create image from current state (same as in generate_script_snapshots)
+        let mut current_image = image::GrayImage::new(SECTOR_SIZE.x as u32, SECTOR_SIZE.y as u32);
+        
+        // Fill with void (0) initially
+        for pixel in current_image.pixels_mut() {
+            *pixel = image::Luma([0u8]);
+        }
+        
+        // Apply all points set by the script
+        let points = shared_state.borrow().points.clone();
+        for (point, cell_type) in points.iter() {
+            let x = point.x as u32;
+            let y = point.y as u32;
+            if x < SECTOR_SIZE.x as u32 && y < SECTOR_SIZE.y as u32 {
+                current_image.put_pixel(x, y, image::Luma([*cell_type]));
+            }
+        }
+        
+        // Load expected snapshot image
+        let base_name = script_name.trim_end_matches(".rhai");
+        let snapshots_dir = maps_dir.join("snapshots");
+        let snapshot_path = snapshots_dir.join(format!("{}_snapshot.png", base_name));
+        
+        if !snapshot_path.exists() {
+            return Err(format!("Snapshot file not found: {:?}. Run 'generate_snapshots' test first to create snapshots.", snapshot_path));
+        }
+        
+        let expected_image = match image::open(&snapshot_path) {
+            Ok(img) => img.to_luma8(),
+            Err(err) => {
+                return Err(format!("Failed to load snapshot image {:?}: {}", snapshot_path, err));
+            }
+        };
+        
+        // Compare images pixel by pixel
+        if current_image.dimensions() != expected_image.dimensions() {
+            return Err(format!(
+                "Image dimensions mismatch: current {:?}, expected {:?}",
+                current_image.dimensions(),
+                expected_image.dimensions()
+            ));
+        }
+        
+        let mut mismatches = Vec::new();
+        for (x, y, current_pixel) in current_image.enumerate_pixels() {
+            let expected_pixel = expected_image.get_pixel(x, y);
+            if current_pixel[0] != expected_pixel[0] {
+                mismatches.push((x, y, current_pixel[0], expected_pixel[0]));
+                // Limit the number of reported mismatches to avoid huge error messages
+                if mismatches.len() >= 100 {
+                    break;
+                }
+            }
+        }
+        
+        if !mismatches.is_empty() {
+            let mut error_msg = format!(
+                "Image comparison failed: {} pixel(s) differ. First {} mismatch(es):\n",
+                mismatches.len(),
+                mismatches.len().min(10)
+            );
+            for (i, (x, y, current, expected)) in mismatches.iter().take(10).enumerate() {
+                error_msg.push_str(&format!("  Pixel ({}, {}): current={}, expected={}\n", x, y, current, expected));
+            }
+            if mismatches.len() > 10 {
+                error_msg.push_str(&format!("  ... and {} more mismatch(es)\n", mismatches.len() - 10));
+            }
+            return Err(error_msg);
+        }
+        
+        println!("    ✓ Image matches snapshot");
+        
+        // Verify script executed successfully
+        // Some scripts might check tick % N and only run on certain ticks, which is fine
+        // But we should verify that the script actually did something meaningful
+        
+        // Additional validation: check if script produces any output or side effects
+        // This helps ensure the test is actually running the script, not just passing silently
+        let script_did_something = final_points > initial_points || 
+                                    initial_state_snapshot != final_state_snapshot ||
+                                    final_points > 0;
+        
+        // Note: Some scripts might only run on specific ticks (e.g., tick % 3 != 0),
+        // so we don't fail if nothing happened, but we log it for visibility
+        if !script_did_something {
+            println!("    Warning: Script did not modify state (might be conditional on tick)");
+        }
+        
+        Ok(())
+    }
+    
+    // Guard to ensure deterministic RNG is cleared when test function exits
+    struct DeterministicRngGuard;
+    
+    impl Drop for DeterministicRngGuard {
+        fn drop(&mut self) {
+            #[cfg(not(target_arch = "wasm32"))]
+            crate::random::clear_deterministic_rng();
+        }
+    }
+    
+    fn generate_script_snapshots(maps_dir: &Path) {
+        use crate::cs::SECTOR_SIZE;
+        use crate::random::{set_deterministic_rng, clear_deterministic_rng};
+        use rand::SeedableRng;
+        
+        // Create deterministic RNG with fixed seed for reproducible snapshots
+        // Use the same seed as in test_script_execution
+        let seed = [42u8; 32];
+        let deterministic_rng = Rc::new(RefCell::new(rand::rngs::StdRng::from_seed(seed)));
+        set_deterministic_rng(deterministic_rng.clone());
+        
+        // Ensure RNG is cleared when function exits
+        let _guard = DeterministicRngGuard;
+        
+        // Create snapshots directory
+        let snapshots_dir = maps_dir.join("snapshots");
+        if let Err(err) = fs::create_dir_all(&snapshots_dir) {
+            panic!("Failed to create snapshots directory {:?}: {}", snapshots_dir, err);
+        }
+        println!("Snapshots will be saved to: {:?}", snapshots_dir);
+        
+        // Create cell registry to get id_dict
+        let cell_registry = CellRegistry::new();
+        let mut id_dict: HashMap<String, u8> = HashMap::new();
+        for a in cell_registry.pal.iter() {
+            if a.id() != 0 {
+                id_dict.insert(a.name().to_owned(), a.id());
+            }
+        }
+
+        // Find all .rhai files
+        let mut script_files = Vec::new();
+        if let Ok(entries) = fs::read_dir(maps_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("rhai") {
+                        script_files.push(path);
+                    }
+                }
+            }
+        }
+
+        if script_files.is_empty() {
+            panic!("No .rhai files found in {:?}", maps_dir);
+        }
+
+        // Sort for consistent output
+        script_files.sort();
+
+        println!("Generating snapshots for {} scripts...", script_files.len());
+
+        // Generate snapshot for each script
+        for script_path in &script_files {
+            // Reset deterministic RNG before each script to ensure reproducible results
+            use rand::SeedableRng;
+            let seed = [42u8; 32];
+            let deterministic_rng = Rc::new(RefCell::new(rand::rngs::StdRng::from_seed(seed)));
+            set_deterministic_rng(deterministic_rng);
+            
+            let script_name = script_path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+            
+            // Remove .rhai extension and create snapshot path in snapshots directory
+            let base_name = script_name.trim_end_matches(".rhai");
+            let snapshot_path = snapshots_dir.join(format!("{}_snapshot.png", base_name));
+            
+            match fs::read_to_string(script_path) {
+                Ok(script_content) => {
+                    // Setup Rhai engine
+                    let mut rhai = rhai::Engine::new();
+                    rhai.set_max_expr_depths(100, 100);
+                    let mut rhai_scope = rhai::Scope::new();
+                    let shared_state_rc = Rc::new(RefCell::new(SharedState::new()));
+                    let script_log_rc = Rc::new(RefCell::new(VecDeque::<String>::with_capacity(30)));
+                    
+                    rhai_lib::register_rhai(
+                        &mut rhai,
+                        &mut rhai_scope,
+                        shared_state_rc.clone(),
+                        id_dict.clone(),
+                        None,
+                        script_log_rc.clone(),
+                        None,
+                    );
+                    
+                    match rhai.compile_with_scope(&mut rhai_scope, script_content.as_str()) {
+                        Ok(ast) => {
+                            // Run script for 10 ticks
+                            const NUM_TICKS: i64 = 10;
+                            
+                            // Initialize scope variables
+                            rhai_scope.set_value("GRID_WIDTH", SECTOR_SIZE.x as i64);
+                            rhai_scope.set_value("GRID_HEIGHT", SECTOR_SIZE.y as i64);
+                            
+                            for tick in 0..NUM_TICKS {
+                                rhai_scope.set_value("tick", tick);
+                                rhai_scope.set_value("time", tick as f64 * 0.016);
+                                rhai_scope.set_value("sim_time", tick as f64 * 0.016);
+                                rhai_scope.set_value("time_of_day", (tick as f64 * 0.016) % 86400.0);
+                                rhai_scope.set_value("frame", tick);
+                                
+                                // Execute the script
+                                if let Err(err) = rhai.run_ast_with_scope(&mut rhai_scope, &ast) {
+                                    eprintln!("  ✗ Runtime error at tick {}: {}", tick, err);
+                                    continue;
+                                }
+                            }
+                            
+                            // Create image from points set by the script
+                            let mut image = image::GrayImage::new(SECTOR_SIZE.x as u32, SECTOR_SIZE.y as u32);
+                            
+                            // Fill with void (0) initially
+                            for pixel in image.pixels_mut() {
+                                *pixel = image::Luma([0u8]);
+                            }
+                            
+                            // Apply all points set by the script
+                            let points = shared_state_rc.borrow().points.clone();
+                            for (point, cell_type) in points.iter() {
+                                let x = point.x as u32;
+                                let y = point.y as u32;
+                                if x < SECTOR_SIZE.x as u32 && y < SECTOR_SIZE.y as u32 {
+                                    image.put_pixel(x, y, image::Luma([*cell_type]));
+                                }
+                            }
+                            
+                            // Save snapshot
+                            match image.save(&snapshot_path) {
+                                Ok(_) => {
+                                    println!("  ✓ Generated snapshot: {}", snapshot_path.file_name().unwrap().to_string_lossy());
+                                }
+                                Err(err) => {
+                                    eprintln!("  ✗ Failed to save snapshot for {}: {}", script_name, err);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("  ✗ Failed to compile {}: {}", script_name, err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("  ✗ Failed to read {}: {}", script_name, err);
+                }
+            }
+        }
+        
+        // Clear deterministic RNG after all snapshots are generated
+        clear_deterministic_rng();
+        
+        println!("\n✓ Snapshot generation complete!");
+    }
+}

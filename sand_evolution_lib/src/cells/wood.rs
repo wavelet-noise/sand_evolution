@@ -45,8 +45,19 @@ impl CellTrait for Wood {
     ) {
         if let Some(temp_ctx) = temp_context {
             let temperature = temp_ctx.get_temp(i, j);
+
+            let chance = prng.next();
             
-            if temperature >= 320.0 && prng.next() > 200 && has_adjacent_air(i, j, container) {
+            if chance < 200 {
+                return;
+            }
+
+            if temperature >= 800.0 && has_adjacent_air(i, j, container) {
+                container[cur] = Gas::id();
+                return;
+            }
+            
+            if temperature >= 320.0 && has_adjacent_air(i, j, container) {
                 container[cur] = burning_wood::id();
                 return;
             }

@@ -6,7 +6,7 @@ use winit::dpi::{LogicalPosition, PhysicalSize};
 
 use crate::shared_state::SharedState;
 use crate::{
-    cells::{stone::Stone, wood::Wood, CellRegistry, Prng},
+    cells::{stone::Stone, void::Void, wood::Wood, CellRegistry, Prng},
     cs::{self, PointType},
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
@@ -1371,20 +1371,38 @@ impl State {
                 1.0 - logical_position.y / scaled_window_size.height as f64,
             );
 
-            for _i in 0..evolution_app.number_of_cells_to_add as usize {
-                let mut px = percentage_position.0 * cs::SECTOR_SIZE.x as f64
-                    + (self.prng.next() as f64 - 128.0) / 25.0;
-                let mut py = percentage_position.1 * cs::SECTOR_SIZE.y as f64
-                    + (self.prng.next() as f64 - 128.0) / 25.0;
+            let center_x = percentage_position.0 * cs::SECTOR_SIZE.x as f64;
+            let center_y = percentage_position.1 * cs::SECTOR_SIZE.y as f64;
+            let radius = evolution_app.brush_radius;
+            let radius_squared = radius * radius;
+            let cell_type = self.pal_container.dict[&evolution_app.selected_option];
 
-                px = clamp(px, 0.0, cs::SECTOR_SIZE.x as f64 - 1.0);
-                py = clamp(py, 0.0, cs::SECTOR_SIZE.y as f64 - 1.0);
+            // Iterate through all pixels in a square around the center
+            let radius_int = radius.ceil() as i32;
+            for dx in -radius_int..=radius_int {
+                for dy in -radius_int..=radius_int {
+                    let distance_squared = (dx as f64) * (dx as f64) + (dy as f64) * (dy as f64);
+                    if distance_squared <= radius_squared {
+                        let px = center_x + dx as f64;
+                        let py = center_y + dy as f64;
 
-                self.diffuse_rgba.put_pixel(
-                    px as u32,
-                    py as u32,
-                    image::Luma([self.pal_container.dict[&evolution_app.selected_option]]),
-                );
+                        let px_clamped = clamp(px, 0.0, cs::SECTOR_SIZE.x as f64 - 1.0);
+                        let py_clamped = clamp(py, 0.0, cs::SECTOR_SIZE.y as f64 - 1.0);
+
+                        let x = px_clamped as u32;
+                        let y = py_clamped as u32;
+
+                        // Check if we should only place in empty cells
+                        if evolution_app.only_empty_cells {
+                            let current_cell = self.diffuse_rgba.get_pixel(x, y).0[0];
+                            if current_cell != Void::id() {
+                                continue;
+                            }
+                        }
+
+                        self.diffuse_rgba.put_pixel(x, y, image::Luma([cell_type]));
+                    }
+                }
             }
         }
     }
@@ -1452,14 +1470,12 @@ impl State {
                     let x = px as PointType;
                     let y = py as PointType;
                     let cell_id = self.diffuse_rgba.get_pixel(x as u32, y as u32).0[0];
-                    let cell_temperature = self.get_temperature(x, y);
-                    let ambient_temperature = cell_temperature;
+                    let ambient_temperature = self.get_temperature(x, y);
 
                     evolution_app.hover_info = Some(crate::evolution_app::HoverInfo {
                         x,
                         y,
                         cell_id,
-                        cell_temperature,
                         ambient_temperature,
                     });
                 }
