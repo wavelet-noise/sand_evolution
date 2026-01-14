@@ -47,7 +47,7 @@ impl CellTrait for Coal {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature >= 450.0 && dim.next() > 235 && has_adjacent_air(i, j, container) {
                 container[cur] = BurningCoal::id();

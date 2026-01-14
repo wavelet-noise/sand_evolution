@@ -144,9 +144,30 @@ impl CellRegistry {
     }
 }
 
-pub struct TemperatureContext<'a> {
-    pub get_temp: Box<dyn Fn(PointType, PointType) -> f32 + 'a>,
-    pub add_temp: Box<dyn FnMut(PointType, PointType, f32) + 'a>,
+/// Temperature access for cell updates.
+///
+/// Important: this is used in the *hot path* (per-cell, per-tick), so it must avoid heap
+/// allocations and dynamic dispatch. We store a raw pointer to `State` and provide small
+/// inline methods.
+pub struct TemperatureContext {
+    state_ptr: *mut crate::State,
+}
+
+impl TemperatureContext {
+    #[inline]
+    pub fn new(state_ptr: *mut crate::State) -> Self {
+        Self { state_ptr }
+    }
+
+    #[inline]
+    pub fn get_temp(&self, x: PointType, y: PointType) -> f32 {
+        unsafe { (*self.state_ptr).get_temperature(x, y) }
+    }
+
+    #[inline]
+    pub fn add_temp(&mut self, x: PointType, y: PointType, delta: f32) {
+        unsafe { (*self.state_ptr).add_temperature(x, y, delta) }
+    }
 }
 
 pub trait CellTrait {

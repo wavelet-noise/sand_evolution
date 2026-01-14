@@ -25,7 +25,7 @@ impl CellTrait for Gas {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context.as_deref() {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature >= 150.0 {
                 let chance_f = ((temperature - 150.0) * (96.0 / 50.0)).clamp(0.0, 255.0);

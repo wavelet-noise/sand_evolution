@@ -28,37 +28,37 @@ impl CellTrait for BurningPowder {
     ) {
         if !sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng) {
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                (temp_ctx.add_temp)(i, j, 400.0);
+                temp_ctx.add_temp(i, j, 400.0);
                 
-                (temp_ctx.add_temp)(i, j + 1, 300.0);
-                (temp_ctx.add_temp)(i, j - 1, 300.0);
-                (temp_ctx.add_temp)(i + 1, j, 300.0);
-                (temp_ctx.add_temp)(i - 1, j, 300.0);
+                temp_ctx.add_temp(i, j + 1, 300.0);
+                temp_ctx.add_temp(i, j - 1, 300.0);
+                temp_ctx.add_temp(i + 1, j, 300.0);
+                temp_ctx.add_temp(i - 1, j, 300.0);
                 
                 if i > 0 && j > 0 {
-                    (temp_ctx.add_temp)(i - 1, j - 1, 200.0);
+                    temp_ctx.add_temp(i - 1, j - 1, 200.0);
                 }
                 if i > 0 && j + 1 < cs::SECTOR_SIZE.y {
-                    (temp_ctx.add_temp)(i - 1, j + 1, 200.0);
+                    temp_ctx.add_temp(i - 1, j + 1, 200.0);
                 }
                 if i + 1 < cs::SECTOR_SIZE.x && j > 0 {
-                    (temp_ctx.add_temp)(i + 1, j - 1, 200.0);
+                    temp_ctx.add_temp(i + 1, j - 1, 200.0);
                 }
                 if i + 1 < cs::SECTOR_SIZE.x && j + 1 < cs::SECTOR_SIZE.y {
-                    (temp_ctx.add_temp)(i + 1, j + 1, 200.0);
+                    temp_ctx.add_temp(i + 1, j + 1, 200.0);
                 }
                 
                 if i > 1 {
-                    (temp_ctx.add_temp)(i - 2, j, 150.0);
+                    temp_ctx.add_temp(i - 2, j, 150.0);
                 }
                 if i + 2 < cs::SECTOR_SIZE.x {
-                    (temp_ctx.add_temp)(i + 2, j, 150.0);
+                    temp_ctx.add_temp(i + 2, j, 150.0);
                 }
                 if j > 1 {
-                    (temp_ctx.add_temp)(i, j - 2, 150.0);
+                    temp_ctx.add_temp(i, j - 2, 150.0);
                 }
                 if j + 2 < cs::SECTOR_SIZE.y {
-                    (temp_ctx.add_temp)(i, j + 2, 150.0);
+                    temp_ctx.add_temp(i, j + 2, 150.0);
                 }
             }
             let bot = cs::xy_to_index(i, j - 1);
@@ -86,34 +86,34 @@ impl CellTrait for BurningPowder {
 
             if prng.next() > 120 {
                 if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                    (temp_ctx.add_temp)(i, j, 500.0);
-                    (temp_ctx.add_temp)(i, j + 1, 500.0);
-                    (temp_ctx.add_temp)(i, j - 1, 500.0);
-                    (temp_ctx.add_temp)(i + 1, j, 500.0);
-                    (temp_ctx.add_temp)(i - 1, j, 500.0);
+                    temp_ctx.add_temp(i, j, 500.0);
+                    temp_ctx.add_temp(i, j + 1, 500.0);
+                    temp_ctx.add_temp(i, j - 1, 500.0);
+                    temp_ctx.add_temp(i + 1, j, 500.0);
+                    temp_ctx.add_temp(i - 1, j, 500.0);
                     if i > 0 && j > 0 {
-                        (temp_ctx.add_temp)(i - 1, j - 1, 350.0);
+                        temp_ctx.add_temp(i - 1, j - 1, 350.0);
                     }
                     if i > 0 && j + 1 < cs::SECTOR_SIZE.y {
-                        (temp_ctx.add_temp)(i - 1, j + 1, 350.0);
+                        temp_ctx.add_temp(i - 1, j + 1, 350.0);
                     }
                     if i + 1 < cs::SECTOR_SIZE.x && j > 0 {
-                        (temp_ctx.add_temp)(i + 1, j - 1, 350.0);
+                        temp_ctx.add_temp(i + 1, j - 1, 350.0);
                     }
                     if i + 1 < cs::SECTOR_SIZE.x && j + 1 < cs::SECTOR_SIZE.y {
-                        (temp_ctx.add_temp)(i + 1, j + 1, 350.0);
+                        temp_ctx.add_temp(i + 1, j + 1, 350.0);
                     }
                     if i > 1 {
-                        (temp_ctx.add_temp)(i - 2, j, 250.0);
+                        temp_ctx.add_temp(i - 2, j, 250.0);
                     }
                     if i + 2 < cs::SECTOR_SIZE.x {
-                        (temp_ctx.add_temp)(i + 2, j, 250.0);
+                        temp_ctx.add_temp(i + 2, j, 250.0);
                     }
                     if j > 1 {
-                        (temp_ctx.add_temp)(i, j - 2, 250.0);
+                        temp_ctx.add_temp(i, j - 2, 250.0);
                     }
                     if j + 2 < cs::SECTOR_SIZE.y {
-                        (temp_ctx.add_temp)(i, j + 2, 250.0);
+                        temp_ctx.add_temp(i, j + 2, 250.0);
                     }
                 }
                 try_spawn_smoke(i, j, container, prng, 6);

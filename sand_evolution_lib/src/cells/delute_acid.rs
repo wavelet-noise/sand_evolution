@@ -49,11 +49,11 @@ impl CellTrait for DeluteAcid {
                     container[cur] = cc_pt;
                     // Diluted acid increases temperature less when dissolving
                     if let Some(temp_ctx) = temp_context {
-                        (temp_ctx.add_temp)(i, j + 1, 10.0); // top
-                        (temp_ctx.add_temp)(i, j - 1, 10.0); // bottom
-                        (temp_ctx.add_temp)(i + 1, j, 10.0); // right
-                        (temp_ctx.add_temp)(i - 1, j, 10.0); // left
-                        (temp_ctx.add_temp)(i, j, 5.0); // cell itself
+                        temp_ctx.add_temp(i, j + 1, 10.0); // top
+                        temp_ctx.add_temp(i, j - 1, 10.0); // bottom
+                        temp_ctx.add_temp(i + 1, j, 10.0); // right
+                        temp_ctx.add_temp(i - 1, j, 10.0); // left
+                        temp_ctx.add_temp(i, j, 5.0); // cell itself
                     }
                     return;
                 }
@@ -74,11 +74,11 @@ impl CellTrait for DeluteAcid {
                     }
                     // Diluted acid increases temperature less during proton transfer
                     if let Some(temp_ctx) = temp_context {
-                        (temp_ctx.add_temp)(i, j + 1, 8.0); // top
-                        (temp_ctx.add_temp)(i, j - 1, 8.0); // bottom
-                        (temp_ctx.add_temp)(i + 1, j, 8.0); // right
-                        (temp_ctx.add_temp)(i - 1, j, 8.0); // left
-                        (temp_ctx.add_temp)(i, j, 4.0); // cell itself
+                        temp_ctx.add_temp(i, j + 1, 8.0); // top
+                        temp_ctx.add_temp(i, j - 1, 8.0); // bottom
+                        temp_ctx.add_temp(i + 1, j, 8.0); // right
+                        temp_ctx.add_temp(i - 1, j, 8.0); // left
+                        temp_ctx.add_temp(i, j, 4.0); // cell itself
                     }
                     return;
                 }

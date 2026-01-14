@@ -25,23 +25,23 @@ impl CellTrait for Cell {
         const FIRE_SUSTAIN_TEMP: f32 = 80.0;
         let mut extinguish = false;
         if let Some(temp_ctx) = temp_context.as_deref() {
-            let mut sum = (temp_ctx.get_temp)(i, j);
+            let mut sum = temp_ctx.get_temp(i, j);
             let mut n = 1.0f32;
 
             if i > 0 {
-                sum += (temp_ctx.get_temp)(i - 1, j);
+                sum += temp_ctx.get_temp(i - 1, j);
                 n += 1.0;
             }
             if i + 1 < cs::SECTOR_SIZE.x {
-                sum += (temp_ctx.get_temp)(i + 1, j);
+                sum += temp_ctx.get_temp(i + 1, j);
                 n += 1.0;
             }
             if j > 0 {
-                sum += (temp_ctx.get_temp)(i, j - 1);
+                sum += temp_ctx.get_temp(i, j - 1);
                 n += 1.0;
             }
             if j + 1 < cs::SECTOR_SIZE.y {
-                sum += (temp_ctx.get_temp)(i, j + 1);
+                sum += temp_ctx.get_temp(i, j + 1);
                 n += 1.0;
             }
 
@@ -50,10 +50,10 @@ impl CellTrait for Cell {
 
         if prng.next() > 128 {
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                (temp_ctx.add_temp)(i, j + 1, 1.5);
-                (temp_ctx.add_temp)(i, j - 1, 1.5);
-                (temp_ctx.add_temp)(i + 1, j, 1.5);
-                (temp_ctx.add_temp)(i - 1, j, 1.5);
+                temp_ctx.add_temp(i, j + 1, 1.5);
+                temp_ctx.add_temp(i, j - 1, 1.5);
+                temp_ctx.add_temp(i + 1, j, 1.5);
+                temp_ctx.add_temp(i - 1, j, 1.5);
             }
             if prng.next() > 240 {
                 try_spawn_smoke(i, j, container, prng, 1);
@@ -67,10 +67,10 @@ impl CellTrait for Cell {
 
         if prng.next() > 200 {
             if let Some(temp_ctx) = temp_context.as_deref_mut() {
-                (temp_ctx.add_temp)(i, j + 1, 2.5);
-                (temp_ctx.add_temp)(i, j - 1, 2.5);
-                (temp_ctx.add_temp)(i + 1, j, 2.5);
-                (temp_ctx.add_temp)(i - 1, j, 2.5);
+                temp_ctx.add_temp(i, j + 1, 2.5);
+                temp_ctx.add_temp(i, j - 1, 2.5);
+                temp_ctx.add_temp(i + 1, j, 2.5);
+                temp_ctx.add_temp(i - 1, j, 2.5);
             }
             try_spawn_smoke(i, j, container, prng, 1);
             container[cur] = 0;
@@ -78,10 +78,10 @@ impl CellTrait for Cell {
         }
 
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
-            (temp_ctx.add_temp)(i, j + 1, 1.5);
-            (temp_ctx.add_temp)(i, j - 1, 1.5);
-            (temp_ctx.add_temp)(i + 1, j, 1.5);
-            (temp_ctx.add_temp)(i - 1, j, 1.5);
+            temp_ctx.add_temp(i, j + 1, 1.5);
+            temp_ctx.add_temp(i, j - 1, 1.5);
+            temp_ctx.add_temp(i + 1, j, 1.5);
+            temp_ctx.add_temp(i - 1, j, 1.5);
         }
         if prng.next() > 240 {
             try_spawn_smoke(i, j, container, prng, 1);

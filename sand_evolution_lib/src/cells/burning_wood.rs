@@ -27,23 +27,23 @@ impl CellTrait for Cell {
         const BURNING_WOOD_SUSTAIN_TEMP: f32 = 60.0;
         let mut extinguish = false;
         if let Some(temp_ctx) = temp_context.as_deref() {
-            let mut sum = (temp_ctx.get_temp)(i, j);
+            let mut sum = temp_ctx.get_temp(i, j);
             let mut n = 1.0f32;
 
             if i > 0 {
-                sum += (temp_ctx.get_temp)(i - 1, j);
+                sum += temp_ctx.get_temp(i - 1, j);
                 n += 1.0;
             }
             if i + 1 < cs::SECTOR_SIZE.x {
-                sum += (temp_ctx.get_temp)(i + 1, j);
+                sum += temp_ctx.get_temp(i + 1, j);
                 n += 1.0;
             }
             if j > 0 {
-                sum += (temp_ctx.get_temp)(i, j - 1);
+                sum += temp_ctx.get_temp(i, j - 1);
                 n += 1.0;
             }
             if j + 1 < cs::SECTOR_SIZE.y {
-                sum += (temp_ctx.get_temp)(i, j + 1);
+                sum += temp_ctx.get_temp(i, j + 1);
                 n += 1.0;
             }
 
@@ -51,10 +51,10 @@ impl CellTrait for Cell {
         }
 
         if let Some(temp_ctx) = temp_context.as_deref_mut() {
-            (temp_ctx.add_temp)(i, j + 1, 1.0);
-            (temp_ctx.add_temp)(i, j - 1, 1.0);
-            (temp_ctx.add_temp)(i + 1, j, 1.0);
-            (temp_ctx.add_temp)(i - 1, j, 1.0);
+            temp_ctx.add_temp(i, j + 1, 1.0);
+            temp_ctx.add_temp(i, j - 1, 1.0);
+            temp_ctx.add_temp(i + 1, j, 1.0);
+            temp_ctx.add_temp(i - 1, j, 1.0);
         }
         if prng.next() > 250 {
             try_spawn_smoke(i, j, container, prng, 1);

@@ -29,16 +29,16 @@ impl CellTrait for Snow {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature > 0.0 {
                 container[cur] = Water::id();
                 const MELT_COOLING: f32 = 2.0;
-                (temp_ctx.add_temp)(i, j, -MELT_COOLING);
-                (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
-                (temp_ctx.add_temp)(i, j - 1, -MELT_COOLING);
-                (temp_ctx.add_temp)(i + 1, j, -MELT_COOLING);
-                (temp_ctx.add_temp)(i - 1, j, -MELT_COOLING);
+                temp_ctx.add_temp(i, j, -MELT_COOLING);
+                temp_ctx.add_temp(i, j + 1, -MELT_COOLING);
+                temp_ctx.add_temp(i, j - 1, -MELT_COOLING);
+                temp_ctx.add_temp(i + 1, j, -MELT_COOLING);
+                temp_ctx.add_temp(i - 1, j, -MELT_COOLING);
                 return;
             }
         }
