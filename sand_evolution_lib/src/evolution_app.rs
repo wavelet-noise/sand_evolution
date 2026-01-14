@@ -130,6 +130,14 @@ pub struct EvolutionApp {
     pub cell_diffusion_iterations: i32,
     /// Centralized window style (background color, etc.).
     pub window_style: WindowStyleManager,
+
+    // Perf diagnostics (filled from the main loop).
+    pub perf_frame_ms: f64,
+    pub perf_update_ms: f64,
+    pub perf_render_ms: f64,
+    pub perf_ui_ms: f64,
+    pub perf_egui_render_ms: f64,
+    pub perf_sim_steps: i32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -960,6 +968,15 @@ impl EvolutionApp {
                     "Frame Processing Time: {:.1} ms.",
                     upd_result.update_time
                 ));
+                ui.label(format!("sim_steps/frame: {}", self.perf_sim_steps));
+                ui.label(format!(
+                    "cpu ms: frame {:.1} | update {:.1} | render {:.1}",
+                    self.perf_frame_ms, self.perf_update_ms, self.perf_render_ms
+                ));
+                ui.label(format!(
+                    "cpu ms: ui {:.1} | egui render {:.1}",
+                    self.perf_ui_ms, self.perf_egui_render_ms
+                ));
                 if upd_result.dropping {
                     ui.colored_label(Color32::from_rgb(255, 0, 0), "frame drop");
                 } else {
@@ -1518,6 +1535,13 @@ impl EvolutionApp {
             display_mode: DisplayMode::Normal,
             cell_diffusion_iterations: 1,
             window_style: WindowStyleManager::default(),
+
+            perf_frame_ms: 0.0,
+            perf_update_ms: 0.0,
+            perf_render_ms: 0.0,
+            perf_ui_ms: 0.0,
+            perf_egui_render_ms: 0.0,
+            perf_sim_steps: 0,
         }
     }
 }
