@@ -465,6 +465,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
         match event {
             RedrawRequested(..) => {
+                let frame_cpu_start_ms = instant::now();
                 let frame_start_time = (instant::now() - start_time) / 1000.0;
                 // Protect against the "spiral of death": cap the dt used for stepping.
                 // If a frame takes long, simulating the full backlog can make the next frame even heavier.
@@ -515,6 +516,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     sim_steps += evolution_app.pending_simulation_steps;
                     evolution_app.pending_simulation_steps = 0;
                 }
+                evolution_app.perf_sim_steps = sim_steps;
 
                 if evolution_app.need_to_recompile {
                     // First, find the entity
@@ -571,6 +573,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 }
 
                 // UPDATE (also runs on pause with sim_steps=0, to keep uniforms/UI responsive)
+                let update_start_ms = instant::now();
                 let upd_result = game_context.update(
                     &queue,
                     sim_steps,
@@ -579,6 +582,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     window.inner_size(),
                     window.scale_factor(),
                 );
+                evolution_app.perf_update_ms = instant::now() - update_start_ms;
 
                 // dispatch() is now called inside update_tick on each simulation tick.
                 // Keep one call for cases when simulation is not running at all.
@@ -589,7 +593,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                     game_context.dispatch();
                 }
 
+                let render_start_ms = instant::now();
                 _ = game_context.state.render(&device, &queue, &output_view);
+                evolution_app.perf_render_ms = instant::now() - render_start_ms;
 
                 // Begin to draw the UI frame.
                 //
@@ -598,6 +604,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 //    //////
                 //
 
+                let ui_start_ms = instant::now();
                 platform.begin_frame();
 
                 let mut any_win_hovered = false;
@@ -616,8 +623,10 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
 
                 // End the UI frame. We could now handle the output and draw the UI with the backend.
                 let full_output = platform.end_frame(Some(&window));
+                evolution_app.perf_ui_ms = instant::now() - ui_start_ms;
                 let paint_jobs = platform.context().tessellate(full_output.shapes);
 
+                let egui_render_start_ms = instant::now();
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
@@ -658,6 +667,9 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 // Let wgpu process internal queues and retire resources/command buffers.
                 // Some backends behave poorly if you never poll the device.
                 device.poll(wgpu::Maintain::Poll);
+
+                evolution_app.perf_egui_render_ms = instant::now() - egui_render_start_ms;
+                evolution_app.perf_frame_ms = instant::now() - frame_cpu_start_ms;
 
                 // Support reactive on windows only, but not on linux.
                 // if _output.needs_repaint {
