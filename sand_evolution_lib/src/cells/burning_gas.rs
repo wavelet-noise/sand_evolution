@@ -26,8 +26,16 @@ impl CellTrait for BurningGas {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
-        _: Option<&mut TemperatureContext>,
+        mut temp_context: Option<&mut TemperatureContext>,
     ) {
+        // Add heat - 2x more than fire (fire adds 1.5, so burning gas adds 3.0)
+        if let Some(temp_ctx) = temp_context.as_deref_mut() {
+            temp_ctx.add_temp(i, j + 1, 3.0);
+            temp_ctx.add_temp(i, j - 1, 3.0);
+            temp_ctx.add_temp(i + 1, j, 3.0);
+            temp_ctx.add_temp(i - 1, j, 3.0);
+        }
+
         let topl = cs::xy_to_index(i - 1, j + 1);
         let topr = cs::xy_to_index(i + 1, j + 1);
 

@@ -225,6 +225,158 @@ pub fn register_rhai(
         });
     });
 
+    // Register try_set_cell function - sets cell only if position is void (empty)
+    // String-based cell type overloads for try_set_cell
+    {
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("try_set_cell", move |x: i64, y: i64, t: &str| -> bool {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                STATE_PTR.with(|ptr| {
+                    let state_ptr = ptr.get();
+                    if !state_ptr.is_null() {
+                        unsafe {
+                            let state = &mut *state_ptr;
+                            let x_u32 = x as u32;
+                            let y_u32 = y as u32;
+                            let dimensions = state.diffuse_rgba.dimensions();
+                            if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                                let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                                if current_cell == 0 {
+                                    // Cell is void, can set
+                                    state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([cell_id]));
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    false
+                })
+            } else {
+                false
+            }
+        });
+    }
+    {
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("try_set_cell", move |x: f64, y: f64, t: &str| -> bool {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                STATE_PTR.with(|ptr| {
+                    let state_ptr = ptr.get();
+                    if !state_ptr.is_null() {
+                        unsafe {
+                            let state = &mut *state_ptr;
+                            let x_u32 = x as u32;
+                            let y_u32 = y as u32;
+                            let dimensions = state.diffuse_rgba.dimensions();
+                            if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                                let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                                if current_cell == 0 {
+                                    state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([cell_id]));
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    false
+                })
+            } else {
+                false
+            }
+        });
+    }
+    {
+        let id_dict_clone = id_dict.clone();
+        rhai.register_fn("try_set_cell", move |v: Vector2<f64>, t: &str| -> bool {
+            if let Some(&cell_id) = id_dict_clone.get(t) {
+                STATE_PTR.with(|ptr| {
+                    let state_ptr = ptr.get();
+                    if !state_ptr.is_null() {
+                        unsafe {
+                            let state = &mut *state_ptr;
+                            let x_u32 = v.x as u32;
+                            let y_u32 = v.y as u32;
+                            let dimensions = state.diffuse_rgba.dimensions();
+                            if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                                let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                                if current_cell == 0 {
+                                    state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([cell_id]));
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    false
+                })
+            } else {
+                false
+            }
+        });
+    }
+    // Numeric ID overloads for try_set_cell
+    rhai.register_fn("try_set_cell", |x: i64, y: i64, t: i64| -> bool {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    let state = &mut *state_ptr;
+                    let x_u32 = x as u32;
+                    let y_u32 = y as u32;
+                    let dimensions = state.diffuse_rgba.dimensions();
+                    if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                        let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                        if current_cell == 0 {
+                            state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([t as u8]));
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        })
+    });
+    rhai.register_fn("try_set_cell", |x: f64, y: f64, t: i64| -> bool {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    let state = &mut *state_ptr;
+                    let x_u32 = x as u32;
+                    let y_u32 = y as u32;
+                    let dimensions = state.diffuse_rgba.dimensions();
+                    if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                        let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                        if current_cell == 0 {
+                            state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([t as u8]));
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        })
+    });
+    rhai.register_fn("try_set_cell", |v: Vector2<f64>, t: i64| -> bool {
+        STATE_PTR.with(|ptr| {
+            let state_ptr = ptr.get();
+            if !state_ptr.is_null() {
+                unsafe {
+                    let state = &mut *state_ptr;
+                    let x_u32 = v.x as u32;
+                    let y_u32 = v.y as u32;
+                    let dimensions = state.diffuse_rgba.dimensions();
+                    if x_u32 < dimensions.0 && y_u32 < dimensions.1 {
+                        let current_cell = state.diffuse_rgba.get_pixel(x_u32, y_u32).0[0];
+                        if current_cell == 0 {
+                            state.diffuse_rgba.put_pixel(x_u32, y_u32, image::Luma([t as u8]));
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        })
+    });
+
     // Register print function for script logging with circular buffer (max 30 entries)
     const MAX_LOG_ENTRIES: usize = 30;
 

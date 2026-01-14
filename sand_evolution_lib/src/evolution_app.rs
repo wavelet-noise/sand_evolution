@@ -73,7 +73,8 @@ impl Executor {
 }
 
 pub struct EvolutionApp {
-    pub number_of_cells_to_add: i32,
+    pub brush_radius: f64,
+    pub only_empty_cells: bool,
     pub number_of_structures_to_add: i32,
     pub simulation_steps_per_second: i32,
     /// Whether automatic simulation stepping is paused (manual step buttons still work).
@@ -136,8 +137,6 @@ pub struct HoverInfo {
     pub x: cs::PointType,
     pub y: cs::PointType,
     pub cell_id: u8,
-    /// Temperature of the cell itself (local, 1:1 with cell grid).
-    pub cell_temperature: f32,
     /// Ambient (smoothed, low-frequency) temperature in the cursor vicinity.
     pub ambient_temperature: f32,
 }
@@ -482,7 +481,6 @@ impl EvolutionApp {
 
                     ui.label(format!("Pos: ({}, {})", info.x, info.y));
                     ui.label(format!("Cell: {} (id {})", cell_name, info.cell_id));
-                    ui.label(format!("Cell temp: {:.1}°", info.cell_temperature));
                     ui.label(format!("Ambient temp: {:.1}°", info.ambient_temperature));
                 } else {
                     ui.label("Move cursor over the simulation to inspect.");
@@ -520,7 +518,6 @@ impl EvolutionApp {
                         }
                         if ui.button("↩ Restore from URL").clicked() {
                             state.diffuse_rgba = state.loaded_rgba.clone();
-                            state.reset_temperatures();
                         }
 
                         ui.separator();
@@ -1224,14 +1221,19 @@ impl EvolutionApp {
             .show(context, |ui| {
                 self.window_style.apply_to_ui(ui);
                 ui.horizontal(|ui| {
-                    // Brush size slider
+                    // Brush radius slider
                     ui.spacing_mut().slider_width = 100.0;
                     ui.add(
-                        egui::Slider::new(&mut self.number_of_cells_to_add, 1..=2000)
+                        egui::Slider::new(&mut self.brush_radius, 1.0..=50.0)
                             .clamp_to_range(false)
                             .show_value(true)
-                            .text("🖌"),
+                            .text("Radius"),
                     );
+
+                    ui.separator();
+
+                    // Checkbox for only empty cells
+                    ui.checkbox(&mut self.only_empty_cells, "Only empty");
 
                     ui.separator();
 
@@ -1457,7 +1459,6 @@ impl EvolutionApp {
                 }
             },
         );
-        state.reset_temperatures();
     }
 
     pub fn new() -> Self {
@@ -1465,13 +1466,15 @@ impl EvolutionApp {
     }
 
     pub fn new_with_log(script_log: Rc<RefCell<VecDeque<String>>>) -> Self {
-        let number_of_cells_to_add = 500;
+        let brush_radius = 5.0;
+        let only_empty_cells = false;
         let number_of_structures_to_add = 100;
         let selected_option: String = "powder".to_owned();
         let options: Vec<String> = Vec::new();
         let executor = Executor::new();
         Self {
-            number_of_cells_to_add,
+            brush_radius,
+            only_empty_cells,
             number_of_structures_to_add,
             simulation_steps_per_second: 240,
             simulation_paused: false,
