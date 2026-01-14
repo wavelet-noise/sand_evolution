@@ -30,7 +30,7 @@ impl CellTrait for Powder {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature >= 300.0 {
                 let ignition_chance = if temperature >= 400.0 {

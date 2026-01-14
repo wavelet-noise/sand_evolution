@@ -24,26 +24,26 @@ impl CellTrait for Water {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature >= 100.0 {
                 if dim.next() < 120 {
                     use super::steam::Steam;
                     container[cur] = Steam::id();
                     const EVAP_COOLING: f32 = 45.0;
-                    (temp_ctx.add_temp)(i, j + 1, -EVAP_COOLING);
-                    (temp_ctx.add_temp)(i, j - 1, -EVAP_COOLING);
-                    (temp_ctx.add_temp)(i + 1, j, -EVAP_COOLING);
-                    (temp_ctx.add_temp)(i - 1, j, -EVAP_COOLING);
+                    temp_ctx.add_temp(i, j + 1, -EVAP_COOLING);
+                    temp_ctx.add_temp(i, j - 1, -EVAP_COOLING);
+                    temp_ctx.add_temp(i + 1, j, -EVAP_COOLING);
+                    temp_ctx.add_temp(i - 1, j, -EVAP_COOLING);
                     return;
                 }
             }
 
             if temperature < -3.0 {
-                (temp_ctx.add_temp)(i, j + 1, 3.0);
-                (temp_ctx.add_temp)(i, j - 1, 3.0);
-                (temp_ctx.add_temp)(i + 1, j, 3.0);
-                (temp_ctx.add_temp)(i - 1, j, 3.0);
+                temp_ctx.add_temp(i, j + 1, 3.0);
+                temp_ctx.add_temp(i, j - 1, 3.0);
+                temp_ctx.add_temp(i + 1, j, 3.0);
+                temp_ctx.add_temp(i - 1, j, 3.0);
 
                 use super::{crushed_ice::CrushedIce, snow::Snow};
                 let roll = dim.next();

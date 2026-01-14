@@ -26,15 +26,15 @@ impl CellTrait for LiquidGas {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature > -5.0 && prng.next() < 30 {
                 use super::gas::Gas;
                 container[cur] = Gas::id();
-                (temp_ctx.add_temp)(i, j + 1, -3.0);
-                (temp_ctx.add_temp)(i, j - 1, -3.0);
-                (temp_ctx.add_temp)(i + 1, j, -3.0);
-                (temp_ctx.add_temp)(i - 1, j, -3.0);
+                temp_ctx.add_temp(i, j + 1, -3.0);
+                temp_ctx.add_temp(i, j - 1, -3.0);
+                temp_ctx.add_temp(i + 1, j, -3.0);
+                temp_ctx.add_temp(i - 1, j, -3.0);
                 return;
             }
         }

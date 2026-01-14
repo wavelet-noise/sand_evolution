@@ -26,7 +26,7 @@ impl CellTrait for Ice {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature > 0.0 {
                 let chance_f = ((temperature / 20.0) * 26.0).clamp(0.0, 255.0);
@@ -34,11 +34,11 @@ impl CellTrait for Ice {
                 if prng.next() < chance {
                     container[cur] = Water::id();
                     const MELT_COOLING: f32 = 5.0;
-                    (temp_ctx.add_temp)(i, j, -MELT_COOLING);
-                    (temp_ctx.add_temp)(i, j + 1, -MELT_COOLING);
-                    (temp_ctx.add_temp)(i, j - 1, -MELT_COOLING);
-                    (temp_ctx.add_temp)(i + 1, j, -MELT_COOLING);
-                    (temp_ctx.add_temp)(i - 1, j, -MELT_COOLING);
+                    temp_ctx.add_temp(i, j, -MELT_COOLING);
+                    temp_ctx.add_temp(i, j + 1, -MELT_COOLING);
+                    temp_ctx.add_temp(i, j - 1, -MELT_COOLING);
+                    temp_ctx.add_temp(i + 1, j, -MELT_COOLING);
+                    temp_ctx.add_temp(i - 1, j, -MELT_COOLING);
                     return;
                 }
             }

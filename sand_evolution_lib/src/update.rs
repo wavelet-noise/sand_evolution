@@ -169,19 +169,10 @@ pub fn update_tick(
             }
         }
 
-        // Create temperature context ONCE before the loop for reuse
-        // Use a pointer to work around borrowing issues
+        // Create temperature context ONCE before the loop for reuse.
+        // Must be allocation-free (hot path).
         let state_ptr: *mut State = state;
-        let mut temp_context = crate::cells::TemperatureContext {
-            get_temp: Box::new(move |x: cs::PointType, y: cs::PointType| unsafe {
-                (*state_ptr).get_temperature(x, y)
-            }),
-            add_temp: Box::new(
-                move |x: cs::PointType, y: cs::PointType, delta: f32| unsafe {
-                    (*state_ptr).add_temperature(x, y, delta);
-                },
-            ),
-        };
+        let mut temp_context = crate::cells::TemperatureContext::new(state_ptr);
 
         for i in (1..(cs::SECTOR_SIZE.x - 2 - state.flip)).rev().step_by(2) {
             for j in (1..(cs::SECTOR_SIZE.y - 2 - state.flop)).rev().step_by(2) {

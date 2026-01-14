@@ -26,7 +26,7 @@ impl CellTrait for Steam {
         temp_context: Option<&mut TemperatureContext>,
     ) {
         if let Some(temp_ctx) = temp_context {
-            let temperature = (temp_ctx.get_temp)(i, j);
+            let temperature = temp_ctx.get_temp(i, j);
 
             if temperature < 0.0 && prng.next() < 10 {
                 use super::water::Water;

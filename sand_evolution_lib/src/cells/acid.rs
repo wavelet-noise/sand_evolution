@@ -61,11 +61,11 @@ impl CellTrait for Acid {
                 if reacted {
                     if let Some(temp_ctx) = temp_context {
                         // Acid heats very strongly during reaction
-                        (temp_ctx.add_temp)(i, j + 1, 30.0); // top
-                        (temp_ctx.add_temp)(i, j - 1, 30.0); // bottom
-                        (temp_ctx.add_temp)(i + 1, j, 30.0); // right
-                        (temp_ctx.add_temp)(i - 1, j, 30.0); // left
-                        (temp_ctx.add_temp)(i, j, 20.0); // cell itself
+                        temp_ctx.add_temp(i, j + 1, 30.0); // top
+                        temp_ctx.add_temp(i, j - 1, 30.0); // bottom
+                        temp_ctx.add_temp(i + 1, j, 30.0); // right
+                        temp_ctx.add_temp(i - 1, j, 30.0); // left
+                        temp_ctx.add_temp(i, j, 20.0); // cell itself
                     }
                     return;
                 }
