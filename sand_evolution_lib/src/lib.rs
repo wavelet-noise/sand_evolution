@@ -467,7 +467,15 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
         match event {
             RedrawRequested(..) => {
                 let frame_start_time = (instant::now() - start_time) / 1000.0;
-                let delta_t = frame_start_time - last_frame_time;
+                // Protect against the "spiral of death":
+                // if a frame takes long, we must not try to simulate an unbounded amount of time
+                // in the next frame, or we can get stuck in permanent slow-mo.
+                let mut delta_t = frame_start_time - last_frame_time;
+                if delta_t.is_nan() || delta_t.is_infinite() {
+                    delta_t = 0.0;
+                }
+                // Cap the wall-clock delta used for stepping.
+                delta_t = delta_t.min(0.25);
                 last_frame_time = frame_start_time;
                 platform.update_time(frame_start_time);
 
@@ -496,12 +504,24 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 if !evolution_app.simulation_paused
                     && evolution_app.simulation_steps_per_second > 0
                 {
+                    const MAX_SIM_STEPS_PER_FRAME: i32 = 16;
+                    const MAX_ACCUMULATED_SECONDS: f64 = 0.5;
                     let steps_per_this_frame = ((delta_t + collected_delta)
                         * evolution_app.simulation_steps_per_second as f64)
                         .floor();
                     let one_tick_delta = 1.0 / evolution_app.simulation_steps_per_second as f64;
-                    collected_delta += delta_t - steps_per_this_frame * one_tick_delta;
-                    sim_steps += steps_per_this_frame as i32;
+                    // Clamp the number of steps we actually execute this frame.
+                    let desired_steps = steps_per_this_frame as i32;
+                    let executed_steps = desired_steps.clamp(0, MAX_SIM_STEPS_PER_FRAME);
+                    // We only "pay back" time that we actually simulated.
+                    collected_delta += delta_t - (executed_steps as f64) * one_tick_delta;
+                    // Don't let the backlog grow without bound; if we can't keep up, we drop time.
+                    if collected_delta > MAX_ACCUMULATED_SECONDS {
+                        collected_delta = MAX_ACCUMULATED_SECONDS;
+                    } else if collected_delta < -MAX_ACCUMULATED_SECONDS {
+                        collected_delta = -MAX_ACCUMULATED_SECONDS;
+                    }
+                    sim_steps += executed_steps;
                 } else {
                     // While paused (or with zero speed) we don't want to accumulate
                     // fractional time towards future automatic steps.
