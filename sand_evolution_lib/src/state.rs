@@ -1487,10 +1487,8 @@ impl State {
         }
 
         let mut dropping = false;
-        if sim_steps > 10 {
-            sim_steps = 1;
-            dropping = true;
-        }
+        // Remove the artificial step limit - it was causing slowdown when steps_per_second is high
+        // The MAX_SIM_STEPS_PER_FRAME limit in lib.rs is sufficient to prevent spiral of death
 
         if sim_steps > 0 {
             update::update_tick(

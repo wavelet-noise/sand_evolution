@@ -456,7 +456,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
     let event_loop_proxy = event_loop.create_proxy();
 
     let start_time = instant::now();
-    let mut last_frame_time = start_time;
+    let mut last_frame_time = 0.0;
     let event_loop_shared_state = shared_state_rc.clone();
     let upd_result = UpdateResult::default();
     event_loop.run(move |event, _, control_flow| {
@@ -472,7 +472,7 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 if delta_t.is_nan() || delta_t.is_infinite() {
                     delta_t = 0.0;
                 }
-                // Cap the wall-clock delta used for stepping.
+                // Cap the wall-clock delta used for stepping to prevent spiral of death.
                 delta_t = delta_t.min(0.25);
                 last_frame_time = frame_start_time;
                 platform.update_time(frame_start_time);
@@ -501,11 +501,10 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 let mut sim_steps: i32 = if !evolution_app.simulation_paused
                     && evolution_app.simulation_steps_per_second > 0
                 {
-                    const MAX_SIM_STEPS_PER_FRAME: i32 = 16;
-                    // Steps are based only on the current frame's delta (stable FPS > strict real-time).
+                    // Steps are based on the current frame's delta time
                     let desired_steps = (delta_t * evolution_app.simulation_steps_per_second as f64)
                         .floor() as i32;
-                    desired_steps.clamp(0, MAX_SIM_STEPS_PER_FRAME)
+                    desired_steps.max(0)
                 } else {
                     // While paused (or with zero speed) don't run automatic simulation steps.
                     0
