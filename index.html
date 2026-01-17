@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sand Evolution v0.2</title>
+</head>
+
+<body id="wasm-example">
+    <script type="module">
+        import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
+
+        async function blobToArrayBuffer(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(new Uint8Array(reader.result));
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(blob);
+            });
+        }
+
+        async function gameloop() {
+            console.log("initialization");
+            await init();
+            console.log("done");
+
+            var body = document.body,
+            html = document.documentElement;
+
+            const vh = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            const vw = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
+
+            console.log("x = " + vw + ", y = " + vh);
+
+            var saveString = new URLSearchParams(location.search).get("save") || "";
+            saveString = decodeURIComponent(saveString);
+            saveString = saveString.replace(/^"|"$/g, '');
+
+            console.log(saveString);
+
+            var scriptFile = new URLSearchParams(location.search).get("script_file") || "";
+            scriptFile = decodeURIComponent(scriptFile);
+            scriptFile = scriptFile.replace(/^"|"$/g, '');
+        
+            console.log(scriptFile);
+
+            let uint8Array = new Uint8Array(0);
+            var scriptContent = "";
+        
+            if (saveString !== "") {
+                const response = await fetch(saveString);
+                console.log(response);
+                const blob = await response.blob();
+        
+                uint8Array = await blobToArrayBuffer(blob);
+            }
+        
+            if (scriptFile !== "") {
+                const response = await fetch(scriptFile);
+                console.log(response);
+                scriptContent = await response.text();
+                console.log(scriptContent);
+            }
+        
+            run(vw, vh, uint8Array, scriptContent);
+        }
+
+        gameloop();
+    </script>
+    <style>
+        html, body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+    </style>
+</body>
+
+</html>
