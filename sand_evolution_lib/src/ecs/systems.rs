@@ -130,13 +130,21 @@ impl EntityScriptSystem {
             }
         }
 
-        // Then execute all compiled scripts (respect one-shot mode)
+        // Then execute all compiled scripts
+        // Scripts with run_once=false execute every frame
+        // Scripts with run_once=true execute only once
         let mut entities_to_run: Vec<specs::Entity> = Vec::new();
         {
             let scripts_read: &WriteStorage<Script> = scripts;
             for (entity, script) in (entities, scripts_read).join() {
                 let runnable = script.ast.is_some();
-                let should_run = !script.run_once || !script.has_run;
+                // For run_once=false scripts, always run (execute every frame)
+                // For run_once=true scripts, only run if not yet executed
+                let should_run = if script.run_once {
+                    !script.has_run
+                } else {
+                    true // Always run scripts that are not one-shot
+                };
                 if runnable && should_run {
                     entities_to_run.push(entity);
                 }
