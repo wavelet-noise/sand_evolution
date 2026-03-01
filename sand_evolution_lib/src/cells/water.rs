@@ -102,6 +102,9 @@ impl CellTrait for Water {
         [26, 38, 255]
     }
 
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "water"
     }

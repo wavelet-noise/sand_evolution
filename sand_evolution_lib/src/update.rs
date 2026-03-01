@@ -191,28 +191,7 @@ pub fn update_tick(
                 let cur = cs::xy_to_index(i, j);
                 let cur_v = *state.diffuse_rgba.get(cur).unwrap();
 
-                // Pass temp_context for cells with temperature interactions:
-                // water (2), steam (3), fire (4), wood (5), burning wood (6), burning coal (7), coal (8),
-                // acid (9), gas (10), burning gas (11), diluted acid (12), liquid gas (17),
-                // powder (50), burning powder (51), ice (55), crushed ice (56), snow (57)
-                // For other cells pass None for optimization
-                let needs_temp = cur_v == 2
-                    || cur_v == 3
-                    || cur_v == 4
-                    || cur_v == 5
-                    || cur_v == 6
-                    || cur_v == 7
-                    || cur_v == 8
-                    || cur_v == 9
-                    || cur_v == 10
-                    || cur_v == 11
-                    || cur_v == 12
-                    || cur_v == 17
-                    || cur_v == 50
-                    || cur_v == 51
-                    || cur_v == 55
-                    || cur_v == 56
-                    || cur_v == 57;
+                let needs_temp = state.pal_container.pal[cur_v as usize].needs_temp();
 
                 state.pal_container.pal[cur_v as usize].update(
                     i,

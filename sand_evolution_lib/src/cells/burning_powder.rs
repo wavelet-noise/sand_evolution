@@ -152,6 +152,9 @@ impl CellTrait for BurningPowder {
     fn proton_transfer(&self) -> CellType {
         BurningGas::id()
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "burning powder"
     }

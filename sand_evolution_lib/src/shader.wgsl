@@ -957,9 +957,12 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     {
       col = vec4<f32>(0.8,0.8,0.8,1.0);
     }
-    else if t == 14u // base
+    else if t == 14u // base (alkali)
     {
-      col = vec4<f32>(1.0,0.2,0.2,1.0);
+      let n = clamp((noise_pixel + 1.0) * 0.5, 0.0, 1.0);
+      let base_col = vec3<f32>(0.75, 0.08, 0.18);
+      let rgb = base_col * (0.85 + 0.25 * n);
+      col = vec4<f32>(rgb, 1.0);
     }
     else if t == 84u // salty water
     {
@@ -989,6 +992,30 @@ col = vec4<f32>(rgb * intensity + spark_rgb, 1.0);
     else if t == 80u // black hole
     {
       col = vec4<f32>(0.35, 0.0, 0.35, 1.0);
+    }
+    else if t == 86u // molten salt
+    {
+      let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
+      let n_slow = clamp(tdnoise * 0.5 + 0.5, 0.0, 1.0);
+      let flicker = 0.85 + 0.30 * n_fast;
+
+      let core   = vec3<f32>(4.0, 2.2, 0.5);
+      let cooler  = vec3<f32>(2.0, 0.8, 0.15);
+      let surface = mix(cooler, core, n_slow * 0.6 + 0.4);
+      let rgb = surface * flicker + vec3<f32>(0.3, 0.12, 0.0) * noise_pixel;
+      col = vec4<f32>(rgb, 1.0);
+    }
+    else if t == 87u // molten base
+    {
+      let n_fast = clamp(tdnoise_fast * 0.5 + 0.5, 0.0, 1.0);
+      let n_slow = clamp(tdnoise * 0.5 + 0.5, 0.0, 1.0);
+      let flicker = 0.80 + 0.35 * n_fast;
+
+      let core   = vec3<f32>(3.5, 0.6, 2.8);
+      let cooler  = vec3<f32>(1.8, 0.15, 1.0);
+      let surface = mix(cooler, core, n_slow * 0.5 + 0.5);
+      let rgb = surface * flicker + vec3<f32>(0.15, 0.0, 0.10) * noise_pixel;
+      col = vec4<f32>(rgb, 1.0);
     }
     else if t == 20u // copper
     {

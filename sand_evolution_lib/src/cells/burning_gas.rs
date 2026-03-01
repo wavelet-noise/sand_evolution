@@ -80,6 +80,9 @@ impl CellTrait for BurningGas {
     fn casts_shadow(&self) -> bool {
         false
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "burning gas"
     }

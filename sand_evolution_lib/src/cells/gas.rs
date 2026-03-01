@@ -58,6 +58,9 @@ impl CellTrait for Gas {
     fn heatable(&self) -> CellType {
         Void::id()
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "gas"
     }

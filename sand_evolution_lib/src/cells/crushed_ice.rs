@@ -119,6 +119,9 @@ impl CellTrait for CrushedIce {
     fn heat_proof(&self) -> u8 {
         200
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "crushed ice"
     }
