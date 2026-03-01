@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../sand_evolution_maps"
+		}
+	],
+	"settings": {
+		"rust-analyzer.linkedProjects": [
+			"./sand_evolution_lib/Cargo.toml",
+			"./sand_evolution_lib/Cargo.toml"
+		]
+	}
+}
