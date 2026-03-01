@@ -9,7 +9,9 @@
 </head>
 
 <body id="wasm-example">
-    <div id="loading-overlay">Loading |</div>
+    <div id="loading-overlay">
+        <span>Loading </span><span id="loading-frame">|</span>
+    </div>
     <script type="module">
         import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
 
@@ -30,15 +32,15 @@
         }
 
         function startLoadingAnimation() {
-            const loadingOverlay = document.getElementById("loading-overlay");
-            if (!loadingOverlay) {
+            const loadingFrame = document.getElementById("loading-frame");
+            if (!loadingFrame) {
                 return () => {};
             }
 
             const frames = ["|", "/", "-", "\\"];
             let index = 0;
             const intervalId = setInterval(() => {
-                loadingOverlay.textContent = `Loading ${frames[index]}`;
+                loadingFrame.textContent = frames[index];
                 index = (index + 1) % frames.length;
             }, 150);
 
@@ -119,9 +121,15 @@
             justify-content: center;
             color: white;
             background-color: black;
-            font-family: Arial, sans-serif;
+            font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
             font-size: 24px;
             z-index: 9999;
+        }
+
+        #loading-frame {
+            display: inline-block;
+            width: 1ch;
+            text-align: center;
         }
     </style>
 </body>
