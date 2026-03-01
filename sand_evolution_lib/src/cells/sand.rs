@@ -1,4 +1,5 @@
 use crate::cells::base_water::BaseWater;
+use crate::cells::molten_base::MoltenBase;
 use crate::cells::salt::Salt;
 use crate::cs::PointType;
 
@@ -73,8 +74,21 @@ impl CellTrait for Base {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         prng: &mut Prng,
-        _: Option<&mut TemperatureContext>,
+        temp_context: Option<&mut TemperatureContext>,
     ) {
+        if let Some(temp_ctx) = temp_context {
+            let temperature = temp_ctx.get_temp(i, j);
+            const MELT_POINT: f32 = 400.0;
+            if temperature > MELT_POINT && prng.next() > 128 {
+                let over = (temperature - MELT_POINT) / 150.0;
+                let chance = (over * 50.0).clamp(0.0, 255.0) as u8;
+                if prng.next() < chance {
+                    container[cur] = MoltenBase::id();
+                    temp_ctx.add_temp(i, j, -(temperature - MELT_POINT) * 0.5);
+                    return;
+                }
+            }
+        }
         sand_falling_helper(self.den(), i, j, container, pal_container, cur, prng);
     }
     fn den(&self) -> i8 {
@@ -86,14 +100,23 @@ impl CellTrait for Base {
     fn dissolve(&self) -> CellType {
         BaseWater::id()
     }
+    fn heatable(&self) -> CellType {
+        MoltenBase::id()
+    }
+    fn heat_proof(&self) -> u8 {
+        180
+    }
     fn thermal_conductivity(&self) -> f32 {
         0.6
     }
     fn display_color(&self) -> [u8; 3] {
-        [255, 51, 51]
+        [190, 20, 45]
     }
     fn id(&self) -> CellType {
         14
+    }
+    fn needs_temp(&self) -> bool {
+        true
     }
     fn name(&self) -> &str {
         "base"

@@ -77,6 +77,9 @@ impl CellTrait for Acid {
         3
     }
 
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "acid"
     }

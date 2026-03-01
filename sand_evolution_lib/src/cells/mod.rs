@@ -31,6 +31,8 @@ pub mod water;
 pub mod wood;
 
 mod laser;
+pub mod molten_base;
+pub mod molten_salt;
 
 mod dry_grass;
 mod plasma;
@@ -39,6 +41,8 @@ use crate::cells::dry_grass::DryGrass;
 use crate::cells::electricity::Electricity;
 use crate::cells::grass::Grass;
 use crate::cells::laser::Laser;
+use crate::cells::molten_base::MoltenBase;
+use crate::cells::molten_salt::MoltenSalt;
 use crate::cells::plasma::Plasma;
 use crate::cs::{self, PointType};
 use base_water::BaseWater;
@@ -231,6 +235,9 @@ pub trait CellTrait {
     fn convection_factor(&self) -> f32 {
         0.0
     }
+    fn needs_temp(&self) -> bool {
+        false
+    }
     fn display_color(&self) -> [u8; 3] {
         [200, 200, 200]
     }
@@ -279,6 +286,8 @@ pub fn setup_palette(cell_registry: &mut CellRegistry) {
     cell_registry.pal[83] = DeluteAcid::boxed();
     cell_registry.pal[84] = SaltyWater::boxed();
     cell_registry.pal[85] = BaseWater::boxed();
+    cell_registry.pal[86] = MoltenSalt::boxed();
+    cell_registry.pal[87] = MoltenBase::boxed();
     cell_registry.pal[255] = stone::Stone::boxed();
 
     let mut index = 0;

@@ -55,6 +55,9 @@ impl CellTrait for LiquidGas {
         Gas::id()
     }
 
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "liquid_gas"
     }

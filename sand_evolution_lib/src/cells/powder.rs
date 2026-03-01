@@ -60,6 +60,9 @@ impl CellTrait for Powder {
     fn ignition_temperature(&self) -> Option<f32> {
         Some(300.0)
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "powder"
     }

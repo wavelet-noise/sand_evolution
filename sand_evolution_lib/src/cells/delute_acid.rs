@@ -1,4 +1,6 @@
+use crate::cells::acid::Acid;
 use crate::cells::helper::fluid_falling_helper;
+use crate::cells::steam::Steam;
 use crate::cells::void::Void;
 use crate::cells::water::Water;
 use crate::cells::{CellRegistry, CellTrait, CellType, Prng, TemperatureContext};
@@ -28,8 +30,29 @@ impl CellTrait for DeluteAcid {
         container: &mut [CellType],
         pal_container: &CellRegistry,
         dim: &mut Prng,
-        temp_context: Option<&mut TemperatureContext>,
+        mut temp_context: Option<&mut TemperatureContext>,
     ) {
+        if let Some(ref mut temp_ctx) = temp_context {
+            let temperature = temp_ctx.get_temp(i, j);
+
+            if temperature >= 100.0 {
+                if dim.next() < 100 {
+                    if dim.next() < 128 {
+                        container[cur] = Steam::id();
+                    } else {
+                        container[cur] = Acid::id();
+                    }
+                    const EVAP_COOLING: f32 = 45.0;
+                    temp_ctx.add_temp(i, j, -EVAP_COOLING);
+                    temp_ctx.add_temp(i, j + 1, -EVAP_COOLING * 0.5);
+                    temp_ctx.add_temp(i, j - 1, -EVAP_COOLING * 0.5);
+                    temp_ctx.add_temp(i + 1, j, -EVAP_COOLING * 0.5);
+                    temp_ctx.add_temp(i - 1, j, -EVAP_COOLING * 0.5);
+                    return;
+                }
+            }
+        }
+
         if !fluid_falling_helper(self.den(), i, j, container, pal_container, cur, dim, 1) {
             let top = cs::xy_to_index(i, j + 1);
             let down = cs::xy_to_index(i, j - 1);
@@ -47,13 +70,12 @@ impl CellTrait for DeluteAcid {
                 if cc_pt != Void::id() {
                     container[cc] = Void::id();
                     container[cur] = cc_pt;
-                    // Diluted acid increases temperature less when dissolving
-                    if let Some(temp_ctx) = temp_context {
-                        temp_ctx.add_temp(i, j + 1, 10.0); // top
-                        temp_ctx.add_temp(i, j - 1, 10.0); // bottom
-                        temp_ctx.add_temp(i + 1, j, 10.0); // right
-                        temp_ctx.add_temp(i - 1, j, 10.0); // left
-                        temp_ctx.add_temp(i, j, 5.0); // cell itself
+                    if let Some(ref mut temp_ctx) = temp_context {
+                        temp_ctx.add_temp(i, j + 1, 10.0);
+                        temp_ctx.add_temp(i, j - 1, 10.0);
+                        temp_ctx.add_temp(i + 1, j, 10.0);
+                        temp_ctx.add_temp(i - 1, j, 10.0);
+                        temp_ctx.add_temp(i, j, 5.0);
                     }
                     return;
                 }
@@ -72,13 +94,12 @@ impl CellTrait for DeluteAcid {
                     } else {
                         container[cur] = Void::id();
                     }
-                    // Diluted acid increases temperature less during proton transfer
-                    if let Some(temp_ctx) = temp_context {
-                        temp_ctx.add_temp(i, j + 1, 8.0); // top
-                        temp_ctx.add_temp(i, j - 1, 8.0); // bottom
-                        temp_ctx.add_temp(i + 1, j, 8.0); // right
-                        temp_ctx.add_temp(i - 1, j, 8.0); // left
-                        temp_ctx.add_temp(i, j, 4.0); // cell itself
+                    if let Some(ref mut temp_ctx) = temp_context {
+                        temp_ctx.add_temp(i, j + 1, 8.0);
+                        temp_ctx.add_temp(i, j - 1, 8.0);
+                        temp_ctx.add_temp(i + 1, j, 8.0);
+                        temp_ctx.add_temp(i - 1, j, 8.0);
+                        temp_ctx.add_temp(i, j, 4.0);
                     }
                     return;
                 }
@@ -90,6 +111,9 @@ impl CellTrait for DeluteAcid {
         2
     }
 
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "delute acid"
     }

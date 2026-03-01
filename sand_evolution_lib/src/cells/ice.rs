@@ -60,6 +60,9 @@ impl CellTrait for Ice {
     fn heat_proof(&self) -> u8 {
         240
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "ice"
     }

@@ -139,6 +139,9 @@ impl CellTrait for Cell {
         false
     }
 
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "fire"
     }

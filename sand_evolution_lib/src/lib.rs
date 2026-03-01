@@ -685,8 +685,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 winit::event::WindowEvent::Resized(size) => {
                     // Resize with 0 width and height is used by winit to signal a minimize event on Windows.
                     // See: https://github.com/rust-windowing/winit/issues/208
-                    // This solves an issue where the app would panic when minimizing on Windows.
-                    if size.width > 0 && size.height > 0 {
+                    // On macOS winit sometimes sends u32::MAX on window state changes; 4K limit filters those.
+                    const MAX_WIDTH: u32 = 3840;
+                    const MAX_HEIGHT: u32 = 2160;
+                    if size.width > 0
+                        && size.height > 0
+                        && size.width <= MAX_WIDTH
+                        && size.height <= MAX_HEIGHT
+                    {
                         surface_config.width = size.width;
                         surface_config.height = size.height;
                         surface.configure(&device, &surface_config);

@@ -74,6 +74,9 @@ impl CellTrait for Snow {
     fn heatable(&self) -> CellType {
         Water::id()
     }
+    fn needs_temp(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "snow"
     }

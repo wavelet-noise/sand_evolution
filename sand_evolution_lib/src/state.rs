@@ -6,7 +6,7 @@ use winit::dpi::{LogicalPosition, PhysicalSize};
 
 use crate::shared_state::SharedState;
 use crate::{
-    cells::{stone::Stone, void::Void, wood::Wood, CellRegistry, Prng},
+    cells::{molten_base::MoltenBase, molten_salt::MoltenSalt, stone::Stone, void::Void, wood::Wood, CellRegistry, Prng},
     cs::{self, PointType},
     evolution_app::EvolutionApp,
     gbuffer::GBuffer,
@@ -248,7 +248,8 @@ impl State {
 
         for _ in 0..3 {
             for cell in self.pal_container.pal.iter() {
-                if cell.id() != 0 {
+                let id = cell.id();
+                if id != 0 && id != MoltenSalt::id() && id != MoltenBase::id() {
                     _ = getrandom::getrandom(&mut buf);
 
                     let nx = (((buf[0] as u32) << 8) | buf[1] as u32) % cs::SECTOR_SIZE.x as u32;
