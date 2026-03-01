@@ -9,6 +9,7 @@
 </head>
 
 <body id="wasm-example">
+    <div id="loading-overlay">Loading |</div>
     <script type="module">
         import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
 
@@ -20,6 +21,31 @@
                 reader.readAsArrayBuffer(blob);
             });
         }
+
+        function hideLoadingOverlay() {
+            const loadingOverlay = document.getElementById("loading-overlay");
+            if (loadingOverlay) {
+                loadingOverlay.style.display = "none";
+            }
+        }
+
+        function startLoadingAnimation() {
+            const loadingOverlay = document.getElementById("loading-overlay");
+            if (!loadingOverlay) {
+                return () => {};
+            }
+
+            const frames = ["|", "/", "-", "\\"];
+            let index = 0;
+            const intervalId = setInterval(() => {
+                loadingOverlay.textContent = `Loading ${frames[index]}`;
+                index = (index + 1) % frames.length;
+            }, 150);
+
+            return () => clearInterval(intervalId);
+        }
+
+        const stopLoadingAnimation = startLoadingAnimation();
 
         async function gameloop() {
             console.log("initialization");
@@ -64,16 +90,38 @@
                 console.log(scriptContent);
             }
         
+            stopLoadingAnimation();
+            hideLoadingOverlay();
             run(vw, vh, uint8Array, scriptContent);
         }
 
-        gameloop();
+        gameloop().catch((error) => {
+            console.error("Failed to start WASM app:", error);
+            stopLoadingAnimation();
+            const loadingOverlay = document.getElementById("loading-overlay");
+            if (loadingOverlay) {
+                loadingOverlay.textContent = "Failed to load app";
+            }
+        });
     </script>
     <style>
         html, body {
             margin: 0;
             overflow: hidden;
             background-color: black;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            background-color: black;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            z-index: 9999;
         }
     </style>
 </body>
