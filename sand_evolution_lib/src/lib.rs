@@ -499,13 +499,14 @@ pub async fn run(w: f32, h: f32, data: &[u8], script: String) {
                 // Calculate how many simulation steps to run this frame.
                 // When paused, automatic stepping is disabled, but manual step buttons
                 // in the UI can still queue discrete steps.
+                const MAX_SIM_STEPS_PER_FRAME: i32 = 1;
                 let mut sim_steps: i32 = if !evolution_app.simulation_paused
                     && evolution_app.simulation_steps_per_second > 0
                 {
                     // Steps are based on the current frame's delta time
                     let desired_steps = (delta_t * evolution_app.simulation_steps_per_second as f64)
                         .floor() as i32;
-                    desired_steps.max(0)
+                    desired_steps.max(0).min(MAX_SIM_STEPS_PER_FRAME)
                 } else {
                     // While paused (or with zero speed) don't run automatic simulation steps.
                     0
