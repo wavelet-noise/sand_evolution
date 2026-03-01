@@ -108,14 +108,16 @@ pub fn update_tick(
                 }
             }
 
-            // Execute ECS systems on each simulation tick
-            // This includes EntityScriptSystem, which executes object scripts
+            // Execute script system once per rendered frame (on the first sim tick),
+            // while physics systems continue to run on every simulation tick.
             // Call systems after releasing the borrow of rhai_resource
             {
                 use specs::WorldExt;
-                let mut script_system = EntityScriptSystem;
-                script_system.run_now(world);
-                world.maintain();
+                if _sim_update == 0 {
+                    let mut script_system = EntityScriptSystem;
+                    script_system.run_now(world);
+                    world.maintain();
+                }
 
                 let mut gravity_system = GravitySystem;
                 gravity_system.run_now(world);
