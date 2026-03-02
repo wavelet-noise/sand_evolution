@@ -10,7 +10,7 @@
 
 <body id="wasm-example">
     <div id="loading-overlay">
-        <span>Loading </span><span id="loading-frame">|</span>
+        <span>Loading </span><span id="loading-frame">⠹</span>
     </div>
     <script type="module">
         import init, { run } from "./sand_evolution_lib/pkg/sand_evolution_lib.js";
@@ -37,7 +37,7 @@
                 return () => {};
             }
 
-            const frames = ["|", "/", "-", "\\"];
+            const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
             let index = 0;
             const intervalId = setInterval(() => {
                 loadingFrame.textContent = frames[index];
